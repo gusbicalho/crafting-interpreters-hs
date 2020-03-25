@@ -1,0 +1,9 @@
+{
+  "hic.executablePath": "./run-ghcide",
+  "editor.detectIndentation": false,
+  "editor.autoIndent": "keep",
+  "editor.tabSize": 2,
+  "haskell.indentationRules.enabled": false,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true
+}

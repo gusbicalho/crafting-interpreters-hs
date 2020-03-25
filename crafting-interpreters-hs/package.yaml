@@ -1,0 +1,48 @@
+name:                crafting-interpreters-hs
+version:             0.1.0.0
+github:              "gusbicalho/crafting-interpreters-hs"
+author:              "Gustavo Bicalho"
+maintainer:          "gusbicalho@gmail.com"
+copyright:           "2020 Gustavo Bicalho"
+
+description:         Please see the README on GitHub at <https://github.com/gusbicalho/crafting-interpreters-hs#readme>
+
+defaults:
+  local: ../defaults.yaml
+
+dependencies:
+- base >= 4.7 && < 5
+- fused-effects
+- megaparsec
+- optparse-applicative
+- text
+
+library:
+  source-dirs: src
+
+executables:
+  crafting-interpreters-hs-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -O2
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - crafting-interpreters-hs
+
+tests:
+  crafting-interpreters-hs-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - crafting-interpreters-hs
+    - base
+    - hspec
+    - QuickCheck
+    - text

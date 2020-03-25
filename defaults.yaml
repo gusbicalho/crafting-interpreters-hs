@@ -1,0 +1,46 @@
+ghc-options:
+- -Wall
+- -Wcompat
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wredundant-constraints
+- -foptimal-applicative-do
+
+default-extensions:
+- ApplicativeDo
+- BangPatterns
+- ConstraintKinds
+- DataKinds
+- DefaultSignatures
+- DeriveAnyClass
+- DeriveFoldable
+- DeriveFunctor
+- DeriveGeneric
+- DeriveLift
+- DeriveTraversable
+- DerivingStrategies
+- EmptyCase
+- ExistentialQuantification
+- FlexibleContexts
+- FlexibleInstances
+- FunctionalDependencies
+- GADTs
+- GeneralizedNewtypeDeriving
+- InstanceSigs
+- KindSignatures
+- LambdaCase
+- MultiParamTypeClasses
+- MultiWayIf
+- NamedFieldPuns
+- OverloadedLabels
+- OverloadedStrings
+- PatternSynonyms
+- RankNTypes
+- ScopedTypeVariables
+- StandaloneDeriving
+- TupleSections
+- TypeApplications
+- TypeFamilies
+- TypeFamilyDependencies
+- TypeOperators
+- ViewPatterns
