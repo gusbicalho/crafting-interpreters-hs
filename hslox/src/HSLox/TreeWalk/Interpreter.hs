@@ -7,21 +7,8 @@ import Control.Carrier.State.Church
 import Control.Effect.Trace
 import Data.Foldable
 import qualified Data.Text as T
+import HSLox.TreeWalk.Error (Error)
 import qualified HSLox.TreeWalk.Scanner as Scanner
-
-data Error
-  = Error
-  { errorLine :: Int
-  , errorWhere :: T.Text
-  , errorMessage :: T.Text
-  }
-  deriving (Eq, Show)
-
-hadError :: _ => m Bool
-hadError = gets @[Error] (not . null)
-
-reportError :: _ => Error -> m ()
-reportError error = modify (error :)
 
 interpret :: Has Trace sig m
           => T.Text -> m [Error]
@@ -29,6 +16,7 @@ interpret source
   = fmap reverse
   . execState @[Error] []
   $ do
-    for_ (Scanner.scanTokens source) $ \token ->
+    tokens <- Scanner.scanTokens source
+    for_ tokens $ \token ->
       trace $ show token
     pure ()

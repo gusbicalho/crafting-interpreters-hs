@@ -9,6 +9,7 @@ import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
 import Control.Monad (forever, void, when)
 import HSLox.CmdLine.ReadLine
+import HSLox.TreeWalk.Error (Error)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import Data.Foldable
 import Data.Function
@@ -69,5 +70,5 @@ runRepl = void . runEmpty . forever $ do
   errors <- Interpreter.interpret line
   reportErrors errors
 
-reportErrors :: _ => [Interpreter.Error] -> m ()
+reportErrors :: _ => [Error] -> m ()
 reportErrors errors = for_ errors (trace . show)
