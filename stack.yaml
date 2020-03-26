@@ -11,6 +11,8 @@ packages:
 
 extra-deps:
 # >>> fused-effects
+- git: git@github.com:fused-effects/fused-effects.git
+  commit: 40cf33031576f179c9e4ba3f9e8a33ba642fcc91
 - fused-effects-exceptions-1.0.0.0@sha256:ee32e6e6a40ce2272603b93036e05945d79f68200b1f09624db39262724b0f98,1731
 # >>> ghcide
 - haskell-lsp-0.19.0.0@sha256:03a1a05fbdea9376cb1edec358866dc5781925badc3f4b5029ccf4174e765efd,5271

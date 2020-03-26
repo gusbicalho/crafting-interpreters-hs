@@ -8,27 +8,27 @@ module HSLox.CmdLine.ReadLine
   ) where
 
 import Control.Algebra
-import Control.Monad.IO.Class
+import Control.Carrier.Lift
 import Data.Text
-import GHC.Generics (Generic1)
+import Data.Kind
 import System.IO (hGetLine, hFlush, hPutStr, stdin, stdout)
 
-data ReadLine m k
-  = ReadLine (Text -> m k)
-  deriving (Functor, Generic1, HFunctor, Effect)
+data ReadLine (m :: Type -> Type) k where
+  ReadLine :: ReadLine m Text
 
 readLine :: (Has ReadLine sig m) => m Text
-readLine = send $ ReadLine pure
+readLine = send $ ReadLine
 
 newtype ReadLineC m a = ReadLineC {
   runReadLine :: m a
   } deriving newtype (Functor, Applicative, Monad)
 
-instance ( MonadIO m, Algebra sig m
+instance ( Has (Lift IO) sig m
          ) => Algebra (ReadLine :+: sig) (ReadLineC m) where
-  alg (L (ReadLine k)) = k =<< ReadLineC do
-    liftIO $ do
-      hPutStr stdout "> "
-      hFlush stdout
-      pack <$> hGetLine stdin
-  alg (R other) = ReadLineC (alg (handleCoercible other))
+  alg hdl sig ctx = case sig of
+    L ReadLine -> fmap (<$ ctx) $
+      sendM @IO $ do
+        hPutStr stdout "> "
+        hFlush stdout
+        pack <$> hGetLine stdin
+    R other -> ReadLineC (alg (runReadLine . hdl) other ctx)
