@@ -1,6 +1,6 @@
 module Main where
 
-import qualified CraftingInterpreters
+import CraftingInterpreters.CmdLine (start)
 
 main :: IO ()
-main = CraftingInterpreters.start
+main = start

@@ -4,6 +4,7 @@ ghc-options:
 - -Wincomplete-record-updates
 - -Wincomplete-uni-patterns
 - -Wredundant-constraints
+- -Wno-name-shadowing
 - -foptimal-applicative-do
 
 default-extensions:
