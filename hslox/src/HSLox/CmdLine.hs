@@ -9,6 +9,7 @@ import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
 import Control.Monad (forever, void)
 import HSLox.CmdLine.ReadLine
+import HSLox.Interpreter (interpret)
 import Data.Function
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
@@ -60,7 +61,3 @@ runRepl = void . runEmpty . forever $ do
   line <- readLine
   guard (line /= ":e")
   interpret line
-
-interpret :: _ => T.Text -> m ()
-interpret source = do
-  trace $ T.unpack source
