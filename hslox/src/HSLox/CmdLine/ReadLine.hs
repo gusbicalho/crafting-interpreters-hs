@@ -9,8 +9,9 @@ module HSLox.CmdLine.ReadLine
 
 import Control.Algebra
 import Control.Carrier.Lift
-import Data.Text
+import Data.Coerce (coerce)
 import Data.Kind
+import Data.Text
 import System.IO (hGetLine, hFlush, hPutStr, stdin, stdout)
 
 data ReadLine (m :: Type -> Type) k where
@@ -31,4 +32,4 @@ instance ( Has (Lift IO) sig m
         hPutStr stdout "> "
         hFlush stdout
         pack <$> hGetLine stdin
-    R other -> ReadLineC (alg (runReadLine . hdl) other ctx)
+    R other -> ReadLineC (alg (coerce . hdl) other ctx)

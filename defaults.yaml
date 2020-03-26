@@ -33,6 +33,7 @@ default-extensions:
 - MultiParamTypeClasses
 - MultiWayIf
 - NamedFieldPuns
+- NoStarIsType
 - OverloadedLabels
 - OverloadedStrings
 - PatternSynonyms
