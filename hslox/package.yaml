@@ -12,6 +12,7 @@ defaults:
 
 dependencies:
 - base >= 4.7 && < 5
+- containers
 - fused-effects
 - megaparsec
 - optparse-applicative

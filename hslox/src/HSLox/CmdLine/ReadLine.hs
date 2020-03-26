@@ -24,8 +24,8 @@ newtype ReadLineC m a = ReadLineC {
   runReadLine :: m a
   } deriving newtype (Functor, Applicative, Monad)
 
-instance ( Has (Lift IO) sig m
-         ) => Algebra (ReadLine :+: sig) (ReadLineC m) where
+instance Has (Lift IO) sig m
+      => Algebra (ReadLine :+: sig) (ReadLineC m) where
   alg hdl sig ctx = case sig of
     L ReadLine -> fmap (<$ ctx) $
       sendM @IO $ do

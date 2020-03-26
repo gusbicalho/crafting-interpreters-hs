@@ -7,9 +7,10 @@ module HSLox.CmdLine
 import Control.Carrier.Empty.Maybe
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
-import Control.Monad (forever, void)
+import Control.Monad (forever, void, when)
 import HSLox.CmdLine.ReadLine
-import HSLox.Interpreter (interpret)
+import qualified HSLox.TreeWalk.Interpreter as Interpreter
+import Data.Foldable
 import Data.Function
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
@@ -51,7 +52,12 @@ runApp app =
       & runM @IO
 
 runSource :: _ => FilePath -> m ()
-runSource path = interpret =<< getSource path
+runSource path = do
+    source <- getSource path
+    errors <- Interpreter.interpret source
+    reportErrors errors
+    when (not . null $ errors) $ do
+      sendM @IO $ exitWith (ExitFailure 65)
   where
     getSource "-"  = sendM @IO $ T.IO.hGetContents stdin
     getSource path = sendM @IO $ T.IO.readFile path
@@ -60,4 +66,8 @@ runRepl :: _ => m ()
 runRepl = void . runEmpty . forever $ do
   line <- readLine
   guard (line /= ":e")
-  interpret line
+  errors <- Interpreter.interpret line
+  reportErrors errors
+
+reportErrors :: _ => [Interpreter.Error] -> m ()
+reportErrors errors = for_ errors (trace . show)
