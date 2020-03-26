@@ -6,7 +6,6 @@ module HSLox.CmdLine
 
 import Control.Carrier.Empty.Maybe
 import Control.Carrier.Lift
-import Control.Carrier.Reader
 import Control.Carrier.Trace.Printing
 import Control.Monad (forever, void)
 import HSLox.CmdLine.ReadLine
@@ -35,21 +34,18 @@ start = do
     Left errMsg -> do
       T.IO.hPutStrLn stderr errMsg
       exitWith (ExitFailure 64)
-    Right args@(Args maybePath) -> do
-      runApp args $
+    Right (Args maybePath) -> do
+      runApp $
         case maybePath of
           Just path -> runSource path
           Nothing -> runRepl
 
 runDefaultRepl :: IO ()
-runDefaultRepl = runApp args runRepl
-  where
-    args = Args Nothing
+runDefaultRepl = runApp runRepl
 
-runApp :: Args -> _ -> IO ()
-runApp args app =
+runApp :: _ -> IO ()
+runApp app =
   app & runReadLine
-      & runReader args
       & runTrace
       & runM @IO
 
@@ -67,6 +63,4 @@ runRepl = void . runEmpty . forever $ do
 
 interpret :: _ => T.Text -> m ()
 interpret source = do
-  args <- ask @Args
-  trace $ show args
   trace $ T.unpack source
