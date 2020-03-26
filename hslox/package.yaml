@@ -1,4 +1,4 @@
-name:                crafting-interpreters-hs
+name:                hslox
 version:             0.1.0.0
 github:              "gusbicalho/crafting-interpreters-hs"
 author:              "Gustavo Bicalho"
@@ -21,7 +21,7 @@ library:
   source-dirs: src
 
 executables:
-  crafting-interpreters-hs-exe:
+  hslox-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -30,10 +30,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - crafting-interpreters-hs
+    - hslox
 
 tests:
-  crafting-interpreters-hs-test:
+  hslox-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -41,7 +41,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - crafting-interpreters-hs
+    - hslox
     - base
     - hspec
     - QuickCheck

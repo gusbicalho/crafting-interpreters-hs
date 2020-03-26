@@ -1,6 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE UndecidableInstances #-}
-module CraftingInterpreters.CmdLine.ReadLine
+module HSLox.CmdLine.ReadLine
   ( ReadLine (..), readLine
   , ReadLineC, runReadLine
   -- * Re-exports
@@ -8,9 +8,10 @@ module CraftingInterpreters.CmdLine.ReadLine
   ) where
 
 import Control.Algebra
-import Control.Effect.Lift
+import Control.Monad.IO.Class
 import Data.Text
 import GHC.Generics (Generic1)
+import System.IO (hGetLine, hFlush, hPutStr, stdin, stdout)
 
 data ReadLine m k
   = ReadLine (Text -> m k)
@@ -23,10 +24,11 @@ newtype ReadLineC m a = ReadLineC {
   runReadLine :: m a
   } deriving newtype (Functor, Applicative, Monad)
 
-instance ( Has (Lift IO) sig m
+instance ( MonadIO m, Algebra sig m
          ) => Algebra (ReadLine :+: sig) (ReadLineC m) where
   alg (L (ReadLine k)) = k =<< ReadLineC do
-    sendM @IO $ do
-      putStr "> "
-      pack <$> getLine
+    liftIO $ do
+      hPutStr stdout "> "
+      hFlush stdout
+      pack <$> hGetLine stdin
   alg (R other) = ReadLineC (alg (handleCoercible other))

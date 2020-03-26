@@ -1,6 +1,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-module CraftingInterpreters.CmdLine
+module HSLox.CmdLine
   ( start, runDefaultRepl
   ) where
 
@@ -9,7 +9,7 @@ import Control.Carrier.Lift
 import Control.Carrier.Reader
 import Control.Carrier.Trace.Printing
 import Control.Monad (forever, void)
-import CraftingInterpreters.CmdLine.ReadLine
+import HSLox.CmdLine.ReadLine
 import Data.Function
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO

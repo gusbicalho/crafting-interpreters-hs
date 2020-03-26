@@ -1,6 +1,6 @@
 module Main where
 
-import CraftingInterpreters.CmdLine (start)
+import HSLox.CmdLine (start)
 
 main :: IO ()
 main = start
