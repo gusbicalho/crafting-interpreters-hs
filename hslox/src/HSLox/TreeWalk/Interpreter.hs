@@ -8,7 +8,7 @@ import Control.Effect.Trace
 import Data.Foldable
 import qualified Data.Text as T
 import HSLox.TreeWalk.Error (Error)
-import qualified HSLox.TreeWalk.Scanner as Scanner
+import qualified HSLox.Scanner.ByTheBook.Scanner as Scanner
 
 interpret :: Has Trace sig m
           => T.Text -> m [Error]

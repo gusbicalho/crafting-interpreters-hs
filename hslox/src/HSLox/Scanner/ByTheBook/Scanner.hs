@@ -1,5 +1,6 @@
-module HSLox.TreeWalk.Scanner where
+module HSLox.Scanner.ByTheBook.Scanner where
 
+import Prelude hiding (getLine)
 import Control.Carrier.Empty.Church
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
@@ -11,152 +12,86 @@ import qualified Data.Map as Map
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
+import HSLox.Scanner.ByTheBook.ScanState
+  ( ScanState
+  , initialScanState
+  , resetSegment
+  , getSegment
+  , getLine
+  , incLine
+  , advance
+  , peek
+  , peek2
+  , match
+  , isAtEnd
+  )
 import HSLox.TreeWalk.TokenType (TokenType)
 import qualified HSLox.TreeWalk.TokenType as TokenType
 import HSLox.TreeWalk.Token (Token (..))
 import qualified HSLox.TreeWalk.Token as Token
 import HSLox.TreeWalk.Error (Error (..))
 import qualified HSLox.TreeWalk.Error as Error
+import qualified HSLox.Util as Util
 
-scanTokens :: Has (State [Error]) sig m
-           => T.Text -> m (Seq Token)
-scanTokens source
+type ScanNext tk = forall sig m . Has Empty sig m
+                               => Has (State [Error]) sig m
+                               => Has (State ScanState) sig m
+                               => m tk
+
+type BuildEOF tk = forall sig m. Has (State ScanState) sig m
+                              => m tk
+
+scanTokens' ::
+  forall tk sig m. Has (State [Error]) sig m
+                => ScanNext tk
+                -> BuildEOF tk
+                -> T.Text
+                -> m (Seq tk)
+scanTokens' scanNextToken buildEOFToken source
     = evalState (initialScanState source)
-    . execWriter @(Seq Token)
+    . execWriter @(Seq tk)
     $ do
-      runEmptyToMaybe . forever $ do
+      Util.runEmptyToMaybe . forever $ do
         resetSegment
-        maybeToken <- runEmptyToMaybe scanNextToken
-        case maybeToken of
-          Nothing -> pure ()
-          Just token -> addToken token
+        maybeToken <- Util.runEmptyToMaybe scanNextToken
+        Util.whenJust maybeToken $ do
+          addToken
         guard =<< isAtEnd
-      endline <- gets scanStateLine
-      addToken $ Token "" TokenType.EOF Nothing endline
+      addToken =<< buildEOFToken
   where
     addToken token = tell $ Seq.singleton token
+
+scanTokens :: Has (State [Error]) sig m => T.Text -> m (Seq Token)
+scanTokens = scanTokens' scanNextToken buildEOFToken
 
 testScan :: T.Text -> ([Error], Seq Token)
 testScan = run
          . runState @[Error] (\s a -> pure (s,a)) []
-         . scanTokens
-
-data ScanState
-  = ScanState
-  { scanStateSource :: T.Text
-  , scanStateSegment :: T.Text
-  , scanStateStart :: Int
-  , scanStateCurrent :: Int
-  , scanStateLine :: Int
-  }
-
-initialScanState :: T.Text -> ScanState
-initialScanState source
-  = ScanState { scanStateSource = source
-              , scanStateSegment = T.empty
-              , scanStateStart = 0
-              , scanStateCurrent = 0
-              , scanStateLine = 1
-              }
-
-runEmptyToMaybe :: Applicative m => EmptyC m a -> m (Maybe a)
-runEmptyToMaybe = runEmpty (pure Nothing) (pure . Just)
-
-runEmptyToUnit :: Applicative m => EmptyC m a -> m ()
-runEmptyToUnit = runEmpty (pure ()) (const $ pure ())
-
-resetSegment :: Has (State ScanState) sig m
-             => m ()
-resetSegment = modify $ \s@(ScanState { scanStateCurrent }) ->
-  s { scanStateStart = scanStateCurrent
-    , scanStateSegment = T.empty
-    }
-
-incLine :: Has (State ScanState) sig m
-        => m ()
-incLine = modify $ \s@(ScanState { scanStateLine }) -> s { scanStateLine = succ scanStateLine }
-
-incCurrent :: Has (State ScanState) sig m
-        => m ()
-incCurrent = modify $ \s@(ScanState { scanStateCurrent }) -> s { scanStateCurrent = succ scanStateCurrent }
-
-isAtEnd :: Has (State ScanState) sig m
-        => m Bool
-isAtEnd = do
-  sourceRemaining <- gets scanStateSource
-  pure $ sourceRemaining /= T.empty
-
-advance :: Has Empty sig m
-        => Has (State ScanState) sig m
-        => m Char
-advance = do
-  state <- get
-  case T.uncons (scanStateSource state) of
-    Nothing -> empty
-    Just (c, source') -> do
-      incCurrent
-      put state { scanStateSource = source'
-                , scanStateSegment = T.snoc (scanStateSegment state) c
-                }
-      pure c
-
-peek :: Has Empty sig m
-     => Has (State ScanState) sig m
-     => m Char
-peek = do
-  state <- get
-  case T.uncons (scanStateSource state) of
-    Nothing -> empty
-    Just (c, _) -> pure c
-
-peek2 :: Has Empty sig m
-      => Has (State ScanState) sig m
-      => m (Char, Char)
-peek2 = do
-  state <- get
-  case T.uncons (scanStateSource state) of
-    Nothing -> empty
-    Just (c, source') ->
-      case T.uncons (source') of
-        Nothing -> empty
-        Just (c2, _) -> pure (c, c2)
-
-match :: Has (State ScanState) sig m
-      => Char -> m Bool
-match expected = do
-  state <- get
-  case T.uncons (scanStateSource state) of
-    Nothing -> pure False
-    Just (c, source')
-      | expected /= c -> pure False
-      | otherwise -> do
-        incCurrent
-        put state { scanStateSource = source'
-                  , scanStateSegment = T.snoc (scanStateSegment state) c
-                  }
-        pure True
+         . scanTokens' scanNextToken buildEOFToken
 
 makeToken :: Has (State ScanState) sig m
           => TokenType -> Maybe Token.LiteralValue -> m Token
 makeToken tkType tkLiteral = do
-  ScanState { scanStateSegment, scanStateLine } <- get
+  line <- getLine
+  segment <- getSegment
   pure Token { tokenType = tkType
              , tokenLiteral = tkLiteral
-             , tokenLexeme = scanStateSegment
-             , tokenLine = scanStateLine
+             , tokenLexeme = segment
+             , tokenLine = line
              }
 
 reportError :: Has (State ScanState) sig m
             => Has (State [Error]) sig m
             => T.Text -> m ()
 reportError msg = do
-  line <- gets scanStateLine
+  line <- getLine
   Error.reportError $ Error line "" msg
 
-scanNextToken :: Has Empty sig m
-              => Has (State [Error]) sig m
-              => Has (State ScanState) sig m
-              => m Token
+buildEOFToken :: BuildEOF Token
+buildEOFToken = do
+  Token "" TokenType.EOF Nothing <$> getLine
+
+scanNextToken :: ScanNext Token
 scanNextToken = do
   c <- advance
   case c of
@@ -193,25 +128,23 @@ scanNextToken = do
 
 lineComment :: Has (State ScanState) sig m
             => m ()
-lineComment
-  = runEmpty (pure ()) (const $ pure ())
-  . forever
-  $ do c <- peek
-       guard $ c /= '\n'
-       advance
+lineComment = Util.untilEmpty $ do
+  c <- peek
+  guard $ c /= '\n'
+  advance
 
 stringLit :: Has Empty sig m
           => Has (State [Error]) sig m
           => Has (State ScanState) sig m
           => m T.Text
 stringLit = do
-    runEmptyToUnit . forever $ do
+    Util.untilEmpty $ do
       c <- peek
       guard $ c /= '"'
       advance
     runEmpty unterminatedStringError pure $ do
       advance
-      seg <- gets scanStateSegment
+      seg <- getSegment
       pure . T.drop 1 . T.dropEnd 1 $ seg
   where
     unterminatedStringError = do
@@ -222,16 +155,16 @@ numberLit :: Has (State ScanState) sig m
           => m Double
 numberLit = do
     advanceWhileDigit
-    runEmptyToUnit $ do
+    Util.runEmptyToUnit $ do
       (dot, digit) <- peek2
       guard (dot == '.' && isDigit digit)
       advance
       advanceWhileDigit
-    seg <- gets scanStateSegment
+    seg <- getSegment
     pure (read (T.unpack seg) :: Double)
   where
     advanceWhileDigit :: forall sig m. Has (State ScanState) sig m => m ()
-    advanceWhileDigit = runEmptyToUnit . forever $ do
+    advanceWhileDigit = Util.untilEmpty $ do
       c <- peek
       guard $ isDigit c
       advance
@@ -262,15 +195,14 @@ lexemeToKeywordType =
                , ("while",  TokenType.WHILE)
                ]
 
-
 makeIdentifierToken :: Has (State ScanState) sig m
                     => m Token
 makeIdentifierToken = do
-  runEmptyToUnit . forever $ do
+  Util.untilEmpty $ do
     c <- peek
     guard $ isIdentifierPart c
     advance
-  seg <- gets scanStateSegment
+  seg <- getSegment
   case Map.lookup seg lexemeToKeywordType of
     Nothing -> makeToken TokenType.IDENTIFIER Nothing
     Just tkType -> makeToken tkType Nothing
