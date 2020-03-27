@@ -4,8 +4,7 @@ import Control.Carrier.Empty.Church
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Control.Monad (forever)
-import Data.Function
-import Data.Functor
+import Data.Bool (bool)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
@@ -28,12 +27,16 @@ scanTokens source
         case maybeToken of
           Nothing -> pure ()
           Just token -> addToken token
-        sourceRemaining <- gets scanStateSource
-        guard (sourceRemaining /= T.empty)
+        guard =<< isAtEnd
       endline <- gets scanStateLine
       addToken $ Token "" TokenType.EOF Nothing endline
   where
     addToken token = tell $ Seq.singleton token
+
+testScan :: T.Text -> ([Error], Seq Token)
+testScan = run
+         . runState @[Error] (\s a -> pure (s,a)) []
+         . scanTokens
 
 data ScanState
   = ScanState
@@ -56,6 +59,9 @@ initialScanState source
 runEmptyToMaybe :: Applicative m => EmptyC m a -> m (Maybe a)
 runEmptyToMaybe = runEmpty (pure Nothing) (pure . Just)
 
+runEmptyToUnit :: Applicative m => EmptyC m a -> m ()
+runEmptyToUnit = runEmpty (pure ()) (const $ pure ())
+
 resetSegment :: Has (State ScanState) sig m
              => m ()
 resetSegment = modify $ \s@(ScanState { scanStateCurrent }) ->
@@ -71,6 +77,12 @@ incCurrent :: Has (State ScanState) sig m
         => m ()
 incCurrent = modify $ \s@(ScanState { scanStateCurrent }) -> s { scanStateCurrent = succ scanStateCurrent }
 
+isAtEnd :: Has (State ScanState) sig m
+        => m Bool
+isAtEnd = do
+  sourceRemaining <- gets scanStateSource
+  pure $ sourceRemaining /= T.empty
+
 advance :: Has Empty sig m
         => Has (State ScanState) sig m
         => m Char
@@ -84,6 +96,15 @@ advance = do
                 , scanStateSegment = T.snoc (scanStateSegment state) c
                 }
       pure c
+
+peek :: Has Empty sig m
+     => Has (State ScanState) sig m
+     => m Char
+peek = do
+  state <- get
+  case T.uncons (scanStateSource state) of
+    Nothing -> empty
+    Just (c, _) -> pure c
 
 match :: Has (State ScanState) sig m
       => Char -> m Bool
@@ -134,15 +155,48 @@ scanNextToken = do
     '+' -> makeToken TokenType.PLUS        Nothing
     ';' -> makeToken TokenType.SEMICOLON   Nothing
     '*' -> makeToken TokenType.STAR        Nothing
-    '!' -> match '=' >>= \m -> makeToken (if m then TokenType.BANG_EQUAL else TokenType.BANG)       Nothing
-    '=' -> match '=' >>= \m -> makeToken (if m then TokenType.EQUAL_EQUAL else TokenType.EQUAL)     Nothing
-    '<' -> match '=' >>= \m -> makeToken (if m then TokenType.LESS_EQUAL else TokenType.LESS)       Nothing
-    '>' -> match '=' >>= \m -> makeToken (if m then TokenType.GREATER_EQUAL else TokenType.GREATER) Nothing
+    '!' -> match '=' >>= bool (makeToken TokenType.BANG          Nothing)
+                              (makeToken TokenType.BANG_EQUAL    Nothing)
+    '=' -> match '=' >>= bool (makeToken TokenType.EQUAL         Nothing)
+                              (makeToken TokenType.EQUAL_EQUAL   Nothing)
+    '<' -> match '=' >>= bool (makeToken TokenType.LESS          Nothing)
+                              (makeToken TokenType.LESS_EQUAL    Nothing)
+    '>' -> match '=' >>= bool (makeToken TokenType.GREATER       Nothing)
+                              (makeToken TokenType.GREATER_EQUAL Nothing)
+    '/' -> match '/' >>= bool (makeToken TokenType.SLASH Nothing)
+                              (lineComment >> empty)
+    ' ' -> empty
+    '\r' -> empty
+    '\t' -> empty
+    '\n' -> incLine >> empty
+    '"' -> makeToken TokenType.STRING . Just . Token.LitString =<< stringLit
     _ -> do
       reportError $ "Unexpected character: " `T.snoc` c
       empty
 
-testScan :: T.Text -> ([Error], Seq Token)
-testScan = run
-         . runState @[Error] (\s a -> pure (s,a)) []
-         . scanTokens
+lineComment :: Has (State ScanState) sig m
+            => m ()
+lineComment
+  = runEmpty (pure ()) (const $ pure ())
+  . forever
+  $ do c <- peek
+       guard $ c /= '\n'
+       advance
+
+stringLit :: Has Empty sig m
+          => Has (State [Error]) sig m
+          => Has (State ScanState) sig m
+          => m T.Text
+stringLit = do
+    runEmptyToUnit . forever $ do
+      c <- peek
+      guard $ c /= '"'
+      advance
+    runEmpty unterminatedStringError pure $ do
+      advance
+      seg <- gets scanStateSegment
+      pure . T.drop 1 . T.dropEnd 1 $ seg
+  where
+    unterminatedStringError = do
+      reportError $ "Unterminated string."
+      empty
