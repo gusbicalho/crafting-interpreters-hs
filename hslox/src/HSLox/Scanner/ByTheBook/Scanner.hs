@@ -4,7 +4,6 @@ import Prelude hiding (getLine)
 import Control.Carrier.Empty.Church
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
-import Control.Monad (forever)
 import Data.Bool (bool)
 import Data.Char (isDigit, isLetter)
 import Data.Map (Map)
@@ -33,41 +32,27 @@ import HSLox.TreeWalk.Error (Error (..))
 import qualified HSLox.TreeWalk.Error as Error
 import qualified HSLox.Util as Util
 
-type ScanNext tk = forall sig m . Has Empty sig m
-                               => Has (State [Error]) sig m
-                               => Has (State ScanState) sig m
-                               => m tk
-
-type BuildEOF tk = forall sig m. Has (State ScanState) sig m
-                              => m tk
-
-scanTokens' ::
-  forall tk sig m. Has (State [Error]) sig m
-                => ScanNext tk
-                -> BuildEOF tk
-                -> T.Text
-                -> m (Seq tk)
-scanTokens' scanNextToken buildEOFToken source
+scanTokens ::
+  forall sig m. Has (State [Error]) sig m
+             => T.Text
+             -> m (Seq Token)
+scanTokens source
     = evalState (initialScanState source)
-    . execWriter @(Seq tk)
+    . execWriter @(Seq Token)
     $ do
-      Util.runEmptyToMaybe . forever $ do
+      Util.untilEmpty $ do
         resetSegment
-        maybeToken <- Util.runEmptyToMaybe scanNextToken
-        Util.whenJust maybeToken $ do
-          addToken
+        maybeToken <- scanNextToken
+        Util.whenJust maybeToken addToken
         guard =<< isAtEnd
       addToken =<< buildEOFToken
   where
     addToken token = tell $ Seq.singleton token
 
-scanTokens :: Has (State [Error]) sig m => T.Text -> m (Seq Token)
-scanTokens = scanTokens' scanNextToken buildEOFToken
-
 testScan :: T.Text -> ([Error], Seq Token)
 testScan = run
          . runState @[Error] (\s a -> pure (s,a)) []
-         . scanTokens' scanNextToken buildEOFToken
+         . scanTokens
 
 makeToken :: Has (State ScanState) sig m
           => TokenType -> Maybe Token.LiteralValue -> m Token
@@ -87,12 +72,15 @@ reportError msg = do
   line <- getLine
   Error.reportError $ Error line "" msg
 
-buildEOFToken :: BuildEOF Token
+buildEOFToken :: Has (State ScanState) sig m => m Token
 buildEOFToken = do
   Token "" TokenType.EOF Nothing <$> getLine
 
-scanNextToken :: ScanNext Token
-scanNextToken = do
+scanNextToken :: Has Empty sig m
+              => Has (State [Error]) sig m
+              => Has (State ScanState) sig m
+              => m (Maybe Token)
+scanNextToken = Util.runEmptyToMaybe $ do
   c <- advance
   case c of
     '(' -> makeToken TokenType.LEFT_PAREN  Nothing
