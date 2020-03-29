@@ -49,11 +49,6 @@ scanTokens source
   where
     addToken token = tell $ Seq.singleton token
 
-testScan :: T.Text -> ([Error], Seq Token)
-testScan = run
-         . runState @[Error] (\s a -> pure (s,a)) []
-         . scanTokens
-
 makeToken :: Has (State ScanState) sig m
           => TokenType -> Maybe Token.LiteralValue -> m Token
 makeToken tkType tkLiteral = do
