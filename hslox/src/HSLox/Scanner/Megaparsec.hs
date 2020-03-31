@@ -1,4 +1,4 @@
-module HSLox.Scanner.Parsec.Scanner where
+module HSLox.Scanner.Megaparsec where
 
 import Control.Carrier.State.Church
 import Control.Monad.Trans (lift)
@@ -27,28 +27,33 @@ scanTokens ::
              => T.Text
              -> m (Seq Token)
 scanTokens source = do
-    tks <- runParserT
-             (manyTill_ (lexeme $ withRecovery recover (Just <$> nextToken))
-                        (eof >> makeToken TokenType.EOF Nothing "")) "" source
+    tks <- runParserT (manyTokensUntilEOF recover) "" source
     case tks of
-      Left errors -> do
-        for_ (bundleErrors errors) register
+      Left errorBundle -> do
+        registerErrorBundle errorBundle
         pure (Seq.empty)
-      Right (tks', eofTk) -> pure
-                           . (Seq.|> eofTk)
-                           . Seq.fromList
-                           . catMaybes
-                           $ tks'
+      Right tks' -> pure tks'
   where
     recover err = do
       lift $ register err
       pure Nothing
+    registerErrorBundle errorBundle = for_ (bundleErrors errorBundle) register
     register (FancyError _ errs) = do
       for_ errs $ \case
         ErrorCustom e -> Error.reportError e
         err -> Error.reportError $ Error 0 "" (T.pack $ show err)
     register err =
       Error.reportError $ Error 0 "" (T.pack $ show err)
+
+manyTokensUntilEOF :: MonadParsec Error T.Text f
+                   => (ParseError T.Text Error -> f (Maybe Token))
+                   -> f (Seq Token)
+manyTokensUntilEOF recover = do
+  space
+  (tks, eof) <- manyTill_
+                  (lexeme $ withRecovery recover (Just <$> nextToken))
+                  (eof >> makeToken TokenType.EOF Nothing "")
+  pure $ (Seq.fromList . catMaybes $ tks) Seq.|> eof
 
 space :: MonadParsec Error T.Text m => m ()
 space = P.L.space P.Char.space1 (P.L.skipLineComment "//") empty
@@ -63,30 +68,36 @@ match :: MonadParsec Error T.Text f => T.Text -> f Bool
 match chunk = try (symbol chunk $> True) <|> pure False
 
 nextToken :: MonadParsec Error T.Text m => m Token
-nextToken = asum
-          $ [ try (symbol "("  >>= makeToken TokenType.LEFT_PAREN    Nothing)
-            , try (symbol ")"  >>= makeToken TokenType.RIGHT_PAREN   Nothing)
-            , try (symbol "{"  >>= makeToken TokenType.LEFT_BRACE    Nothing)
-            , try (symbol "}"  >>= makeToken TokenType.RIGHT_BRACE   Nothing)
-            , try (symbol ","  >>= makeToken TokenType.COMMA         Nothing)
-            , try (symbol "."  >>= makeToken TokenType.DOT           Nothing)
-            , try (symbol "-"  >>= makeToken TokenType.MINUS         Nothing)
-            , try (symbol "+"  >>= makeToken TokenType.PLUS          Nothing)
-            , try (symbol ";"  >>= makeToken TokenType.SEMICOLON     Nothing)
-            , try (symbol "*"  >>= makeToken TokenType.STAR          Nothing)
-            , try (P.Char.char '!' <* notFollowedBy (P.Char.char '=')
-                                <&> T.singleton
-                                >>= makeToken TokenType.BANG          Nothing)
-            , try (symbol "!=" >>= makeToken TokenType.BANG_EQUAL    Nothing)
-            , try (symbol "<=" >>= makeToken TokenType.LESS_EQUAL    Nothing)
-            , try (symbol "<"  >>= makeToken TokenType.LESS          Nothing)
-            , try (symbol ">=" >>= makeToken TokenType.GREATER_EQUAL Nothing)
-            , try (symbol ">"  >>= makeToken TokenType.GREATER       Nothing)
-            , try (symbol "/"  >>= makeToken TokenType.SLASH         Nothing)
-            , stringToken
-            , numberToken
-            , identifierOrKeywordToken
-            , anySingle >>= makeError . ("Unexpected character: " `T.snoc`) >>= fancyFailure]
+nextToken =
+    asum [ singleCharToken '(' TokenType.LEFT_PAREN
+         , singleCharToken ')' TokenType.RIGHT_PAREN
+         , singleCharToken '{' TokenType.LEFT_BRACE
+         , singleCharToken '}' TokenType.RIGHT_BRACE
+         , singleCharToken ',' TokenType.COMMA
+         , singleCharToken '.' TokenType.DOT
+         , singleCharToken '-' TokenType.MINUS
+         , singleCharToken '+' TokenType.PLUS
+         , singleCharToken ';' TokenType.SEMICOLON
+         , singleCharToken '*' TokenType.STAR
+         , singleCharToken '/' TokenType.SLASH -- line comments // are taken care of by `space`
+         , oneTwoCharToken '!' TokenType.BANG
+                           '=' TokenType.BANG_EQUAL
+         , oneTwoCharToken '=' TokenType.EQUAL
+                           '=' TokenType.EQUAL_EQUAL
+         , oneTwoCharToken '<' TokenType.LESS
+                           '=' TokenType.LESS_EQUAL
+         , oneTwoCharToken '>' TokenType.GREATER
+                           '=' TokenType.GREATER_EQUAL
+         , stringToken
+         , numberToken
+         , identifierOrKeywordToken
+         , unexpectedChar
+         ]
+  where
+    unexpectedChar = do
+      c <- anySingle
+      error <- makeError ("Unexpected character: " `T.snoc` c)
+      fancyFailure error
 
 makeError :: MonadParsec Error T.Text m
             => T.Text -> m (Set.Set (ErrorFancy Error))
@@ -102,6 +113,21 @@ makeToken tkType tkLiteral lexeme = do
              , tokenLexeme = lexeme
              , tokenLine = line
              }
+
+singleCharToken :: MonadParsec Error T.Text m => Char -> TokenType -> m Token
+singleCharToken c tkType =
+  try (makeToken tkType Nothing =<< symbol (T.singleton c))
+
+oneTwoCharToken :: MonadParsec Error T.Text f => Char -> TokenType -> Char -> TokenType -> f Token
+oneTwoCharToken c1 oneCharType c2 twoCharsType =
+    asum [ try . lexeme $ P.Char.char c1 <* notFollowedBy (P.Char.char c2)
+                            *> makeToken oneCharType Nothing oneCharSymbol
+          , try . lexeme $ P.Char.char c1 *> P.Char.char c2
+                            *> makeToken twoCharsType Nothing twoCharSymbol
+          ]
+  where
+    oneCharSymbol = T.singleton c1
+    twoCharSymbol = oneCharSymbol `T.snoc` c2
 
 stringToken :: MonadParsec Error T.Text m => m Token
 stringToken = do
