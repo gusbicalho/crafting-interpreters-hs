@@ -64,9 +64,6 @@ lexeme = P.L.lexeme space
 symbol :: MonadParsec Error T.Text m => T.Text -> m T.Text
 symbol = P.L.symbol space
 
-match :: MonadParsec Error T.Text f => T.Text -> f Bool
-match chunk = try (symbol chunk $> True) <|> pure False
-
 nextToken :: MonadParsec Error T.Text m => m Token
 nextToken =
     asum [ singleCharToken '(' TokenType.LEFT_PAREN
