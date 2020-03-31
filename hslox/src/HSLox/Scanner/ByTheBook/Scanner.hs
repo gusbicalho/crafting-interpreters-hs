@@ -6,6 +6,7 @@ import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Data.Bool (bool)
 import Data.Char (isDigit, isLetter)
+import Data.Foldable (for_)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Sequence (Seq)
@@ -43,7 +44,7 @@ scanTokens source
       Util.untilEmpty $ do
         resetSegment
         maybeToken <- scanNextToken
-        Util.whenJust maybeToken addToken
+        for_ maybeToken addToken
         guard =<< isAtEnd
       addToken =<< buildEOFToken
   where

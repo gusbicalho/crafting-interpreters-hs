@@ -11,6 +11,3 @@ runEmptyToUnit = runEmpty (pure ()) (const $ pure ())
 
 untilEmpty :: Applicative m => EmptyC m a -> m ()
 untilEmpty = runEmptyToUnit . forever
-
-whenJust :: Applicative f => Maybe a -> (a -> f ()) -> f ()
-whenJust ma f = maybe (pure ()) f ma
