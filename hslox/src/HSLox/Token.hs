@@ -1,6 +1,21 @@
-module HSLox.TreeWalk.TokenType
-  ( TokenType (..)
-  ) where
+module HSLox.Token where
+
+import qualified Data.Text as T
+
+data LiteralValue
+  = LitString T.Text
+  | LitBool Bool
+  | LitNum Double
+  deriving (Eq, Show)
+
+data Token
+  = Token
+  { tokenLexeme :: T.Text
+  , tokenType :: TokenType
+  , tokenLiteral :: Maybe LiteralValue
+  , tokenLine :: Int
+  }
+  deriving (Eq, Show)
 
 data TokenType
   -- Single-character tokens

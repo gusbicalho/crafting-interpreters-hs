@@ -4,7 +4,6 @@ import Control.Carrier.State.Church
 import Control.Monad.Trans (lift)
 import Data.Char (isLetter, isDigit)
 import Data.Foldable (asum, for_)
-import Data.Functor
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
@@ -17,10 +16,8 @@ import qualified Text.Megaparsec.Char as P.Char
 import qualified Text.Megaparsec.Char.Lexer as P.L
 import HSLox.TreeWalk.Error (Error (..))
 import qualified HSLox.TreeWalk.Error as Error
-import HSLox.TreeWalk.Token (Token (..))
-import qualified HSLox.TreeWalk.Token as Token
-import HSLox.TreeWalk.TokenType (TokenType)
-import qualified HSLox.TreeWalk.TokenType as TokenType
+import HSLox.Token (Token (..), TokenType)
+import qualified HSLox.Token as Token
 
 scanTokens ::
   forall sig m. Has (State [Error]) sig m
@@ -52,7 +49,7 @@ manyTokensUntilEOF recover = do
   space
   (tks, eof) <- manyTill_
                   (lexeme $ withRecovery recover (Just <$> nextToken))
-                  (eof >> makeToken TokenType.EOF Nothing "")
+                  (eof >> makeToken Token.EOF Nothing "")
   pure $ (Seq.fromList . catMaybes $ tks) Seq.|> eof
 
 space :: MonadParsec Error T.Text m => m ()
@@ -66,25 +63,25 @@ symbol = P.L.symbol space
 
 nextToken :: MonadParsec Error T.Text m => m Token
 nextToken =
-    asum [ singleCharToken '(' TokenType.LEFT_PAREN
-         , singleCharToken ')' TokenType.RIGHT_PAREN
-         , singleCharToken '{' TokenType.LEFT_BRACE
-         , singleCharToken '}' TokenType.RIGHT_BRACE
-         , singleCharToken ',' TokenType.COMMA
-         , singleCharToken '.' TokenType.DOT
-         , singleCharToken '-' TokenType.MINUS
-         , singleCharToken '+' TokenType.PLUS
-         , singleCharToken ';' TokenType.SEMICOLON
-         , singleCharToken '*' TokenType.STAR
-         , singleCharToken '/' TokenType.SLASH -- line comments // are taken care of by `space`
-         , oneTwoCharToken '!' TokenType.BANG
-                           '=' TokenType.BANG_EQUAL
-         , oneTwoCharToken '=' TokenType.EQUAL
-                           '=' TokenType.EQUAL_EQUAL
-         , oneTwoCharToken '<' TokenType.LESS
-                           '=' TokenType.LESS_EQUAL
-         , oneTwoCharToken '>' TokenType.GREATER
-                           '=' TokenType.GREATER_EQUAL
+    asum [ singleCharToken '(' Token.LEFT_PAREN
+         , singleCharToken ')' Token.RIGHT_PAREN
+         , singleCharToken '{' Token.LEFT_BRACE
+         , singleCharToken '}' Token.RIGHT_BRACE
+         , singleCharToken ',' Token.COMMA
+         , singleCharToken '.' Token.DOT
+         , singleCharToken '-' Token.MINUS
+         , singleCharToken '+' Token.PLUS
+         , singleCharToken ';' Token.SEMICOLON
+         , singleCharToken '*' Token.STAR
+         , singleCharToken '/' Token.SLASH -- line comments // are taken care of by `space`
+         , oneTwoCharToken '!' Token.BANG
+                           '=' Token.BANG_EQUAL
+         , oneTwoCharToken '=' Token.EQUAL
+                           '=' Token.EQUAL_EQUAL
+         , oneTwoCharToken '<' Token.LESS
+                           '=' Token.LESS_EQUAL
+         , oneTwoCharToken '>' Token.GREATER
+                           '=' Token.GREATER_EQUAL
          , stringToken
          , numberToken
          , identifierOrKeywordToken
@@ -131,7 +128,7 @@ stringToken = do
   openQuote <- try (P.Char.char '\"')
   s <- T.pack <$> many (anySingleBut '\"')
   closeQuote <- P.Char.char '\"' <|> (fancyFailure =<< makeError "Unterminated string.")
-  makeToken TokenType.STRING
+  makeToken Token.STRING
             (Just $ Token.LitString s)
             (openQuote `T.cons` s `T.snoc` closeQuote)
 
@@ -143,7 +140,7 @@ numberToken = try $ do
                       pure $ dot : fracDigits)
               <|> pure ""
   let numberText = wholeDigits <> decimals
-  makeToken TokenType.NUMBER
+  makeToken Token.NUMBER
             (Just . Token.LitNum . read @Double $ numberText)
             (T.pack numberText)
 
@@ -159,25 +156,25 @@ identifierOrKeywordToken = try $ do
   rest <- takeWhileP (Just "") isIdentifierPart
   let identifier = init <> rest
   case Map.lookup identifier lexemeToKeywordType of
-    Nothing -> makeToken TokenType.IDENTIFIER Nothing identifier
+    Nothing -> makeToken Token.IDENTIFIER Nothing identifier
     Just tkType -> makeToken tkType Nothing identifier
 
 lexemeToKeywordType :: Map T.Text TokenType
 lexemeToKeywordType =
-  Map.fromList [ ("and",    TokenType.AND)
-               , ("class",  TokenType.CLASS)
-               , ("else",   TokenType.ELSE)
-               , ("false",  TokenType.FALSE)
-               , ("for",    TokenType.FOR)
-               , ("fun",    TokenType.FUN)
-               , ("if",     TokenType.IF)
-               , ("nil",    TokenType.NIL)
-               , ("or",     TokenType.OR)
-               , ("print",  TokenType.PRINT)
-               , ("return", TokenType.RETURN)
-               , ("super",  TokenType.SUPER)
-               , ("this",   TokenType.THIS)
-               , ("true",   TokenType.TRUE)
-               , ("var",    TokenType.VAR)
-               , ("while",  TokenType.WHILE)
+  Map.fromList [ ("and",    Token.AND)
+               , ("class",  Token.CLASS)
+               , ("else",   Token.ELSE)
+               , ("false",  Token.FALSE)
+               , ("for",    Token.FOR)
+               , ("fun",    Token.FUN)
+               , ("if",     Token.IF)
+               , ("nil",    Token.NIL)
+               , ("or",     Token.OR)
+               , ("print",  Token.PRINT)
+               , ("return", Token.RETURN)
+               , ("super",  Token.SUPER)
+               , ("this",   Token.THIS)
+               , ("true",   Token.TRUE)
+               , ("var",    Token.VAR)
+               , ("while",  Token.WHILE)
                ]

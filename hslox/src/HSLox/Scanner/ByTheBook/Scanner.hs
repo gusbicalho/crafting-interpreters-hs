@@ -25,10 +25,8 @@ import HSLox.Scanner.ByTheBook.ScanState
   , match
   , isAtEnd
   )
-import HSLox.TreeWalk.TokenType (TokenType)
-import qualified HSLox.TreeWalk.TokenType as TokenType
-import HSLox.TreeWalk.Token (Token (..))
-import qualified HSLox.TreeWalk.Token as Token
+import HSLox.Token (Token (..), TokenType)
+import qualified HSLox.Token as Token
 import HSLox.TreeWalk.Error (Error (..))
 import qualified HSLox.TreeWalk.Error as Error
 import qualified HSLox.Util as Util
@@ -70,7 +68,7 @@ reportError msg = do
 
 buildEOFToken :: Has (State ScanState) sig m => m Token
 buildEOFToken = do
-  Token "" TokenType.EOF Nothing <$> getLine
+  Token "" Token.EOF Nothing <$> getLine
 
 scanNextToken :: Has Empty sig m
               => Has (State [Error]) sig m
@@ -79,32 +77,32 @@ scanNextToken :: Has Empty sig m
 scanNextToken = Util.runEmptyToMaybe $ do
   c <- advance
   case c of
-    '(' -> makeToken TokenType.LEFT_PAREN  Nothing
-    ')' -> makeToken TokenType.RIGHT_PAREN Nothing
-    '{' -> makeToken TokenType.LEFT_BRACE  Nothing
-    '}' -> makeToken TokenType.RIGHT_BRACE Nothing
-    ',' -> makeToken TokenType.COMMA       Nothing
-    '.' -> makeToken TokenType.DOT         Nothing
-    '-' -> makeToken TokenType.MINUS       Nothing
-    '+' -> makeToken TokenType.PLUS        Nothing
-    ';' -> makeToken TokenType.SEMICOLON   Nothing
-    '*' -> makeToken TokenType.STAR        Nothing
-    '!' -> match '=' >>= bool (makeToken TokenType.BANG          Nothing)
-                              (makeToken TokenType.BANG_EQUAL    Nothing)
-    '=' -> match '=' >>= bool (makeToken TokenType.EQUAL         Nothing)
-                              (makeToken TokenType.EQUAL_EQUAL   Nothing)
-    '<' -> match '=' >>= bool (makeToken TokenType.LESS          Nothing)
-                              (makeToken TokenType.LESS_EQUAL    Nothing)
-    '>' -> match '=' >>= bool (makeToken TokenType.GREATER       Nothing)
-                              (makeToken TokenType.GREATER_EQUAL Nothing)
-    '/' -> match '/' >>= bool (makeToken TokenType.SLASH Nothing)
+    '(' -> makeToken Token.LEFT_PAREN  Nothing
+    ')' -> makeToken Token.RIGHT_PAREN Nothing
+    '{' -> makeToken Token.LEFT_BRACE  Nothing
+    '}' -> makeToken Token.RIGHT_BRACE Nothing
+    ',' -> makeToken Token.COMMA       Nothing
+    '.' -> makeToken Token.DOT         Nothing
+    '-' -> makeToken Token.MINUS       Nothing
+    '+' -> makeToken Token.PLUS        Nothing
+    ';' -> makeToken Token.SEMICOLON   Nothing
+    '*' -> makeToken Token.STAR        Nothing
+    '!' -> match '=' >>= bool (makeToken Token.BANG          Nothing)
+                              (makeToken Token.BANG_EQUAL    Nothing)
+    '=' -> match '=' >>= bool (makeToken Token.EQUAL         Nothing)
+                              (makeToken Token.EQUAL_EQUAL   Nothing)
+    '<' -> match '=' >>= bool (makeToken Token.LESS          Nothing)
+                              (makeToken Token.LESS_EQUAL    Nothing)
+    '>' -> match '=' >>= bool (makeToken Token.GREATER       Nothing)
+                              (makeToken Token.GREATER_EQUAL Nothing)
+    '/' -> match '/' >>= bool (makeToken Token.SLASH Nothing)
                               (lineComment >> empty)
     ' ' -> empty
     '\r' -> empty
     '\t' -> empty
     '\n' -> incLine >> empty
-    '"' -> makeToken TokenType.STRING . Just . Token.LitString =<< stringLit
-    _ | isDigit c -> makeToken TokenType.NUMBER . Just . Token.LitNum =<< numberLit
+    '"' -> makeToken Token.STRING . Just . Token.LitString =<< stringLit
+    _ | isDigit c -> makeToken Token.NUMBER . Just . Token.LitNum =<< numberLit
       | isIdentifierFirst c -> makeIdentifierToken
       | otherwise -> do
         reportError $ "Unexpected character: " `T.snoc` c
@@ -161,22 +159,22 @@ isIdentifierPart c = isIdentifierFirst c || isDigit c
 
 lexemeToKeywordType :: Map T.Text TokenType
 lexemeToKeywordType =
-  Map.fromList [ ("and",    TokenType.AND)
-               , ("class",  TokenType.CLASS)
-               , ("else",   TokenType.ELSE)
-               , ("false",  TokenType.FALSE)
-               , ("for",    TokenType.FOR)
-               , ("fun",    TokenType.FUN)
-               , ("if",     TokenType.IF)
-               , ("nil",    TokenType.NIL)
-               , ("or",     TokenType.OR)
-               , ("print",  TokenType.PRINT)
-               , ("return", TokenType.RETURN)
-               , ("super",  TokenType.SUPER)
-               , ("this",   TokenType.THIS)
-               , ("true",   TokenType.TRUE)
-               , ("var",    TokenType.VAR)
-               , ("while",  TokenType.WHILE)
+  Map.fromList [ ("and",    Token.AND)
+               , ("class",  Token.CLASS)
+               , ("else",   Token.ELSE)
+               , ("false",  Token.FALSE)
+               , ("for",    Token.FOR)
+               , ("fun",    Token.FUN)
+               , ("if",     Token.IF)
+               , ("nil",    Token.NIL)
+               , ("or",     Token.OR)
+               , ("print",  Token.PRINT)
+               , ("return", Token.RETURN)
+               , ("super",  Token.SUPER)
+               , ("this",   Token.THIS)
+               , ("true",   Token.TRUE)
+               , ("var",    Token.VAR)
+               , ("while",  Token.WHILE)
                ]
 
 makeIdentifierToken :: Has (State ScanState) sig m
@@ -188,5 +186,5 @@ makeIdentifierToken = do
     advance
   seg <- getSegment
   case Map.lookup seg lexemeToKeywordType of
-    Nothing -> makeToken TokenType.IDENTIFIER Nothing
+    Nothing -> makeToken Token.IDENTIFIER Nothing
     Just tkType -> makeToken tkType Nothing
