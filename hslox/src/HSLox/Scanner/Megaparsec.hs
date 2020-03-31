@@ -14,10 +14,10 @@ import qualified Data.Text as T
 import Text.Megaparsec hiding (State, Token)
 import qualified Text.Megaparsec.Char as P.Char
 import qualified Text.Megaparsec.Char.Lexer as P.L
-import HSLox.TreeWalk.Error (Error (..))
-import qualified HSLox.TreeWalk.Error as Error
 import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
+import HSLox.TreeWalk.Error (Error (..))
+import qualified HSLox.TreeWalk.Error as Error
 
 scanTokens ::
   forall sig m. Has (State [Error]) sig m
