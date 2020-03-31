@@ -11,7 +11,7 @@ data Error
   , errorWhere :: T.Text
   , errorMessage :: T.Text
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 hadError :: _ => m Bool
 hadError = gets @[Error] (not . null)

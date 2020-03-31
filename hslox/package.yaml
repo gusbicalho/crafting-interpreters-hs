@@ -15,6 +15,7 @@ dependencies:
 - containers
 - fused-effects
 - megaparsec
+- mtl
 - optparse-applicative
 - text
 
