@@ -3,27 +3,26 @@ module HSLox.AST where
 import qualified Data.Text as T
 import HSLox.Token (Token (..))
 
-unary :: Token -> Expr -> Expr
-unary op expr = UnaryExpr $ Unary op expr
+pattern UnaryE :: Token -> Expr -> Expr
+pattern UnaryE op expr = UnaryExpr (Unary op expr)
 
-binary :: Expr -> Token -> Expr -> Expr
-binary left op right = BinaryExpr $ Binary left op right
+pattern BinaryE :: Expr -> Token -> Expr -> Expr
+pattern BinaryE left op right = BinaryExpr (Binary left op right)
 
-grouping :: Expr -> Expr
-grouping = GroupingExpr . Grouping
+pattern GroupingE :: Expr -> Expr
+pattern GroupingE expr = GroupingExpr (Grouping expr)
 
-stringValue :: T.Text -> Expr
-stringValue = ValueExpr . ValString
+pattern StringE :: T.Text -> Expr
+pattern StringE t = ValueExpr (ValString t)
 
-numValue :: Double -> Expr
-numValue = ValueExpr . ValNum
+pattern NumE :: Double -> Expr
+pattern NumE v = ValueExpr (ValNum v)
 
-boolValue :: Bool -> Expr
-boolValue = ValueExpr . ValBool
+pattern BoolE :: Bool -> Expr
+pattern BoolE v = ValueExpr (ValBool v)
 
-nilValue :: Expr
-nilValue = ValueExpr ValNil
-
+pattern NilE :: Expr
+pattern NilE = ValueExpr ValNil
 
 data Expr = UnaryExpr Unary
           | BinaryExpr Binary

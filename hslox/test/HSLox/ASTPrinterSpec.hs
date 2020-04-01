@@ -20,24 +20,26 @@ printedBookExpr = "(* (- 123.0) (group 45.67))"
 
 bookExpr :: Expr
 bookExpr =
-  binary
-    (unary (Token "-" Token.MINUS Nothing 1) (numValue 123))
+  BinaryE
+    (UnaryE
+      (Token "-" Token.MINUS Nothing 1)
+      (NumE 123))
     (Token "*" Token.STAR Nothing 1)
-    (grouping
-      (numValue 45.67))
+    (GroupingE
+      (NumE 45.67))
 
 printedBiggerExpr :: T.Text
 printedBiggerExpr = "(+ (group (- 3.0 (- 1.0))) \"asd\")"
 
 biggerExpr :: Expr
 biggerExpr =
-  binary
-    (grouping
-      (binary
-        (numValue 3)
+  BinaryE
+    (GroupingE
+      (BinaryE
+        (NumE 3)
         (Token "-" Token.MINUS Nothing 0)
-        (unary
+        (UnaryE
           (Token "-" Token.MINUS Nothing 0)
-          (numValue 1))))
+          (NumE 1))))
     (Token "+" Token.PLUS Nothing 0)
-    (stringValue "asd")
+    (StringE "asd")
