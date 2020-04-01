@@ -27,8 +27,8 @@ import HSLox.Scanner.ByTheBook.ScanState
   )
 import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
-import HSLox.TreeWalk.Error (Error (..))
-import qualified HSLox.TreeWalk.Error as Error
+import HSLox.Error (Error (..))
+import qualified HSLox.Error as Error
 import qualified HSLox.Util as Util
 
 scanTokens ::

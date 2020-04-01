@@ -7,7 +7,7 @@ import Control.Carrier.State.Church
 import Control.Effect.Trace
 import Data.Foldable
 import qualified Data.Text as T
-import HSLox.TreeWalk.Error (Error)
+import HSLox.Error (Error)
 import qualified HSLox.Scanner.Megaparsec as Scanner
 
 interpret :: Has Trace sig m

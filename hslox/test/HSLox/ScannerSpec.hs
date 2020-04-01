@@ -8,7 +8,7 @@ import Control.Carrier.Trace.Printing
 import Data.Sequence (Seq)
 import qualified Data.Text as T
 import qualified Data.Sequence as Seq
-import HSLox.TreeWalk.Error
+import HSLox.Error
 import qualified HSLox.Scanner.ByTheBook.Scanner as ByTheBook
 import qualified HSLox.Scanner.Megaparsec as Megaparsec
 import HSLox.Token (Token (..))

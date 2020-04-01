@@ -1,6 +1,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-module HSLox.TreeWalk.Error where
+module HSLox.Error where
 
 import Control.Effect.State
 import qualified Data.Text as T

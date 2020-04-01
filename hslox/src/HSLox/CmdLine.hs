@@ -9,7 +9,7 @@ import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
 import Control.Monad (forever, void, when)
 import HSLox.CmdLine.ReadLine
-import HSLox.TreeWalk.Error (Error)
+import HSLox.Error (Error)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import Data.Foldable
 import Data.Function
