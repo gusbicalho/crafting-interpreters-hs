@@ -11,21 +11,22 @@ defaults:
   local: ../defaults.yaml
 
 dependencies:
-- base >= 4.7 && < 5
-- containers
-- fused-effects
-- megaparsec
-- mtl
-- optparse-applicative
-- text
+  - base >= 4.7 && < 5
+  - containers
+  - fused-effects
+  - megaparsec
+  - mtl
+  - optparse-applicative
+  - text
 
 library:
   source-dirs: src
 
 executables:
   hslox-exe:
-    main:                Main.hs
-    source-dirs:         app
+    main: Main.hs
+    source-dirs:
+    - app
     ghc-options:
     - -O2
     - -threaded
@@ -33,6 +34,14 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - hslox
+  hslox-test-dev:
+    main: Spec.hs
+    source-dirs:
+      - test
+      - src
+    dependencies:
+    - hspec
+    - QuickCheck
 
 tests:
   hslox-test:
@@ -44,7 +53,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - hslox
-    - base
     - hspec
     - QuickCheck
-    - text
