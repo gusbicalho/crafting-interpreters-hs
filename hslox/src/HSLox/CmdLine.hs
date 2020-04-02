@@ -40,7 +40,7 @@ start = do
     Right (Args maybePath) -> do
       runApp $
         case maybePath of
-          Just path -> runSource path
+          Just path -> runFromSourceFile path
           Nothing -> runRepl
 
 runDefaultRepl :: IO ()
@@ -52,16 +52,19 @@ runApp app =
       & runTrace
       & runM @IO
 
-runSource :: _ => FilePath -> m ()
-runSource path = do
-    source <- getSource path
-    errors <- Interpreter.interpret source
-    reportErrors errors
-    when (not . null $ errors) $ do
-      sendM @IO $ exitWith (ExitFailure 65)
+runFromSourceFile :: _ => FilePath -> m ()
+runFromSourceFile path =
+    runSource =<< getSource path
   where
     getSource "-"  = sendM @IO $ T.IO.hGetContents stdin
     getSource path = sendM @IO $ T.IO.readFile path
+
+runSource :: _ => T.Text -> m ()
+runSource source = do
+  errors <- Interpreter.interpret source
+  reportErrors errors
+  when (not . null $ errors) $ do
+    sendM @IO $ exitWith (ExitFailure 65)
 
 runRepl :: _ => m ()
 runRepl = void . runEmpty . forever $ do

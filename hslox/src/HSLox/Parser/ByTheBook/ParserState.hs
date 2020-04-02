@@ -20,13 +20,19 @@ initialParserState source
                 , parserStatePrevious = Nothing
                 }
 
-match :: Has (State ParserState) sig m
-      => Seq TokenType -> m Bool
+match :: Has Empty sig m
+      => Has (State ParserState) sig m
+      => Foldable t
+      => t TokenType -> m Token
 match tkTypes = do
-  acceptableNext <- Util.anyM check tkTypes
-  if acceptableNext
-  then Util.runEmptyToBool advance
-  else pure False
+  state <- get @ParserState
+  tk <- advance
+  if (any ((tokenType tk) ==) tkTypes)
+  then
+    pure tk
+  else do
+    put state
+    empty
 
 peek :: Has Empty sig m
      => Has (State ParserState) sig m
@@ -37,6 +43,16 @@ peek = do
     Seq.EmptyL -> empty
     tk Seq.:< _ -> pure tk
 
+currentLine :: Has (State ParserState) sig m
+            => m Int
+currentLine =
+  (tokenLine <$> peek) `Util.recoverFromEmptyWith` do
+    previous <- gets parserStatePrevious
+    case previous of
+      Nothing -> pure 0
+      Just tk -> pure $ tokenLine tk
+
+
 advance :: Has Empty sig m
         => Has (State ParserState) sig m
         => m Token
@@ -45,9 +61,9 @@ advance = do
   case Seq.viewl (parserStateTokens state) of
     Seq.EmptyL -> empty
     tk Seq.:< tks -> do
-      pure ParserState { parserStateTokens = tks
-                       , parserStatePrevious = Just tk
-                       }
+      put ParserState { parserStateTokens = tks
+                      , parserStatePrevious = Just tk
+                      }
       pure tk
 
 check :: Has (State ParserState) sig m
