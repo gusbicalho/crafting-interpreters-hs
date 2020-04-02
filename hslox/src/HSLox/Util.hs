@@ -54,3 +54,14 @@ tapM ma = do
   a <- ma
   trace (show a)
   pure a
+
+-- Holds a reference to the current monadic state, then calls the
+-- provided fn with restore action, which can be used to restore
+-- the original state.
+backingUpState :: forall s b sig1 m1 sig2 m2.
+                  Has (State s) sig1 m1
+               => Has (State s) sig2 m2
+               => (m2 () -> m1 b) -> m1 b
+backingUpState action = do
+  s <- get @s
+  action (put @s s)
