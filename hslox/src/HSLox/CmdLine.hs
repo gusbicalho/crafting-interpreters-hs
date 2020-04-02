@@ -46,7 +46,7 @@ start = do
 runDefaultRepl :: IO ()
 runDefaultRepl = runApp runRepl
 
-runApp :: _ -> IO ()
+runApp :: _ a -> IO a
 runApp app =
   app & runReadLine
       & runTrace
