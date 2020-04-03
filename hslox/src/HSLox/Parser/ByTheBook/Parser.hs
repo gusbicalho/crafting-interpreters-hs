@@ -6,6 +6,7 @@ import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import qualified Data.Text as T
 import HSLox.AST
 import HSLox.Parser.ParserError
 import HSLox.Parser.ByTheBook.ParserState
@@ -77,22 +78,36 @@ primary = do
       Just (Token { tokenType = Token.STRING, tokenLiteral }) ->
         case tokenLiteral of
           Just (Token.LitString s) -> pure (StringE s)
-          _ -> error "SCANNER ERROR: Expected string literal in STRING token."
+          _ -> throwParserError "SCANNER ERROR: Expected string literal in STRING token."
       Just (Token { tokenType = Token.NUMBER, tokenLiteral }) ->
         case tokenLiteral of
           Just (Token.LitNum n) -> pure (NumE n)
-          _ -> error "SCANNER ERROR: Expected numeric literal in NUMBER token."
+          _ -> throwParserError "SCANNER ERROR: Expected numeric literal in NUMBER token."
       Just (Token { tokenType = Token.LEFT_PAREN }) -> do
         expr <- expression
         match [Token.RIGHT_PAREN]
           `Util.recoverFromEmptyWith`
-          error "Expect ')' after expression."
+          throwParserError "Expect ')' after expression."
         pure expr
-      _ -> error "Expect expression."
+      -- If `match` failed, point the error at the next token
+      Nothing -> do
+        Util.runEmptyToUnit advance
+        throwParserError "Expect expression."
+      _ -> throwParserError "Expect expression."
+
+makeParserError :: Has (ErrorEff.Throw ParserError) sig m
+                => Has (State ParserState) sig m
+                => T.Text -> m ParserError
+makeParserError msg = do
+    tk <- maybe eof id <$> previous
+    pure $ ParserError tk msg
   where
-    error msg = do
-      line <- currentLine
-      ErrorEff.throwError $ ParserError line "" msg
+    eof = Token "" Token.EOF Nothing 0
+
+throwParserError :: Has (ErrorEff.Throw ParserError) sig m
+                 => Has (State ParserState) sig m
+                => T.Text -> m b
+throwParserError msg = ErrorEff.throwError =<< makeParserError msg
 
 leftAssociativeBinaryOp :: Foldable t => ExprParser -> t TokenType -> ExprParser
 leftAssociativeBinaryOp termParser opTypes = do

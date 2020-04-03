@@ -64,3 +64,6 @@ currentLine =
     case previous of
       Nothing -> pure 0
       Just tk -> pure $ tokenLine tk
+
+previous :: Has (State ParserState) sig m => m (Maybe Token)
+previous = gets parserStatePrevious

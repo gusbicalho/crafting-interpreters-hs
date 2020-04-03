@@ -6,19 +6,22 @@ import Control.Effect.Writer
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import HSLox.ErrorReport
+import HSLox.Token (Token (..))
+import qualified HSLox.Token as Token
 
 data ParserError
   = ParserError
-  { parserErrorLine :: Int
-  , parserErrorWhere :: T.Text
+  { parserErrorToken :: Token
   , parserErrorMessage :: T.Text
   }
   deriving (Eq, Show, Ord)
 
 instance ToErrorReport ParserError where
-  toErrorReport ParserError { parserErrorLine, parserErrorWhere, parserErrorMessage }
-    = ErrorReport { errorReportLine = parserErrorLine
-                  , errorReportWhere = parserErrorWhere
+  toErrorReport ParserError { parserErrorToken, parserErrorMessage }
+    = ErrorReport { errorReportLine = (tokenLine parserErrorToken)
+                  , errorReportWhere = case (tokenType parserErrorToken) of
+                      Token.EOF -> " at end"
+                      _ -> " at '" <> (tokenLexeme parserErrorToken) <> "'"
                   , errorReportMessage = parserErrorMessage
                   }
 
