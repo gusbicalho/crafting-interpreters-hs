@@ -31,17 +31,16 @@ parse tokens
         tell $ Seq.singleton expr
     guard . not =<< isAtEnd
 
-type ExprParser = forall sig m. ( Has (ErrorEff.Throw ParserError) sig m
+type ExprParser = forall sig m. ( Has (ErrorEff.Error ParserError) sig m
                                 , Has (State ParserState) sig m )
                                 => m Expr
-
 
 synchronize :: Has (State ParserState) sig m => m ()
 synchronize = Util.untilEmpty $ do
   tk <- advance
   guard $ (tokenType tk) /= Token.SEMICOLON
   tk <- peek
-  guard $ any ((tokenType tk) ==) [ Token.CLASS
+  guard $ all ((tokenType tk) /=) [ Token.CLASS
                                   , Token.FUN
                                   , Token.VAR
                                   , Token.FOR
