@@ -2,7 +2,6 @@ module HSLox.Parser.ByTheBook.Parser where
 
 import qualified Control.Effect.Error as ErrorEff
 import Control.Effect.Empty
-import Control.Carrier.Lift
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Data.Sequence (Seq)
@@ -56,7 +55,21 @@ expression :: ExprParser
 expression = comma
 
 comma :: ExprParser
-comma = leftAssociativeBinaryOp equality [ Token.COMMA ]
+comma = leftAssociativeBinaryOp conditional [ Token.COMMA ]
+
+conditional :: ExprParser
+conditional = do
+  left <- equality
+  mbTk <- Util.runEmptyToMaybe $ match [ Token.QUESTION_MARK ]
+  case mbTk of
+    Nothing -> pure left
+    Just op1 -> do
+      middle <- expression
+      op2 <- match [ Token.COLON ]
+              `Util.recoverFromEmptyWith`
+              throwParserError "Expect ':' after '?' expression."
+      right <- conditional
+      pure $ TernaryE  left op1 middle op2 right
 
 equality :: ExprParser
 equality = leftAssociativeBinaryOp comparison [ Token.EQUAL_EQUAL

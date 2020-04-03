@@ -10,6 +10,7 @@ class ASTPrinter e where
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e
   printAST (BinaryExpr e) = printAST e
+  printAST (TernaryExpr e) = printAST e
   printAST (GroupingExpr e) = printAST e
   printAST (ValueExpr e) = printAST e
 
@@ -27,6 +28,11 @@ instance ASTPrinter Unary where
 
 instance ASTPrinter Binary where
   printAST (Binary left op right) = parenthesize (tokenLexeme op) [left, right]
+
+instance ASTPrinter Ternary where
+  printAST (Ternary left op1 middle op2 right)
+    = parenthesize ((tokenLexeme op1) <> (tokenLexeme op2))
+                   [left, middle, right]
 
 parenthesize :: T.Text -> [Expr] -> T.Text
 parenthesize name exprs = "("

@@ -22,10 +22,12 @@ data TokenType
   | RIGHT_PAREN
   | LEFT_BRACE
   | RIGHT_BRACE
+  | COLON
   | COMMA
   | DOT
   | MINUS
   | PLUS
+  | QUESTION_MARK
   | SEMICOLON
   | SLASH
   | STAR

@@ -22,9 +22,9 @@ spec = do
                . fmap snd
                . Util.runWriterToPair @(Seq ScanError)
                . Scanner.scanTokens
-               $ "1 / 5 + 2 * 4 / 3 - 6 / 3 / 2 + ---1 * !!!true"
+               $ "1 / 5 + 2 * 4 / 3 - 6 / 3 / 2 + ---1 * !!!true?false,5:7,8 == 9"
     let expected = ( Seq.empty
-                   , Seq.singleton "(+ (- (+ (/ 1.0 5.0) (/ (* 2.0 4.0) 3.0)) (/ (/ 6.0 3.0) 2.0)) (* (- (- (- 1.0))) (! (! (! True)))))")
+                   , Seq.singleton "(, (?: (+ (- (+ (/ 1.0 5.0) (/ (* 2.0 4.0) 3.0)) (/ (/ 6.0 3.0) 2.0)) (* (- (- (- 1.0))) (! (! (! True))))) (, False 5.0) 7.0) (== 8.0 9.0))")
     describe "ByTheBook" $
       it "parses correctly" $
         runParser ByTheBook.parse tokens `shouldReturn` expected

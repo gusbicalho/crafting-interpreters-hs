@@ -69,9 +69,11 @@ nextToken =
          , singleCharToken '{' Token.LEFT_BRACE
          , singleCharToken '}' Token.RIGHT_BRACE
          , singleCharToken ',' Token.COMMA
+         , singleCharToken ':' Token.COLON
          , singleCharToken '.' Token.DOT
          , singleCharToken '-' Token.MINUS
          , singleCharToken '+' Token.PLUS
+         , singleCharToken '?' Token.QUESTION_MARK
          , singleCharToken ';' Token.SEMICOLON
          , singleCharToken '*' Token.STAR
          , singleCharToken '/' Token.SLASH -- line comments // are taken care of by `space`
@@ -111,15 +113,15 @@ makeToken tkType tkLiteral lexeme = do
 
 singleCharToken :: MonadParsec ScanError T.Text m => Char -> TokenType -> m Token
 singleCharToken c tkType =
-  try (makeToken tkType Nothing =<< symbol (T.singleton c))
+  try (makeToken tkType Nothing . T.singleton =<< P.Char.char c)
 
 oneTwoCharToken :: MonadParsec ScanError T.Text f => Char -> TokenType -> Char -> TokenType -> f Token
 oneTwoCharToken c1 oneCharType c2 twoCharsType =
-    asum [ try . lexeme $ P.Char.char c1 <* notFollowedBy (P.Char.char c2)
-                            *> makeToken oneCharType Nothing oneCharSymbol
-          , try . lexeme $ P.Char.char c1 *> P.Char.char c2
-                            *> makeToken twoCharsType Nothing twoCharSymbol
-          ]
+    asum [ try $ P.Char.char c1 <* notFollowedBy (P.Char.char c2)
+                  *> makeToken oneCharType Nothing oneCharSymbol
+         , try $ P.Char.char c1 *> P.Char.char c2
+                  *> makeToken twoCharsType Nothing twoCharSymbol
+         ]
   where
     oneCharSymbol = T.singleton c1
     twoCharSymbol = oneCharSymbol `T.snoc` c2

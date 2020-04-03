@@ -77,16 +77,18 @@ scanNextToken :: Has Empty sig m
 scanNextToken = Util.runEmptyToMaybe $ do
   c <- advance
   case c of
-    '(' -> makeToken Token.LEFT_PAREN  Nothing
-    ')' -> makeToken Token.RIGHT_PAREN Nothing
-    '{' -> makeToken Token.LEFT_BRACE  Nothing
-    '}' -> makeToken Token.RIGHT_BRACE Nothing
-    ',' -> makeToken Token.COMMA       Nothing
-    '.' -> makeToken Token.DOT         Nothing
-    '-' -> makeToken Token.MINUS       Nothing
-    '+' -> makeToken Token.PLUS        Nothing
-    ';' -> makeToken Token.SEMICOLON   Nothing
-    '*' -> makeToken Token.STAR        Nothing
+    '(' -> makeToken Token.LEFT_PAREN    Nothing
+    ')' -> makeToken Token.RIGHT_PAREN   Nothing
+    '{' -> makeToken Token.LEFT_BRACE    Nothing
+    '}' -> makeToken Token.RIGHT_BRACE   Nothing
+    ':' -> makeToken Token.COLON         Nothing
+    ',' -> makeToken Token.COMMA         Nothing
+    '.' -> makeToken Token.DOT           Nothing
+    '-' -> makeToken Token.MINUS         Nothing
+    '+' -> makeToken Token.PLUS          Nothing
+    '?' -> makeToken Token.QUESTION_MARK Nothing
+    ';' -> makeToken Token.SEMICOLON     Nothing
+    '*' -> makeToken Token.STAR          Nothing
     '!' -> match '=' >>= bool (makeToken Token.BANG          Nothing)
                               (makeToken Token.BANG_EQUAL    Nothing)
     '=' -> match '=' >>= bool (makeToken Token.EQUAL         Nothing)

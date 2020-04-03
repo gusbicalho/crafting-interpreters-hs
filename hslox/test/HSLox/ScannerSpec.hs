@@ -25,7 +25,7 @@ spec = do
      runScan Megaparsec.scanTokens testSource `shouldReturn` expectedResults
 
 testSource :: T.Text
-testSource = "//first comment\n{123.456.789\nand.123.treco&// zuera\n \"lol\" )!=!<=<>=>/bla \"erro"
+testSource = "//first comment\n{123.456.789\nand.123.treco&?:// zuera\n \"lol\" )!=!<=<>=>/bla \"erro"
 
 expectedResults :: (Seq ScanError, Seq Token)
 expectedResults =
@@ -43,6 +43,8 @@ expectedResults =
       , Token "123"     Token.NUMBER        (Just $ Token.LitNum 123.0)    3
       , Token "."       Token.DOT           Nothing                        3
       , Token "treco"   Token.IDENTIFIER    Nothing                        3
+      , Token "?"       Token.QUESTION_MARK Nothing                        3
+      , Token ":"       Token.COLON         Nothing                        3
       , Token "\"lol\"" Token.STRING        (Just $ Token.LitString "lol") 4
       , Token ")"       Token.RIGHT_PAREN   Nothing                        4
       , Token "!="      Token.BANG_EQUAL    Nothing                        4

@@ -9,6 +9,9 @@ pattern UnaryE op expr = UnaryExpr (Unary op expr)
 pattern BinaryE :: Expr -> Token -> Expr -> Expr
 pattern BinaryE left op right = BinaryExpr (Binary left op right)
 
+pattern TernaryE :: Expr -> Token -> Expr -> Token -> Expr -> Expr
+pattern TernaryE left op1 middle op2 right = TernaryExpr (Ternary left op1 middle op2 right)
+
 pattern GroupingE :: Expr -> Expr
 pattern GroupingE expr = GroupingExpr (Grouping expr)
 
@@ -26,8 +29,17 @@ pattern NilE = ValueExpr ValNil
 
 data Expr = UnaryExpr Unary
           | BinaryExpr Binary
+          | TernaryExpr Ternary
           | GroupingExpr Grouping
           | ValueExpr Value
+  deriving (Eq, Show, Ord)
+
+data Ternary = Ternary { ternaryLeft :: Expr
+                       , ternaryFirstOperator :: Token
+                       , ternaryMiddle :: Expr
+                       , ternarySecondOperator :: Token
+                       , ternaryRight :: Expr
+                       }
   deriving (Eq, Show, Ord)
 
 data Binary = Binary { binaryLeft :: Expr
