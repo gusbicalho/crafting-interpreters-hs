@@ -5,6 +5,7 @@ import Control.Effect.State
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import HSLox.Token (Token (..), TokenType)
+import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
 data ParserState
@@ -67,3 +68,10 @@ currentLine =
 
 previous :: Has (State ParserState) sig m => m (Maybe Token)
 previous = gets parserStatePrevious
+
+isAtEnd :: Has (State ParserState) sig m
+        => m Bool
+isAtEnd = do
+  ((Token.EOF ==) . tokenType <$> peek)
+    `Util.recoverFromEmptyWith`
+    pure True

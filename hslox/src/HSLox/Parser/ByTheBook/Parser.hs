@@ -1,6 +1,7 @@
 module HSLox.Parser.ByTheBook.Parser where
 
 import qualified Control.Effect.Error as ErrorEff
+import Control.Effect.Empty
 import Control.Carrier.Lift
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
@@ -20,15 +21,36 @@ parse :: forall sig m. Has (Writer (Seq ParserError)) sig m
 parse tokens
   = evalState (initialParserState tokens)
   . execWriter @(Seq Expr)
+  . Util.untilEmpty
   $ do
     expr' <- Util.runErrorToEither @ParserError expression
     case expr' of
-      Left error -> reportError error
-      Right expr -> tell $ Seq.singleton expr
+      Left error -> do
+        reportError error
+        synchronize
+      Right expr -> do
+        tell $ Seq.singleton expr
+    guard . not =<< isAtEnd
 
 type ExprParser = forall sig m. ( Has (ErrorEff.Throw ParserError) sig m
                                 , Has (State ParserState) sig m )
                                 => m Expr
+
+
+synchronize :: Has (State ParserState) sig m => m ()
+synchronize = Util.untilEmpty $ do
+  tk <- advance
+  guard $ (tokenType tk) /= Token.SEMICOLON
+  tk <- peek
+  guard $ any ((tokenType tk) ==) [ Token.CLASS
+                                  , Token.FUN
+                                  , Token.VAR
+                                  , Token.FOR
+                                  , Token.IF
+                                  , Token.WHILE
+                                  , Token.PRINT
+                                  , Token.RETURN
+                                  ]
 
 expression :: ExprParser
 expression = equality
@@ -89,17 +111,13 @@ primary = do
           `Util.recoverFromEmptyWith`
           throwParserError "Expect ')' after expression."
         pure expr
-      -- If `match` failed, point the error at the next token
-      Nothing -> do
-        Util.runEmptyToUnit advance
-        throwParserError "Expect expression."
       _ -> throwParserError "Expect expression."
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m
                 => T.Text -> m ParserError
 makeParserError msg = do
-    tk <- maybe eof id <$> previous
+    tk <- maybe eof id <$> Util.runEmptyToMaybe peek
     pure $ ParserError tk msg
   where
     eof = Token "" Token.EOF Nothing 0
