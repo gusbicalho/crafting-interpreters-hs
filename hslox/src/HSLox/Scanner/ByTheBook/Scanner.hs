@@ -27,12 +27,12 @@ import HSLox.Scanner.ByTheBook.ScanState
   )
 import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
-import HSLox.Error (Error (..))
-import qualified HSLox.Error as Error
+import HSLox.Scanner.ScanError (ScanError (..))
+import qualified HSLox.Scanner.ScanError as ScanError
 import qualified HSLox.Util as Util
 
 scanTokens ::
-  forall sig m. Has (State [Error]) sig m
+  forall sig m. Has (Writer (Seq ScanError)) sig m
              => T.Text
              -> m (Seq Token)
 scanTokens source
@@ -60,18 +60,18 @@ makeToken tkType tkLiteral = do
              }
 
 reportError :: Has (State ScanState) sig m
-            => Has (State [Error]) sig m
+            => Has (Writer (Seq ScanError)) sig m
             => T.Text -> m ()
 reportError msg = do
   line <- getLine
-  Error.reportError $ Error line "" msg
+  ScanError.reportScanError $ ScanError line "" msg
 
 buildEOFToken :: Has (State ScanState) sig m => m Token
 buildEOFToken = do
   Token "" Token.EOF Nothing <$> getLine
 
 scanNextToken :: Has Empty sig m
-              => Has (State [Error]) sig m
+              => Has (Writer (Seq ScanError)) sig m
               => Has (State ScanState) sig m
               => m (Maybe Token)
 scanNextToken = Util.runEmptyToMaybe $ do
@@ -116,7 +116,7 @@ lineComment = Util.untilEmpty $ do
   advance
 
 stringLit :: Has Empty sig m
-          => Has (State [Error]) sig m
+          => Has (Writer (Seq ScanError)) sig m
           => Has (State ScanState) sig m
           => m T.Text
 stringLit = do

@@ -3,16 +3,16 @@
 module HSLox.ScannerSpec where
 
 import Control.Carrier.Lift
-import Control.Carrier.State.Church
 import Control.Carrier.Trace.Printing
 import Data.Sequence (Seq)
 import qualified Data.Text as T
 import qualified Data.Sequence as Seq
-import HSLox.Error
+import HSLox.Scanner.ScanError
 import qualified HSLox.Scanner.ByTheBook.Scanner as ByTheBook
 import qualified HSLox.Scanner.Megaparsec as Megaparsec
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
+import qualified HSLox.Util as Util
 import Test.Hspec
 
 spec :: Spec
@@ -27,11 +27,12 @@ spec = do
 testSource :: T.Text
 testSource = "//first comment\n{123.456.789\nand.123.treco&// zuera\n \"lol\" )!=!<=<>=>/bla \"erro"
 
-expectedResults :: ([Error], Seq Token)
+expectedResults :: (Seq ScanError, Seq Token)
 expectedResults =
-  ( [ Error {errorLine = 4, errorWhere = "", errorMessage = "Unterminated string."}
-    , Error {errorLine = 3, errorWhere = "", errorMessage = "Unexpected character: &"}
-    ]
+  ( Seq.fromList
+      [ ScanError 3 "" "Unexpected character: &"
+      , ScanError 4 "" "Unterminated string."
+      ]
   , Seq.fromList
       [ Token "{"       Token.LEFT_BRACE    Nothing                        2
       , Token "123.456" Token.NUMBER        (Just $ Token.LitNum 123.456)  2
@@ -56,8 +57,8 @@ expectedResults =
       ]
   )
 
-runScan :: (a -> _ (Seq Token)) -> a -> IO ([Error], (Seq Token))
+runScan :: (a -> _ (Seq Token)) -> a -> IO (Seq ScanError, (Seq Token))
 runScan scanTokens = runM @IO
                    . runTrace
-                   . runState @[Error] (\s a -> pure (s,a)) []
+                   . Util.runWriterToPair @(Seq ScanError)
                    . scanTokens

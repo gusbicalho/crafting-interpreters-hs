@@ -1,6 +1,7 @@
 module HSLox.Scanner.Megaparsec where
 
 import Control.Carrier.State.Church
+import Control.Effect.Writer
 import Control.Monad.Trans (lift)
 import Data.Char (isLetter, isDigit)
 import Data.Foldable (asum, for_)
@@ -16,11 +17,11 @@ import qualified Text.Megaparsec.Char as P.Char
 import qualified Text.Megaparsec.Char.Lexer as P.L
 import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
-import HSLox.Error (Error (..))
-import qualified HSLox.Error as Error
+import HSLox.Scanner.ScanError (ScanError (..))
+import qualified HSLox.Scanner.ScanError as ScanError
 
 scanTokens ::
-  forall sig m. Has (State [Error]) sig m
+  forall sig m. Has (Writer (Seq ScanError)) sig m
              => T.Text
              -> m (Seq Token)
 scanTokens source = do
@@ -37,13 +38,13 @@ scanTokens source = do
     registerErrorBundle errorBundle = for_ (bundleErrors errorBundle) register
     register (FancyError _ errs) = do
       for_ errs $ \case
-        ErrorCustom e -> Error.reportError e
-        err -> Error.reportError $ Error 0 "" (T.pack $ show err)
+        ErrorCustom e -> ScanError.reportScanError e
+        err -> ScanError.reportScanError $ ScanError 0 "" (T.pack $ show err)
     register err =
-      Error.reportError $ Error 0 "" (T.pack $ show err)
+      ScanError.reportScanError $ ScanError 0 "" (T.pack $ show err)
 
-manyTokensUntilEOF :: MonadParsec Error T.Text f
-                   => (ParseError T.Text Error -> f (Maybe Token))
+manyTokensUntilEOF :: MonadParsec ScanError T.Text f
+                   => (ParseError T.Text ScanError -> f (Maybe Token))
                    -> f (Seq Token)
 manyTokensUntilEOF recover = do
   space
@@ -52,16 +53,16 @@ manyTokensUntilEOF recover = do
                   (eof >> makeToken Token.EOF Nothing "")
   pure $ (Seq.fromList . catMaybes $ tks) Seq.|> eof
 
-space :: MonadParsec Error T.Text m => m ()
+space :: MonadParsec ScanError T.Text m => m ()
 space = P.L.space P.Char.space1 (P.L.skipLineComment "//") empty
 
-lexeme :: MonadParsec Error T.Text m => m a -> m a
+lexeme :: MonadParsec ScanError T.Text m => m a -> m a
 lexeme = P.L.lexeme space
 
-symbol :: MonadParsec Error T.Text m => T.Text -> m T.Text
+symbol :: MonadParsec ScanError T.Text m => T.Text -> m T.Text
 symbol = P.L.symbol space
 
-nextToken :: MonadParsec Error T.Text m => m Token
+nextToken :: MonadParsec ScanError T.Text m => m Token
 nextToken =
     asum [ singleCharToken '(' Token.LEFT_PAREN
          , singleCharToken ')' Token.RIGHT_PAREN
@@ -93,13 +94,13 @@ nextToken =
       error <- makeError ("Unexpected character: " `T.snoc` c)
       fancyFailure error
 
-makeError :: MonadParsec Error T.Text m
-            => T.Text -> m (Set.Set (ErrorFancy Error))
+makeError :: MonadParsec ScanError T.Text m
+            => T.Text -> m (Set.Set (ErrorFancy ScanError))
 makeError msg = do
   line <- unPos . sourceLine <$> getSourcePos
-  pure . Set.singleton . ErrorCustom $ Error line "" msg
+  pure . Set.singleton . ErrorCustom $ ScanError line "" msg
 
-makeToken :: MonadParsec Error T.Text m => TokenType -> Maybe Token.LiteralValue -> T.Text -> m Token
+makeToken :: MonadParsec ScanError T.Text m => TokenType -> Maybe Token.LiteralValue -> T.Text -> m Token
 makeToken tkType tkLiteral lexeme = do
   line <- unPos . sourceLine <$> getSourcePos
   pure Token { tokenType = tkType
@@ -108,11 +109,11 @@ makeToken tkType tkLiteral lexeme = do
              , tokenLine = line
              }
 
-singleCharToken :: MonadParsec Error T.Text m => Char -> TokenType -> m Token
+singleCharToken :: MonadParsec ScanError T.Text m => Char -> TokenType -> m Token
 singleCharToken c tkType =
   try (makeToken tkType Nothing =<< symbol (T.singleton c))
 
-oneTwoCharToken :: MonadParsec Error T.Text f => Char -> TokenType -> Char -> TokenType -> f Token
+oneTwoCharToken :: MonadParsec ScanError T.Text f => Char -> TokenType -> Char -> TokenType -> f Token
 oneTwoCharToken c1 oneCharType c2 twoCharsType =
     asum [ try . lexeme $ P.Char.char c1 <* notFollowedBy (P.Char.char c2)
                             *> makeToken oneCharType Nothing oneCharSymbol
@@ -123,7 +124,7 @@ oneTwoCharToken c1 oneCharType c2 twoCharsType =
     oneCharSymbol = T.singleton c1
     twoCharSymbol = oneCharSymbol `T.snoc` c2
 
-stringToken :: MonadParsec Error T.Text m => m Token
+stringToken :: MonadParsec ScanError T.Text m => m Token
 stringToken = do
   openQuote <- try (P.Char.char '\"')
   s <- T.pack <$> many (anySingleBut '\"')
@@ -132,7 +133,7 @@ stringToken = do
             (Just $ Token.LitString s)
             (openQuote `T.cons` s `T.snoc` closeQuote)
 
-numberToken :: MonadParsec Error T.Text m => m Token
+numberToken :: MonadParsec ScanError T.Text m => m Token
 numberToken = try $ do
   wholeDigits <- some P.Char.digitChar
   decimals <- try (do dot <- P.Char.char '.'
@@ -150,7 +151,7 @@ isIdentifierFirst c = c == '_' || isLetter c
 isIdentifierPart :: Char -> Bool
 isIdentifierPart c = isIdentifierFirst c || isDigit c
 
-identifierOrKeywordToken :: MonadParsec Error T.Text m => m Token
+identifierOrKeywordToken :: MonadParsec ScanError T.Text m => m Token
 identifierOrKeywordToken = try $ do
   init <- takeWhile1P (Just "") isIdentifierFirst
   rest <- takeWhileP (Just "") isIdentifierPart

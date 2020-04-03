@@ -3,7 +3,8 @@ module HSLox.Util where
 
 import Control.Carrier.Empty.Church
 import Control.Carrier.Error.Church
-import Control.Effect.State
+import Control.Carrier.State.Church
+import Control.Carrier.Writer.Church
 import Control.Effect.Trace
 import Control.Monad (forever)
 
@@ -54,6 +55,12 @@ tapM ma = do
   a <- ma
   trace (show a)
   pure a
+
+runStateToPair :: forall s m a. Applicative m => s -> StateC s m a -> m (s, a)
+runStateToPair = runState (\s a -> pure (s, a))
+
+runWriterToPair :: forall w m a. (Monoid w, Applicative m) => WriterC w m a -> m (w, a)
+runWriterToPair = runWriter (\w a -> pure (w, a))
 
 -- Holds a reference to the current monadic state, then calls the
 -- provided fn with restore action, which can be used to restore

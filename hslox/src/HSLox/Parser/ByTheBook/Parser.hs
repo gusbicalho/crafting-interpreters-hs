@@ -7,25 +7,25 @@ import Control.Carrier.Writer.Church
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import HSLox.AST
-import HSLox.Error
+import HSLox.Parser.ParserError
 import HSLox.Parser.ByTheBook.ParserState
 import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
-parse :: forall sig m. Has (State [Error]) sig m
+parse :: forall sig m. Has (Writer (Seq ParserError)) sig m
                     => (Seq Token)
                     -> m (Seq Expr)
 parse tokens
   = evalState (initialParserState tokens)
   . execWriter @(Seq Expr)
   $ do
-    expr' <- Util.runErrorToEither @Error expression
+    expr' <- Util.runErrorToEither @ParserError expression
     case expr' of
       Left error -> reportError error
       Right expr -> tell $ Seq.singleton expr
 
-type ExprParser = forall sig m. ( Has (ErrorEff.Throw Error) sig m
+type ExprParser = forall sig m. ( Has (ErrorEff.Throw ParserError) sig m
                                 , Has (State ParserState) sig m )
                                 => m Expr
 
@@ -92,7 +92,7 @@ primary = do
   where
     error msg = do
       line <- currentLine
-      ErrorEff.throwError $ Error line "" msg
+      ErrorEff.throwError $ ParserError line "" msg
 
 leftAssociativeBinaryOp :: Foldable t => ExprParser -> t TokenType -> ExprParser
 leftAssociativeBinaryOp termParser opTypes = do
