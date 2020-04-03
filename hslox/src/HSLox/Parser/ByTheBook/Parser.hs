@@ -2,8 +2,11 @@ module HSLox.Parser.ByTheBook.Parser where
 
 import qualified Control.Effect.Error as ErrorEff
 import Control.Effect.Empty
+import Control.Carrier.Empty.Church (EmptyC)
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
+import Control.Monad (void)
+import Data.Foldable
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
@@ -54,7 +57,12 @@ expression :: ExprParser
 expression = comma
 
 comma :: ExprParser
-comma = leftAssociativeBinaryOp conditional [ Token.COMMA ]
+comma = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
+    leftAssociativeBinaryOp conditional opTypes
+  where
+    opTypes = [ Token.COMMA ]
 
 conditional :: ExprParser
 conditional = do
@@ -71,26 +79,44 @@ conditional = do
       pure $ TernaryE  left op1 middle op2 right
 
 equality :: ExprParser
-equality = leftAssociativeBinaryOp comparison [ Token.EQUAL_EQUAL
-                                              , Token.BANG_EQUAL
-                                              ]
+equality = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
+    leftAssociativeBinaryOp comparison opTypes
+  where
+    opTypes = [ Token.EQUAL_EQUAL
+              , Token.BANG_EQUAL
+              ]
 
 comparison :: ExprParser
-comparison = leftAssociativeBinaryOp addition [ Token.GREATER
-                                              , Token.GREATER_EQUAL
-                                              , Token.LESS
-                                              , Token.LESS_EQUAL
-                                              ]
+comparison = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression addition opTypes ]
+    leftAssociativeBinaryOp addition opTypes
+  where
+    opTypes = [ Token.GREATER
+              , Token.GREATER_EQUAL
+              , Token.LESS
+              , Token.LESS_EQUAL
+              ]
 
 addition :: ExprParser
-addition = leftAssociativeBinaryOp multiplication [ Token.MINUS
-                                                  , Token.PLUS
-                                                  ]
+addition = do
+  checkForKnownErrorProductions
+    [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
+  leftAssociativeBinaryOp multiplication [ Token.MINUS
+                                         , Token.PLUS
+                                         ]
 
 multiplication :: ExprParser
-multiplication = leftAssociativeBinaryOp unary [ Token.STAR
-                                               , Token.SLASH
-                                               ]
+multiplication = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression unary opTypes ]
+    leftAssociativeBinaryOp unary opTypes
+  where
+    opTypes =  [ Token.STAR
+               , Token.SLASH
+               ]
 
 unary :: ExprParser
 unary = do
@@ -151,3 +177,34 @@ leftAssociativeBinaryOp termParser opTypes = do
     right <- termParser
     put $ BinaryE left op right
   pure e
+
+checkForKnownErrorProductions
+  :: Foldable t
+  => Has (State ParserState) sig m
+  => t (EmptyC m a) -> m ()
+checkForKnownErrorProductions errorProductions
+  = Util.backingUpState @ParserState $ \restore -> do
+      for_ errorProductions Util.runEmptyToUnit
+      restore
+
+binaryOperatorAtBeginningOfExpression
+  :: Foldable t
+  => Has (ErrorEff.Error ParserError) sig m
+  => Has (State ParserState) sig m
+  => Has Empty sig m
+  => m a -> t TokenType -> m b
+binaryOperatorAtBeginningOfExpression termParser opTypes = do
+  op <- match opTypes
+  error <- makeParserError $ "Binary operator "
+                          <> (tokenLexeme op)
+                          <> " found at the beginning of expression."
+  synchronizeByConsuming termParser
+  ErrorEff.throwError error
+
+synchronizeByConsuming
+  :: Has (ErrorEff.Catch ParserError) sig m
+  => m a -> m ()
+synchronizeByConsuming termParser =
+  ErrorEff.catchError @ParserError
+    (void termParser)
+    (const $ pure ())
