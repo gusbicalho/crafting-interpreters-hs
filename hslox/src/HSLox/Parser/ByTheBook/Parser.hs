@@ -53,7 +53,10 @@ synchronize = Util.untilEmpty $ do
                                   ]
 
 expression :: ExprParser
-expression = equality
+expression = comma
+
+comma :: ExprParser
+comma = leftAssociativeBinaryOp equality [ Token.COMMA ]
 
 equality :: ExprParser
 equality = leftAssociativeBinaryOp comparison [ Token.EQUAL_EQUAL
