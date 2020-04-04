@@ -195,9 +195,9 @@ binaryOperatorAtBeginningOfExpression
   => m a -> t TokenType -> m b
 binaryOperatorAtBeginningOfExpression termParser opTypes = do
   op <- match opTypes
-  error <- makeParserError $ "Binary operator "
-                          <> (tokenLexeme op)
-                          <> " found at the beginning of expression."
+  let error = ParserError op $ "Binary operator "
+                            <> (tokenLexeme op)
+                            <> " found at the beginning of expression."
   synchronizeByConsuming termParser
   ErrorEff.throwError error
 
