@@ -1,9 +1,9 @@
 module HSLox.Parser.Megaparsec where
 
 import Control.Effect.Error as ErrorEff
-import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Control.Monad.Trans (lift)
+import Data.Maybe (catMaybes)
 import Data.Foldable
 import Data.Functor
 import Data.Sequence (Seq)
@@ -22,17 +22,13 @@ parse :: Has (Writer (Seq ParserError)) sig m
       => (Seq Token)
       -> m (Seq Expr)
 parse tokens = do
-    exprs <- runParserT nextExpr "" (TokenStream tokens)
+    exprs <- runParserT (manyExprsUntilEOF (lift . register)) "" (TokenStream tokens)
     case exprs of
       Left errorBundle -> do
-        registerErrorBundle errorBundle
+        for_ (bundleErrors errorBundle) register
         pure (Seq.empty)
-      Right exprs' -> pure . Seq.singleton $ exprs'
+      Right exprs' -> pure exprs'
   where
-    recover err = do
-      lift $ register err
-      pure Nothing
-    registerErrorBundle errorBundle = for_ (bundleErrors errorBundle) register
     register (FancyError _ errs) = do
       for_ errs $ \case
         ErrorCustom e -> ParserError.reportError e
@@ -40,12 +36,35 @@ parse tokens = do
     register err =
       ParserError.reportError $ ParserError Nothing (T.pack $ show err)
 
+manyExprsUntilEOF :: MonadParsec ParserError TokenStream m
+                  => (ParseError TokenStream ParserError -> m ())
+                  -> m (Seq Expr)
+manyExprsUntilEOF handleError =
+    Seq.fromList . catMaybes <$>
+      manyTill
+        (withRecovery recover (Just <$> expression))
+        (eof <|> void (singleMatching [ Token.EOF ]))
+  where
+    recover err = do
+      handleError err
+      manyTill anySingle synchronizationPoint
+      pure Nothing
+    synchronizationPoint =
+      asum [ void             $ singleMatching [ Token.SEMICOLON ]
+           , void . lookAhead $ singleMatching [ Token.CLASS
+                                               , Token.FUN
+                                               , Token.VAR
+                                               , Token.FOR
+                                               , Token.IF
+                                               , Token.WHILE
+                                               , Token.PRINT
+                                               , Token.RETURN
+                                               ]
+           , eof
+           ]
 
 makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
-
-nextExpr :: MonadParsec ParserError TokenStream m => m Expr
-nextExpr = expression
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
 expression = comma
