@@ -70,7 +70,12 @@ expression :: MonadParsec ParserError TokenStream m => m Expr
 expression = comma
 
 comma :: MonadParsec ParserError TokenStream m => m Expr
-comma = leftAssociativeBinaryOp conditional [ Token.COMMA ]
+comma =
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
+      <|> leftAssociativeBinaryOp conditional opTypes
+  where
+    opTypes = [ Token.COMMA ]
 
 conditional :: MonadParsec ParserError TokenStream m => m Expr
 conditional = do
@@ -86,7 +91,9 @@ conditional = do
 
 equality :: MonadParsec ParserError TokenStream m => m Expr
 equality =
-    leftAssociativeBinaryOp comparison opTypes
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
+      <|> leftAssociativeBinaryOp comparison opTypes
   where
     opTypes = [ Token.EQUAL_EQUAL
               , Token.BANG_EQUAL
@@ -94,7 +101,9 @@ equality =
 
 comparison :: MonadParsec ParserError TokenStream m => m Expr
 comparison =
-    leftAssociativeBinaryOp addition opTypes
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression addition opTypes ]
+      <|> leftAssociativeBinaryOp addition opTypes
   where
     opTypes = [ Token.GREATER
               , Token.GREATER_EQUAL
@@ -104,15 +113,17 @@ comparison =
 
 addition :: MonadParsec ParserError TokenStream m => m Expr
 addition =
-    leftAssociativeBinaryOp multiplication opTypes
-  where
-    opTypes = [ Token.MINUS
-              , Token.PLUS
-              ]
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
+      <|> leftAssociativeBinaryOp multiplication [ Token.MINUS
+                                           , Token.PLUS
+                                           ]
 
 multiplication :: MonadParsec ParserError TokenStream m => m Expr
 multiplication =
-    leftAssociativeBinaryOp unary opTypes
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression unary opTypes ]
+      <|> leftAssociativeBinaryOp unary opTypes
   where
     opTypes = [ Token.STAR
               , Token.SLASH
@@ -162,9 +173,27 @@ maybeAny :: MonadParsec ParserError TokenStream m => m (Maybe Token)
 maybeAny = (Just <$> anySingle) <|> pure Nothing
 
 consume :: Foldable t
-        => MonadParsec ParserError TokenStream f
-        => t TokenType -> T.Text -> f Token
+        => MonadParsec ParserError TokenStream m
+        => t TokenType -> T.Text -> m Token
 consume tkTypes errorMsg
     = singleMatching tkTypes
   <|> do tk <- maybeAny
          fancyFailure (makeError tk errorMsg)
+
+checkForKnownErrorProductions
+  :: Foldable t
+  => MonadParsec ParserError TokenStream m
+  => t (m a) -> m a
+checkForKnownErrorProductions errorProductions
+  = lookAhead $ asum errorProductions
+
+binaryOperatorAtBeginningOfExpression
+  :: Foldable t
+  => MonadParsec ParserError TokenStream m
+  => m a -> t TokenType -> m b
+binaryOperatorAtBeginningOfExpression termParser opTypes = do
+  op <- singleMatching opTypes
+  observing termParser
+  fancyFailure $ makeError (Just op) $ "Binary operator "
+                                    <> (tokenLexeme op)
+                                    <> " found at the beginning of expression."
