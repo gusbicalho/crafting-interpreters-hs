@@ -10,20 +10,26 @@ import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 
 data ParserError
-  = ParserError
-  { parserErrorToken :: Token
-  , parserErrorMessage :: T.Text
-  }
+  = ParserError { parserErrorToken :: Maybe Token
+                , parserErrorMessage :: T.Text
+                }
   deriving (Eq, Show, Ord)
 
 instance ToErrorReport ParserError where
   toErrorReport ParserError { parserErrorToken, parserErrorMessage }
-    = ErrorReport { errorReportLine = (tokenLine parserErrorToken)
-                  , errorReportWhere = case (tokenType parserErrorToken) of
-                      Token.EOF -> " at end"
-                      _ -> " at '" <> (tokenLexeme parserErrorToken) <> "'"
-                  , errorReportMessage = parserErrorMessage
-                  }
+    = case parserErrorToken of
+        Nothing ->
+          ErrorReport { errorReportLine = 0
+                      , errorReportWhere = ""
+                      , errorReportMessage = parserErrorMessage
+                      }
+        Just token ->
+          ErrorReport { errorReportLine = (tokenLine token)
+                      , errorReportWhere = case (tokenType token) of
+                          Token.EOF -> " at end"
+                          _ -> " at '" <> (tokenLexeme token) <> "'"
+                      , errorReportMessage = parserErrorMessage
+                      }
 
 reportError :: _ => ParserError -> m ()
 reportError error = tell (Seq.singleton error)

@@ -17,9 +17,9 @@ import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
-parse :: forall sig m. Has (Writer (Seq ParserError)) sig m
-                    => (Seq Token)
-                    -> m (Seq Expr)
+parse :: Has (Writer (Seq ParserError)) sig m
+      => (Seq Token)
+      -> m (Seq Expr)
 parse tokens
   = evalState (initialParserState tokens)
   . execWriter @(Seq Expr)
@@ -159,7 +159,7 @@ makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => T.Text -> m ParserError
 makeParserError msg = do
     tk <- maybe eof id <$> Util.runEmptyToMaybe peek
-    pure $ ParserError tk msg
+    pure $ ParserError (Just tk) msg
   where
     eof = Token "" Token.EOF Nothing 0
 
@@ -195,9 +195,9 @@ binaryOperatorAtBeginningOfExpression
   => m a -> t TokenType -> m b
 binaryOperatorAtBeginningOfExpression termParser opTypes = do
   op <- match opTypes
-  let error = ParserError op $ "Binary operator "
-                            <> (tokenLexeme op)
-                            <> " found at the beginning of expression."
+  let error = ParserError (Just op) $ "Binary operator "
+                                   <> (tokenLexeme op)
+                                   <> " found at the beginning of expression."
   synchronizeByConsuming termParser
   ErrorEff.throwError error
 
