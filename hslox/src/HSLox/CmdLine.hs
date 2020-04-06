@@ -7,9 +7,15 @@ module HSLox.CmdLine
 import Control.Carrier.Empty.Maybe
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import HSLox.CmdLine.ReadLine
-import HSLox.ErrorReport (ErrorReport)
+import HSLox.ErrorReport (ErrorReport, toErrorReport)
+import qualified HSLox.Parser.Megaparsec as Parser
+import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
+import qualified HSLox.Scanner.Megaparsec as Scanner
+import HSLox.Scanner.ScanError (ScanError)
 import qualified HSLox.Util as Util
 import Data.Foldable
 import Data.Function
@@ -61,31 +67,36 @@ runFromSourceFile path =
 
 runSource :: _ => T.Text -> m ()
 runSource source = do
-  result <- Interpreter.interpret source
-  case result of
-    Left compileErrorReports -> do
-      reportErrors compileErrorReports
-      sendM @IO $ exitWith (ExitFailure 65)
-    Right (values, rtError) -> do
-      for_ values $ \value -> do
-        sendM @IO $ putStrLn (show value)
-      for_ rtError $ \error -> do
-        sendM @IO $ putStrLn (show error)
-        sendM @IO $ exitWith (ExitFailure (-1))
+  (scanErrors, tokens) <- Util.runWriterToPair @(Seq ScanError) $ Scanner.scanTokens source
+  (parserErrors, exprs) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
+  if scanErrors /= Seq.empty || parserErrors /= Seq.empty
+  then do
+    reportErrors $ (toErrorReport <$> scanErrors)
+                <> (toErrorReport <$> parserErrors)
+    sendM @IO $ exitWith (ExitFailure 65)
+  else do
+    (values, rtError) <- Interpreter.interpretExprs exprs
+    for_ values $ \value -> do
+      sendM @IO $ putStrLn (show value)
+    for_ rtError $ \error -> do
+      sendM @IO $ putStrLn (show error)
+      sendM @IO $ exitWith (ExitFailure (-1))
 
 runRepl :: _ => m ()
 runRepl = Util.untilEmpty $ do
   line <- readLine
   guard (line /= ":e")
-  result <- Interpreter.interpret line
-  case result of
-    Left compileErrorReports -> do
-      reportErrors compileErrorReports
-    Right (values, rtError) -> do
-      for_ values $ \value -> do
-        sendM @IO $ putStrLn (show value)
-      for_ rtError $ \error -> do
-        sendM @IO $ putStrLn (show error)
+  (scanErrors, tokens) <- Util.runWriterToPair @(Seq ScanError) $ Scanner.scanTokens line
+  (parserErrors, exprs) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
+  if scanErrors /= Seq.empty || parserErrors /= Seq.empty
+  then reportErrors $ (toErrorReport <$> scanErrors)
+                   <> (toErrorReport <$> parserErrors)
+  else do
+    (values, rtError) <- Interpreter.interpretExprs exprs
+    for_ values $ \value -> do
+      sendM @IO $ putStrLn (show value)
+    for_ rtError $ \error -> do
+      sendM @IO $ putStrLn (show error)
 
 reportErrors :: _ => f ErrorReport -> m ()
 reportErrors errors = for_ errors (trace . show)

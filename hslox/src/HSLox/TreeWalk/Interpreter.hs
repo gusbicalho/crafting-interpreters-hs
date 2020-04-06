@@ -12,39 +12,21 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
 import HSLox.ASTPrinter (printAST)
-import HSLox.ErrorReport (ErrorReport, toErrorReport)
-import qualified HSLox.Scanner.Megaparsec as Scanner
-import HSLox.Scanner.ScanError (ScanError)
-import qualified HSLox.Parser.Megaparsec as Parser
-import HSLox.Parser.ParserError (ParserError)
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
-interpret :: Has Trace sig m
-          => T.Text -> m (Either (Seq ErrorReport) (Seq RTValue, Maybe RTError))
-interpret source = do
-  let parsed = runParser source
-  case parsed of
-    Left (scanErrors, parserErrors) ->
-      pure . Left $ (toErrorReport <$> scanErrors)
-                 <> (toErrorReport <$> parserErrors)
-    Right exprs ->
-      fmap Right $ Util.runWriterToPair @(Seq RTValue)
-                 . fmap (Util.rightToMaybe . Util.swapEither)
-                 . Util.runErrorToEither @RTError
-                 . for_ exprs $ \expr -> do
-                    trace . T.unpack $ "expr> " <> printAST expr
-                    result <- interpretAST expr
-                    tell (Seq.singleton result)
-
-runParser :: T.Text -> Either (Seq ScanError, Seq ParserError) (Seq AST.Expr)
-runParser source = run $ do
-  (scanErrors, tokens) <- Util.runWriterToPair @(Seq ScanError) $ Scanner.scanTokens source
-  (parserErrors, exprs) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
-  if (scanErrors /= Seq.empty || parserErrors /= Seq.empty)
-  then pure . Left  $ (scanErrors, parserErrors)
-  else pure . Right $ exprs
+interpretExprs :: Foldable t
+               => Has Trace sig m
+               => t AST.Expr
+               -> m (Seq RTValue, Maybe RTError)
+interpretExprs exprs = Util.runWriterToPair @(Seq RTValue)
+                     . fmap (Util.rightToMaybe . Util.swapEither)
+                     . Util.runErrorToEither @RTError
+                     . for_ exprs $ \expr -> do
+                        trace . T.unpack $ "expr> " <> printAST expr
+                        result <- interpretAST expr
+                        tell (Seq.singleton result)
 
 data RTValue
   = ValString T.Text
@@ -53,7 +35,9 @@ data RTValue
   | ValNil
   deriving (Eq, Show, Ord)
 
-data RTError = RTError T.Text
+data RTError = RTError { rtErrorMessage :: T.Text
+                       , rtErrorToken :: Token
+                       }
   deriving (Eq, Show)
 
 class ASTInterpreter e m where
@@ -77,11 +61,11 @@ instance ( ASTInterpreter AST.Expr m
           if isTruthy leftVal
           then interpretAST middle
           else interpretAST right
-        _ -> throwRT $ "AST Error: Operator pair "
-                    <> tokenLexeme op1
-                    <> " and "
-                    <> tokenLexeme op2
-                    <> " not supported in ternary position"
+        _ -> throwRT op2 $ "AST Error: Operator pair "
+                        <> tokenLexeme op1
+                        <> " and "
+                        <> tokenLexeme op2
+                        <> " not supported in ternary position"
 
 instance ( ASTInterpreter AST.Expr m
          , Has (Error RTError) sig m )
@@ -91,28 +75,25 @@ instance ( ASTInterpreter AST.Expr m
       rightVal <- interpretAST right
       case tokenType op of
         Token.COMMA         -> pure rightVal
-        Token.PLUS          -> sumVals leftVal rightVal
-        Token.MINUS         -> applyNumericOp (-) leftVal rightVal
-        Token.STAR          -> applyNumericOp (*) leftVal rightVal
-        Token.SLASH         -> applyNumericOp (/) leftVal rightVal
-        Token.GREATER       -> applyComparisonOp (>)  leftVal rightVal
-        Token.GREATER_EQUAL -> applyComparisonOp (>=) leftVal rightVal
-        Token.LESS          -> applyComparisonOp (<)  leftVal rightVal
-        Token.LESS_EQUAL    -> applyComparisonOp (<=) leftVal rightVal
+        Token.PLUS          -> sumVals op leftVal rightVal
+        Token.MINUS         -> applyNumericOp op (-) leftVal rightVal
+        Token.STAR          -> applyNumericOp op (*) leftVal rightVal
+        Token.SLASH         -> applyNumericOp op (/) leftVal rightVal
+        Token.GREATER       -> applyComparisonOp op (>)  leftVal rightVal
+        Token.GREATER_EQUAL -> applyComparisonOp op (>=) leftVal rightVal
+        Token.LESS          -> applyComparisonOp op (<)  leftVal rightVal
+        Token.LESS_EQUAL    -> applyComparisonOp op (<=) leftVal rightVal
         Token.EQUAL_EQUAL   -> pure . ValBool       $ isEqual leftVal rightVal
         Token.BANG_EQUAL    -> pure . ValBool . not $ isEqual leftVal rightVal
-        _ -> throwRT $ "AST Error: Operator "
-                    <> tokenLexeme op
-                    <> " not supported in binary position"
+        _ -> throwRT op $ "AST Error: Operator "
+                       <> tokenLexeme op
+                       <> " not supported in binary position"
     where
-      applyNumericOp op v1 v2 = ValNum <$> (op <$> castValToNum v1
-                                               <*> castValToNum v2)
-      sumVals (ValNum d1)    v2 = ValNum    . (d1 +)  <$> castValToNum v2
-      sumVals (ValString s1) v2 = ValString . (s1 <>) <$> castValToString v2
-      sumVals _              _  = throwRT "Operands must be two numbers or two strings."
-      applyComparisonOp op v1 v2 = ValBool <$> (op <$> castValToNum v1
-                                                   <*> castValToNum v2)
-      -- sumVals (ValNum d1) (ValNum d2) = pure . ValNum $ d1 - d2
+      applyNumericOp    opTk op v1 v2 = ValNum  . uncurry op <$> numericOperands opTk v1 v2
+      applyComparisonOp opTk op v1 v2 = ValBool . uncurry op <$> numericOperands opTk v1 v2
+      sumVals _ (ValNum d1)    (ValNum d2)    = pure $ ValNum (d1 + d2)
+      sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
+      sumVals opTk _ _ = throwRT opTk "Operands must be two numbers or two strings."
 
 instance ( ASTInterpreter AST.Expr m
          , Has (Error RTError) sig m )
@@ -120,11 +101,11 @@ instance ( ASTInterpreter AST.Expr m
   interpretAST (AST.Unary op expr) = do
     val <- interpretAST expr
     case tokenType op of
-      Token.BANG -> pure . ValBool . not . isTruthy $val
-      Token.MINUS -> negateValue val
-      _ -> throwRT $ "AST Error: Operator "
-                  <> tokenLexeme op
-                  <> " not supported in unary position"
+      Token.BANG -> pure . ValBool . not . isTruthy $ val
+      Token.MINUS -> ValNum . negate <$> numericOperand op val
+      _ -> throwRT op $ "AST Error: Operator "
+                     <> tokenLexeme op
+                     <> " not supported in unary position"
 
 instance ASTInterpreter AST.Expr m => ASTInterpreter AST.Grouping m where
   interpretAST (AST.Grouping expr) = interpretAST expr
@@ -135,8 +116,8 @@ instance Applicative m => ASTInterpreter AST.Literal m where
   interpretAST (AST.LitBool b)   = pure $ ValBool b
   interpretAST AST.LitNil        = pure $ ValNil
 
-throwRT :: Has (Error RTError) sig m => T.Text -> m a
-throwRT = throwError . RTError
+throwRT :: Has (Throw RTError) sig m => Token -> T.Text -> m a
+throwRT tk msg = throwError $ RTError msg tk
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b
@@ -150,14 +131,20 @@ isEqual (ValBool b1)   (ValBool b2)   = b1 == b2
 isEqual ValNil         ValNil         = True
 isEqual _              _              = False
 
-negateValue :: Has (Error RTError) sig m => RTValue -> m RTValue
-negateValue (ValNum d) = pure $ ValNum (negate d)
-negateValue v = throwRT $ "Unary - expected number operand, found " <> T.pack (show v)
+negateValue :: Has (Error RTError) sig m => Token -> RTValue -> m RTValue
+negateValue tk v = ValNum . negate <$> numericOperand tk v
 
-castValToNum :: Has (Error RTError) sig m => RTValue -> m Double
-castValToNum (ValNum d) = pure d
-castValToNum v = throwRT $ "Expected number, found " <> T.pack (show v)
+numericOperand :: Has (Throw RTError) sig m
+                => Token
+                -> RTValue
+                -> m Double
+numericOperand _ (ValNum n) = pure n
+numericOperand opTk _ = throwRT opTk "Operand must be a number."
 
-castValToString :: Has (Error RTError) sig m => RTValue -> m T.Text
-castValToString (ValString s) = pure s
-castValToString v = throwRT $ "Expected string, found " <> T.pack (show v)
+numericOperands :: Has (Throw RTError) sig m
+                => Token
+                -> RTValue
+                -> RTValue
+                -> m (Double, Double)
+numericOperands _ (ValNum n1) (ValNum n2) = pure (n1, n2)
+numericOperands opTk _ _ = throwRT opTk "Operands must be numbers."
