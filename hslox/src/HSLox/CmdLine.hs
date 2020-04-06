@@ -7,10 +7,10 @@ module HSLox.CmdLine
 import Control.Carrier.Empty.Maybe
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
-import Control.Monad (forever, void, when)
 import HSLox.CmdLine.ReadLine
 import HSLox.ErrorReport (ErrorReport)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
+import qualified HSLox.Util as Util
 import Data.Foldable
 import Data.Function
 import qualified Data.Text as T
@@ -61,17 +61,31 @@ runFromSourceFile path =
 
 runSource :: _ => T.Text -> m ()
 runSource source = do
-  errors <- Interpreter.interpret source
-  reportErrors errors
-  when (not . null $ errors) $ do
-    sendM @IO $ exitWith (ExitFailure 65)
+  result <- Interpreter.interpret source
+  case result of
+    Left compileErrorReports -> do
+      reportErrors compileErrorReports
+      sendM @IO $ exitWith (ExitFailure 65)
+    Right (values, rtError) -> do
+      for_ values $ \value -> do
+        sendM @IO $ putStrLn (show value)
+      for_ rtError $ \error -> do
+        sendM @IO $ putStrLn (show error)
+        sendM @IO $ exitWith (ExitFailure (-1))
 
 runRepl :: _ => m ()
-runRepl = void . runEmpty . forever $ do
+runRepl = Util.untilEmpty $ do
   line <- readLine
   guard (line /= ":e")
-  errors <- Interpreter.interpret line
-  reportErrors errors
+  result <- Interpreter.interpret line
+  case result of
+    Left compileErrorReports -> do
+      reportErrors compileErrorReports
+    Right (values, rtError) -> do
+      for_ values $ \value -> do
+        sendM @IO $ putStrLn (show value)
+      for_ rtError $ \error -> do
+        sendM @IO $ putStrLn (show error)
 
 reportErrors :: _ => f ErrorReport -> m ()
 reportErrors errors = for_ errors (trace . show)

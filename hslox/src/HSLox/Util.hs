@@ -72,3 +72,11 @@ backingUpState :: forall s b sig1 m1 sig2 m2.
 backingUpState action = do
   s <- get @s
   action (put @s s)
+
+swapEither :: Either b a -> Either a b
+swapEither (Left a) = Right a
+swapEither (Right b) = Left b
+
+rightToMaybe :: Either b a -> Maybe a
+rightToMaybe (Right r) = Just r
+rightToMaybe _         = Nothing
