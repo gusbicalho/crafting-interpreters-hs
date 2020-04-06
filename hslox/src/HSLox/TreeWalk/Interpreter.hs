@@ -1,7 +1,9 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE UndecidableInstances #-}
-module HSLox.TreeWalk.Interpreter where
+module HSLox.TreeWalk.Interpreter
+  ( interpretExprs
+  ) where
 
 import Control.Carrier.Error.Church
 import Control.Effect.Trace
@@ -20,13 +22,15 @@ interpretExprs :: Foldable t
                => Has Trace sig m
                => t AST.Expr
                -> m (Seq RTValue, Maybe RTError)
-interpretExprs exprs = Util.runWriterToPair @(Seq RTValue)
-                     . fmap (Util.rightToMaybe . Util.swapEither)
-                     . Util.runErrorToEither @RTError
-                     . for_ exprs $ \expr -> do
-                        trace . T.unpack $ "expr> " <> printAST expr
-                        result <- interpretAST expr
-                        tell (Seq.singleton result)
+interpretExprs = collectingValuesAndError . evaluateExprs
+  where
+    collectingValuesAndError = Util.runWriterToPair @(Seq RTValue)
+                             . fmap (Util.rightToMaybe . Util.swapEither)
+                             . Util.runErrorToEither @RTError
+    evaluateExprs exprs = for_ exprs $ \expr -> do
+      trace . T.unpack $ "expr> " <> printAST expr
+      result <- interpretAST expr
+      tell (Seq.singleton result)
 
 data RTValue
   = ValString T.Text
@@ -130,9 +134,6 @@ isEqual (ValNum d1)    (ValNum d2)    = d1 == d2
 isEqual (ValBool b1)   (ValBool b2)   = b1 == b2
 isEqual ValNil         ValNil         = True
 isEqual _              _              = False
-
-negateValue :: Has (Error RTError) sig m => Token -> RTValue -> m RTValue
-negateValue tk v = ValNum . negate <$> numericOperand tk v
 
 numericOperand :: Has (Throw RTError) sig m
                 => Token

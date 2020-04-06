@@ -26,6 +26,9 @@ untilEmpty = runEmptyToUnit . forever
 runErrorToEither :: forall e m a. Applicative m => ErrorC e m a -> m (Either e a)
 runErrorToEither = runError (pure . Left) (pure . Right)
 
+runErrorToUnit :: forall e m a. Applicative m => ErrorC e m a -> m ()
+runErrorToUnit = runError (const $ pure ()) (const $ pure ())
+
 anyM :: (Foldable f, Monad m) => (a -> m Bool) -> f a -> m Bool
 anyM predicate = foldr (orNext . predicate) (pure False)
   where
