@@ -22,9 +22,9 @@ spec = do
   describe "expression without identifiers and keywords" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "1 / 2 / 3 + 2 * 4 == 9 + 6 ? !!true : -false, 9 < 11")
+        (scan "1 / 2 / 3 + (2 * 4) == 9 + 6 ? !!true : -false, 9 < 11")
         ( Seq.empty
-        , Seq.singleton "(, (?: (== (+ (/ (/ 1.0 2.0) 3.0) (* 2.0 4.0)) (+ 9.0 6.0)) (! (! True)) (- False)) (< 9.0 11.0))"
+        , Seq.singleton "(, (?: (== (+ (/ (/ 1.0 2.0) 3.0) (group (* 2.0 4.0))) (+ 9.0 6.0)) (! (! True)) (- False)) (< 9.0 11.0))"
         )
     describe "with error productions" $ do
       testParserImplementations

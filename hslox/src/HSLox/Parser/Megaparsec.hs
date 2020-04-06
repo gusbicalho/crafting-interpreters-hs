@@ -150,7 +150,7 @@ primary =
        , do singleMatching [ Token.LEFT_PAREN ]
             expr <- expression
             consume [ Token.RIGHT_PAREN ] "Expect ')' after expression."
-            pure expr
+            pure $ GroupingE expr
        , do tk <- lookAhead maybeAny
             fancyFailure (makeError tk "Expect expression.")
        ]

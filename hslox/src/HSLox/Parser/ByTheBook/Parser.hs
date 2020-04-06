@@ -151,7 +151,7 @@ primary = do
         match [Token.RIGHT_PAREN]
           `Util.recoverFromEmptyWith`
           throwParserError "Expect ')' after expression."
-        pure expr
+        pure $ GroupingE expr
       _ -> throwParserError "Expect expression."
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
