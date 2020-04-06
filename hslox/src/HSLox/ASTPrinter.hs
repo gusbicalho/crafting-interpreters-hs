@@ -12,13 +12,13 @@ instance ASTPrinter Expr where
   printAST (BinaryExpr e) = printAST e
   printAST (TernaryExpr e) = printAST e
   printAST (GroupingExpr e) = printAST e
-  printAST (ValueExpr e) = printAST e
+  printAST (LiteralExpr e) = printAST e
 
-instance ASTPrinter Value where
-  printAST (ValString t) = T.pack . show $ t
-  printAST (ValBool t) = T.pack . show $ t
-  printAST (ValNum t) = T.pack . show $ t
-  printAST ValNil = "nil"
+instance ASTPrinter Literal where
+  printAST (LitString t) = T.pack . show $ t
+  printAST (LitBool t) = T.pack . show $ t
+  printAST (LitNum t) = T.pack . show $ t
+  printAST LitNil = "nil"
 
 instance ASTPrinter Grouping where
   printAST (Grouping expr) = parenthesize "group" [expr]

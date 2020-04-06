@@ -16,22 +16,22 @@ pattern GroupingE :: Expr -> Expr
 pattern GroupingE expr = GroupingExpr (Grouping expr)
 
 pattern StringE :: T.Text -> Expr
-pattern StringE t = ValueExpr (ValString t)
+pattern StringE t = LiteralExpr (LitString t)
 
 pattern NumE :: Double -> Expr
-pattern NumE v = ValueExpr (ValNum v)
+pattern NumE v = LiteralExpr (LitNum v)
 
 pattern BoolE :: Bool -> Expr
-pattern BoolE v = ValueExpr (ValBool v)
+pattern BoolE v = LiteralExpr (LitBool v)
 
 pattern NilE :: Expr
-pattern NilE = ValueExpr ValNil
+pattern NilE = LiteralExpr LitNil
 
 data Expr = UnaryExpr Unary
           | BinaryExpr Binary
           | TernaryExpr Ternary
           | GroupingExpr Grouping
-          | ValueExpr Value
+          | LiteralExpr Literal
   deriving (Eq, Show, Ord)
 
 data Ternary = Ternary { ternaryLeft :: Expr
@@ -56,9 +56,9 @@ data Unary = Unary { unaryOperator :: Token
 data Grouping = Grouping { groupingExpr :: Expr }
   deriving (Eq, Show, Ord)
 
-data Value
-  = ValString T.Text
-  | ValNum Double
-  | ValBool Bool
-  | ValNil
+data Literal
+  = LitString T.Text
+  | LitNum Double
+  | LitBool Bool
+  | LitNil
   deriving (Eq, Show, Ord)
