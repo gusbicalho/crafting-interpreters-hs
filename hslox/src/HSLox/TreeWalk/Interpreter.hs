@@ -11,7 +11,7 @@ import HSLox.ASTPrinter (printAST)
 import HSLox.ErrorReport (ErrorReport, toErrorReport)
 import qualified HSLox.Scanner.Megaparsec as Scanner
 import HSLox.Scanner.ScanError (ScanError)
-import qualified HSLox.Parser.ByTheBook.Parser as Parser
+import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.Util as Util
 
