@@ -13,6 +13,7 @@ import qualified Data.Sequence as Seq
 import qualified HSLox.AST as AST
 import HSLox.CmdLine.ReadLine
 import HSLox.ErrorReport (ErrorReport, toErrorReport)
+import HSLox.Output.Carrier.ToIO
 import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
@@ -25,7 +26,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import qualified System.Environment as Env
 import System.Exit (exitWith, ExitCode (..))
-import System.IO (stdin, stderr)
+import System.IO (hPutStrLn, stdin, stdout, stderr)
 
 data Args = Args (Maybe FilePath)
   deriving (Eq, Show)
@@ -57,6 +58,7 @@ runDefaultRepl = runApp runRepl
 runApp :: _ a -> IO a
 runApp app =
   app & runReadLine
+      & runOutputText stdout
       & runTrace
       & runM @IO
 
@@ -85,9 +87,9 @@ runSource source = do
       reportReadErrors readErrors
       sendM @IO $ exitWith (ExitFailure 65)
     Right exprs -> do
-      (_, rtError) <- Interpreter.interpretExprs exprs
+      rtError <- Interpreter.interpretExprs exprs
       for_ rtError $ \error -> do
-        sendM @IO $ putStrLn (show error)
+        sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
 
 runRepl :: _ => m ()
@@ -99,11 +101,9 @@ runRepl = Util.untilEmpty $ do
     Left readErrors -> do
       reportReadErrors readErrors
     Right exprs -> do
-      (values, rtError) <- Interpreter.interpretExprs exprs
-      for_ values $ \value -> do
-        sendM @IO . putStrLn . T.unpack $ (Interpreter.showValue value)
+      rtError <- Interpreter.interpretExprs exprs
       for_ rtError $ \error -> do
-        sendM @IO $ putStrLn (show error)
+        sendM @IO $ hPutStrLn stderr (show error)
 
 reportReadErrors :: Has Trace sig m => (Seq ScanError, Seq ParserError) -> m ()
 reportReadErrors (scanErrors, parserErrors) =

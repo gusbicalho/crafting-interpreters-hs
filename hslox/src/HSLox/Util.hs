@@ -1,3 +1,9 @@
+-- |
+-- Module      :  HSLox.Util
+-- Copyright   :  © 2020-Gustavo Bicalho
+--
+-- Useful fns.
+
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module HSLox.Util where
 
@@ -65,8 +71,8 @@ runStateToPair = runState (\s a -> pure (s, a))
 runWriterToPair :: forall w m a. (Monoid w, Applicative m) => WriterC w m a -> m (w, a)
 runWriterToPair = runWriter (\w a -> pure (w, a))
 
--- Holds a reference to the current monadic state, then calls the
--- provided fn with restore action, which can be used to restore
+-- | Holds a reference to the current monadic state, then calls the
+-- provided fn with a restore action, which can be used to restore
 -- the original state.
 backingUpState :: forall s b sig1 m1 sig2 m2.
                   Has (State s) sig1 m1

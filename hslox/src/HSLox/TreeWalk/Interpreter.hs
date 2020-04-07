@@ -9,12 +9,11 @@ module HSLox.TreeWalk.Interpreter
   ) where
 
 import Control.Carrier.Error.Church
-import Control.Effect.Writer
 import Data.Foldable
-import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import HSLox.Output.Carrier.Transform
+import HSLox.Output.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
@@ -32,17 +31,17 @@ data RTError = RTError { rtErrorMessage :: T.Text
   deriving (Eq, Show)
 
 interpretExprs :: Foldable t
-               => Algebra sig m
+               => Has (Output T.Text) sig m
                => t AST.Expr
-               -> m (Seq RTValue, Maybe RTError)
+               -> m (Maybe RTError)
 interpretExprs = collectingValuesAndError . evaluateExprs
   where
-    collectingValuesAndError = Util.runWriterToPair @(Seq RTValue)
+    collectingValuesAndError = runOutputTransform showValue
                              . fmap (Util.rightToMaybe . Util.swapEither)
                              . Util.runErrorToEither @RTError
     evaluateExprs exprs = for_ exprs $ \expr -> do
       result <- interpretAST expr
-      tell (Seq.singleton result)
+      output result
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s
