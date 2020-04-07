@@ -88,7 +88,7 @@ runSource source = do
       (_, rtError) <- Interpreter.interpretExprs exprs
       for_ rtError $ \error -> do
         sendM @IO $ putStrLn (show error)
-        sendM @IO $ exitWith (ExitFailure (-1))
+        sendM @IO $ exitWith (ExitFailure (70))
 
 runRepl :: _ => m ()
 runRepl = Util.untilEmpty $ do
