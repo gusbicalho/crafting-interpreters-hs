@@ -101,7 +101,7 @@ runRepl = Util.untilEmpty $ do
     Right exprs -> do
       (values, rtError) <- Interpreter.interpretExprs exprs
       for_ values $ \value -> do
-        sendM @IO $ putStrLn (show value)
+        sendM @IO . putStrLn . T.unpack $ (Interpreter.showValue value)
       for_ rtError $ \error -> do
         sendM @IO $ putStrLn (show error)
 

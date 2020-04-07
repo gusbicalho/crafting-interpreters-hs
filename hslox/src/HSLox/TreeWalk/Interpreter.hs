@@ -3,34 +3,21 @@
 {-# LANGUAGE UndecidableInstances #-}
 module HSLox.TreeWalk.Interpreter
   ( interpretExprs
+  , RTValue (..)
+  , RTError (..)
+  , showValue
   ) where
 
 import Control.Carrier.Error.Church
-import Control.Effect.Trace
 import Control.Effect.Writer
 import Data.Foldable
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
-import HSLox.ASTPrinter (printAST)
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
-
-interpretExprs :: Foldable t
-               => Has Trace sig m
-               => t AST.Expr
-               -> m (Seq RTValue, Maybe RTError)
-interpretExprs = collectingValuesAndError . evaluateExprs
-  where
-    collectingValuesAndError = Util.runWriterToPair @(Seq RTValue)
-                             . fmap (Util.rightToMaybe . Util.swapEither)
-                             . Util.runErrorToEither @RTError
-    evaluateExprs exprs = for_ exprs $ \expr -> do
-      trace . T.unpack $ "expr> " <> printAST expr
-      result <- interpretAST expr
-      tell (Seq.singleton result)
 
 data RTValue
   = ValString T.Text
@@ -43,6 +30,31 @@ data RTError = RTError { rtErrorMessage :: T.Text
                        , rtErrorToken :: Token
                        }
   deriving (Eq, Show)
+
+interpretExprs :: Foldable t
+               => Algebra sig m
+               => t AST.Expr
+               -> m (Seq RTValue, Maybe RTError)
+interpretExprs = collectingValuesAndError . evaluateExprs
+  where
+    collectingValuesAndError = Util.runWriterToPair @(Seq RTValue)
+                             . fmap (Util.rightToMaybe . Util.swapEither)
+                             . Util.runErrorToEither @RTError
+    evaluateExprs exprs = for_ exprs $ \expr -> do
+      result <- interpretAST expr
+      tell (Seq.singleton result)
+
+showValue :: RTValue -> T.Text
+showValue (ValString s) = s
+showValue (ValBool True) = "true"
+showValue (ValBool False) = "false"
+showValue ValNil = "nil"
+showValue (ValNum d) = dropZeroDecimal doubleString
+  where
+    doubleString = T.pack $ show d
+    dropZeroDecimal numStr
+      | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
+      | otherwise                  = numStr
 
 class ASTInterpreter e m where
   interpretAST :: e -> m RTValue
