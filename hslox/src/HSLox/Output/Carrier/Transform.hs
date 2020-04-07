@@ -9,7 +9,7 @@ newtype OutputTransformC to from m a = OutputTransformC { runOutputTransformC ::
   deriving newtype (Functor, Applicative, Monad)
 
 runOutputTransform :: (from -> to) -> OutputTransformC to from m a -> m a
-runOutputTransform onOutput = runReader onOutput . runOutputTransformC
+runOutputTransform transform = runReader transform . runOutputTransformC
 
 instance Has (Output to) sig m
          => Algebra (Output from :+: sig) (OutputTransformC to from m) where
