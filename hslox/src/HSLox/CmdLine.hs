@@ -5,9 +5,10 @@ module HSLox.CmdLine
   ) where
 
 import Control.Carrier.Error.Church
-import Control.Carrier.Empty.Maybe
+import Control.Carrier.State.Church
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
+import Control.Effect.Empty
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified HSLox.AST as AST
@@ -87,23 +88,28 @@ runSource source = do
       reportReadErrors readErrors
       sendM @IO $ exitWith (ExitFailure 65)
     Right exprs -> do
-      rtError <- Interpreter.interpretExprs exprs
+      rtError <- snd <$> Interpreter.interpretExprs Interpreter.newEnv exprs
       for_ rtError $ \error -> do
         sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
 
 runRepl :: _ => m ()
-runRepl = Util.untilEmpty $ do
-  line <- readLine
-  guard (line /= ":e")
-  exprs' <- readSource line
-  case exprs' of
-    Left readErrors -> do
-      reportReadErrors readErrors
-    Right exprs -> do
-      rtError <- Interpreter.interpretExprs exprs
-      for_ rtError $ \error -> do
-        sendM @IO $ hPutStrLn stderr (show error)
+runRepl
+  = Util.untilEmpty
+  . evalState Interpreter.newEnv
+  $ do
+    line <- readLine
+    guard (line /= ":e")
+    exprs' <- readSource line
+    case exprs' of
+      Left readErrors -> do
+        reportReadErrors readErrors
+      Right exprs -> do
+        rtEnv <- get
+        (rtEnv, rtError) <- Interpreter.interpretExprs rtEnv exprs
+        put rtEnv
+        for_ rtError $ \error -> do
+          sendM @IO $ putStrLn (show error)
 
 reportReadErrors :: Has Trace sig m => (Seq ScanError, Seq ParserError) -> m ()
 reportReadErrors (scanErrors, parserErrors) =

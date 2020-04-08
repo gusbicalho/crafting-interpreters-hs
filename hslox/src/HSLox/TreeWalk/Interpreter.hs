@@ -5,7 +5,8 @@ module HSLox.TreeWalk.Interpreter
   ( interpretExprs
   , RTValue (..)
   , RTError (..)
-  , showValue
+  , RTEnv (..)
+  , newEnv
   ) where
 
 import Control.Carrier.Error.Church
@@ -30,13 +31,20 @@ data RTError = RTError { rtErrorMessage :: T.Text
                        }
   deriving (Eq, Show)
 
+data RTEnv = RTEnv
+
+newEnv :: RTEnv
+newEnv = RTEnv
+
 interpretExprs :: Foldable t
                => Has (Output T.Text) sig m
-               => t AST.Expr
-               -> m (Maybe RTError)
-interpretExprs = collectingValuesAndError . evaluateExprs
+               => RTEnv
+               -> t AST.Expr
+               -> m (RTEnv, Maybe RTError)
+interpretExprs env = collectingValuesAndError . evaluateExprs
   where
-    collectingValuesAndError = runOutputTransform showValue
+    collectingValuesAndError = Util.runStateToPair env
+                             . runOutputTransform showValue
                              . fmap (Util.rightToMaybe . Util.swapEither)
                              . Util.runErrorToEither @RTError
     evaluateExprs exprs = for_ exprs $ \expr -> do
