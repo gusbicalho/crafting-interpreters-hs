@@ -20,14 +20,14 @@ import Text.Megaparsec hiding (State, Token)
 
 parse :: Has (Writer (Seq ParserError)) sig m
       => (Seq Token)
-      -> m (Seq Expr)
+      -> m Program
 parse tokens = do
-    exprs <- runParserT (manyExprsUntilEOF (lift . register)) "" (TokenStream tokens)
-    case exprs of
+    stmts' <- runParserT (manyExprsUntilEOF (lift . register)) "" (TokenStream tokens)
+    case stmts' of
       Left errorBundle -> do
         for_ (bundleErrors errorBundle) register
-        pure (Seq.empty)
-      Right exprs' -> pure exprs'
+        pure $ Program Seq.empty
+      Right stmts -> pure $ Program stmts
   where
     register (FancyError _ errs) = do
       for_ errs $ \case
@@ -38,11 +38,11 @@ parse tokens = do
 
 manyExprsUntilEOF :: MonadParsec ParserError TokenStream m
                   => (ParseError TokenStream ParserError -> m ())
-                  -> m (Seq Expr)
+                  -> m (Seq Stmt)
 manyExprsUntilEOF handleError =
     Seq.fromList . catMaybes <$>
       manyTill
-        (withRecovery recover (Just <$> expression))
+        (withRecovery recover (Just <$> statement))
         (eof <|> void (singleMatching [ Token.EOF ]))
   where
     recover err = do
@@ -65,6 +65,21 @@ manyExprsUntilEOF handleError =
 
 makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
+
+statement :: MonadParsec ParserError TokenStream m => m Stmt
+statement = do
+    stmt <- printStmt <|> expressionStmt
+    consume [ Token.SEMICOLON ] "Expect ';' after expression."
+    pure stmt
+
+printStmt :: MonadParsec ParserError TokenStream m => m Stmt
+printStmt = do
+  tk <- singleMatching [ Token.PRINT ]
+  expr <- expression
+  pure $ PrintStmt tk expr
+
+expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
+expressionStmt = ExprStmt <$> expression
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
 expression = comma

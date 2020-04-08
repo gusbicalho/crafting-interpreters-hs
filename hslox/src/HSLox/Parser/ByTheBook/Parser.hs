@@ -19,24 +19,29 @@ import qualified HSLox.Util as Util
 
 parse :: Has (Writer (Seq ParserError)) sig m
       => (Seq Token)
-      -> m (Seq Expr)
+      -> m Program
 parse tokens
   = evalState (initialParserState tokens)
-  . execWriter @(Seq Expr)
+  . fmap Program
+  . execWriter @(Seq Stmt)
   . Util.untilEmpty
   $ do
-    expr' <- Util.runErrorToEither @ParserError expression
-    case expr' of
+    stmt' <- Util.runErrorToEither @ParserError statement
+    case stmt' of
       Left error -> do
         reportError error
         synchronize
-      Right expr -> do
-        tell $ Seq.singleton expr
+      Right stmt -> do
+        tell $ Seq.singleton stmt
     guard . not =<< isAtEnd
 
-type ExprParser = forall sig m. ( Has (ErrorEff.Error ParserError) sig m
-                                , Has (State ParserState) sig m )
-                                => m Expr
+type ExprParser sig m = ( Has (ErrorEff.Error ParserError) sig m
+                        , Has (State ParserState) sig m )
+                        => m Expr
+
+type StmtParser sig m = ( Has (ErrorEff.Error ParserError) sig m
+                        , Has (State ParserState) sig m )
+                        => m Stmt
 
 synchronize :: Has (State ParserState) sig m => m ()
 synchronize = Util.untilEmpty $ do
@@ -53,10 +58,27 @@ synchronize = Util.untilEmpty $ do
                                   , Token.RETURN
                                   ]
 
-expression :: ExprParser
+statement :: StmtParser sig m
+statement = do
+    stmt <- printStmt `Util.recoverFromEmptyWith` expressionStmt
+    match [Token.SEMICOLON]
+          `Util.recoverFromEmptyWith`
+          throwParserError "Expect ';' after expression."
+    pure stmt
+
+printStmt :: Has Empty sig m => StmtParser sig m
+printStmt = do
+  tk <- match [ Token.PRINT ]
+  expr <- expression
+  pure $ PrintStmt tk expr
+
+expressionStmt :: StmtParser sig m
+expressionStmt = ExprStmt <$> expression
+
+expression :: ExprParser sig m
 expression = comma
 
-comma :: ExprParser
+comma :: ExprParser sig m
 comma = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
@@ -64,7 +86,7 @@ comma = do
   where
     opTypes = [ Token.COMMA ]
 
-conditional :: ExprParser
+conditional :: ExprParser sig m
 conditional = do
   left <- equality
   mbTk <- Util.runEmptyToMaybe $ match [ Token.QUESTION_MARK ]
@@ -78,7 +100,7 @@ conditional = do
       right <- conditional
       pure $ TernaryE  left op1 middle op2 right
 
-equality :: ExprParser
+equality :: ExprParser sig m
 equality = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
@@ -88,7 +110,7 @@ equality = do
               , Token.BANG_EQUAL
               ]
 
-comparison :: ExprParser
+comparison :: ExprParser sig m
 comparison = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression addition opTypes ]
@@ -100,7 +122,7 @@ comparison = do
               , Token.LESS_EQUAL
               ]
 
-addition :: ExprParser
+addition :: ExprParser sig m
 addition = do
   checkForKnownErrorProductions
     [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
@@ -108,7 +130,7 @@ addition = do
                                          , Token.PLUS
                                          ]
 
-multiplication :: ExprParser
+multiplication :: ExprParser sig m
 multiplication = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression unary opTypes ]
@@ -118,14 +140,14 @@ multiplication = do
                , Token.SLASH
                ]
 
-unary :: ExprParser
+unary :: ExprParser sig m
 unary = do
   mbTk <- Util.runEmptyToMaybe (match [Token.MINUS, Token.BANG])
   case mbTk of
     Nothing -> primary
     Just tk -> UnaryE tk <$> unary
 
-primary :: ExprParser
+primary :: ExprParser sig m
 primary = do
     mbTk <- Util.runEmptyToMaybe (match [ Token.FALSE
                                         , Token.TRUE
@@ -168,7 +190,10 @@ throwParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => T.Text -> m b
 throwParserError msg = ErrorEff.throwError =<< makeParserError msg
 
-leftAssociativeBinaryOp :: Foldable t => ExprParser -> t TokenType -> ExprParser
+leftAssociativeBinaryOp :: Foldable t
+                        => (forall sig m. ExprParser sig m)
+                        -> t TokenType
+                        -> ExprParser sig m
 leftAssociativeBinaryOp termParser opTypes = do
   left <- termParser
   e <- execState left . Util.untilEmpty $ do

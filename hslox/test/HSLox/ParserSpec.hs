@@ -22,9 +22,9 @@ spec = do
   describe "expression without identifiers and keywords" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "1 / 2 / 3 + (2 * 4) == 9 + 6 ? !!true : -false, 9 < 11")
+        (scan "1 / 2 / 3 + (2 * 4) == 9 + 6 ? !!true : -false, 9 < 11;")
         ( Seq.empty
-        , Seq.singleton "(, (?: (== (+ (/ (/ 1.0 2.0) 3.0) (group (* 2.0 4.0))) (+ 9.0 6.0)) (! (! True)) (- False)) (< 9.0 11.0))"
+        , "[ (, (?: (== (+ (/ (/ 1.0 2.0) 3.0) (group (* 2.0 4.0))) (+ 9.0 6.0)) (! (! True)) (- False)) (< 9.0 11.0)) ]"
         )
     describe "with error productions" $ do
       testParserImplementations
@@ -32,15 +32,21 @@ spec = do
         ( Seq.fromList
             [ ParserError (Just $ Token "<"  Token.LESS        Nothing 1) "Binary operator < found at the beginning of expression."
             , ParserError (Just $ Token "+"  Token.PLUS        Nothing 2) "Binary operator + found at the beginning of expression."
-            , ParserError (Just $ Token ";"  Token.SEMICOLON   Nothing 3) "Expect expression."
             , ParserError (Just $ Token "*"  Token.STAR        Nothing 4) "Binary operator * found at the beginning of expression."
             , ParserError (Just $ Token "==" Token.EQUAL_EQUAL Nothing 4) "Binary operator == found at the beginning of expression."
             ]
-        , Seq.singleton "(- (- 1.0) 1.0)"
+        , "[ (- (- 1.0) 1.0) ]"
+        )
+  describe "programs with expression and print statements" $ do
+    describe "correct" $ do
+      testParserImplementations
+        (scan "120 / 2; print 123 + 4 * 7;")
+        ( Seq.empty
+        , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) ]"
         )
 
 testParserImplementations :: Seq Token
-                          -> (Seq ParserError, Seq T.Text)
+                          -> (Seq ParserError, T.Text)
                           -> Spec
 testParserImplementations tokens expected = do
   describe "ByTheBook" $
@@ -50,8 +56,8 @@ testParserImplementations tokens expected = do
     it "parses correctly" $
       runParser Megaparsec.parse tokens `shouldReturn` expected
 
-runParser :: _ -> Seq Token -> IO (Seq ParserError, Seq T.Text)
-runParser parse = (fmap . fmap . fmap) printAST
+runParser :: _ -> Seq Token -> IO (Seq ParserError, T.Text)
+runParser parse = (fmap . fmap) printAST
                 . runM @IO
                 . Util.runWriterToPair @(Seq ParserError)
                 . parse

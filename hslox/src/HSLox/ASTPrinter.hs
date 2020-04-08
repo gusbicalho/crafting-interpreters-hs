@@ -7,6 +7,13 @@ import HSLox.Token (Token (..))
 class ASTPrinter e where
   printAST :: e -> T.Text
 
+instance ASTPrinter Program where
+  printAST (Program stmts) = "[" <> foldMap ((" " <>) . printAST) stmts <> " ]"
+
+instance ASTPrinter Stmt where
+  printAST (ExprStmt e) = printAST e
+  printAST (PrintStmt tk e) = parenthesize (tokenLexeme tk) [e]
+
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e
   printAST (BinaryExpr e) = printAST e
@@ -37,5 +44,5 @@ instance ASTPrinter Ternary where
 parenthesize :: T.Text -> [Expr] -> T.Text
 parenthesize name exprs = "("
                        <> name
-                       <> (foldMap ((" " <>) . printAST) exprs)
+                       <> foldMap ((" " <>) . printAST) exprs
                        <> ")"

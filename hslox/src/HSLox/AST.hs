@@ -1,7 +1,13 @@
 module HSLox.AST where
 
+import Data.Sequence (Seq)
 import qualified Data.Text as T
 import HSLox.Token (Token (..))
+
+newtype Program = Program (Seq Stmt)
+
+data Stmt = ExprStmt Expr
+          | PrintStmt Token Expr
 
 pattern UnaryE :: Token -> Expr -> Expr
 pattern UnaryE op expr = UnaryExpr (Unary op expr)

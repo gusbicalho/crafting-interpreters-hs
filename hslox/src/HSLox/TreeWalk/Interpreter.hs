@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE UndecidableInstances #-}
 module HSLox.TreeWalk.Interpreter
-  ( interpretExprs
+  ( interpret
   , RTValue (..)
   , RTError (..)
   , RTEnv (..)
@@ -36,20 +36,17 @@ data RTEnv = RTEnv
 newEnv :: RTEnv
 newEnv = RTEnv
 
-interpretExprs :: Foldable t
-               => Has (Output T.Text) sig m
-               => RTEnv
-               -> t AST.Expr
-               -> m (RTEnv, Maybe RTError)
-interpretExprs env = collectingValuesAndError . evaluateExprs
+interpret :: Has (Output T.Text) sig m
+          => RTEnv
+          -> AST.Program
+          -> m (RTEnv, Maybe RTError)
+interpret env = collectingValuesAndError . evaluate
   where
     collectingValuesAndError = Util.runStateToPair env
                              . runOutputTransform showValue
                              . fmap (Util.rightToMaybe . Util.swapEither)
                              . Util.runErrorToEither @RTError
-    evaluateExprs exprs = for_ exprs $ \expr -> do
-      result <- interpretAST expr
-      output result
+    evaluate prog = output =<< interpretAST prog
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s
@@ -65,6 +62,15 @@ showValue (ValNum d) = dropZeroDecimal doubleString
 
 class ASTInterpreter e m where
   interpretAST :: e -> m RTValue
+
+instance Has (Error RTError) sig m
+      => ASTInterpreter AST.Program m where
+  interpretAST (AST.Program stmts) = foldlM (\_ stmt -> interpretAST stmt) ValNil stmts
+
+instance Has (Error RTError) sig m
+      => ASTInterpreter AST.Stmt m where
+  interpretAST (AST.PrintStmt _ expr) = interpretAST expr -- TODO
+  interpretAST (AST.ExprStmt expr) = interpretAST expr
 
 instance Has (Error RTError) sig m
       => ASTInterpreter AST.Expr m where

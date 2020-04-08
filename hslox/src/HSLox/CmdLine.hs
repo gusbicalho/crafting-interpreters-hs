@@ -72,13 +72,13 @@ runFromSourceFile path =
 
 readSource :: Algebra sig m
            => T.Text
-           -> m (Either (Seq ScanError, Seq ParserError) (Seq AST.Expr))
+           -> m (Either (Seq ScanError, Seq ParserError) AST.Program)
 readSource source = do
   (scanErrors, tokens) <- Util.runWriterToPair @(Seq ScanError) $ Scanner.scanTokens source
-  (parserErrors, exprs) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
+  (parserErrors, program) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
   if (scanErrors /= Seq.empty || parserErrors /= Seq.empty)
   then pure $ Left (scanErrors, parserErrors)
-  else pure $ Right exprs
+  else pure $ Right program
 
 runSource :: _ => T.Text -> m ()
 runSource source = do
@@ -88,7 +88,7 @@ runSource source = do
       reportReadErrors readErrors
       sendM @IO $ exitWith (ExitFailure 65)
     Right exprs -> do
-      rtError <- snd <$> Interpreter.interpretExprs Interpreter.newEnv exprs
+      rtError <- snd <$> Interpreter.interpret Interpreter.newEnv exprs
       for_ rtError $ \error -> do
         sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
@@ -106,7 +106,7 @@ runRepl
         reportReadErrors readErrors
       Right exprs -> do
         rtEnv <- get
-        (rtEnv, rtError) <- Interpreter.interpretExprs rtEnv exprs
+        (rtEnv, rtError) <- Interpreter.interpret rtEnv exprs
         put rtEnv
         for_ rtError $ \error -> do
           sendM @IO $ putStrLn (show error)
