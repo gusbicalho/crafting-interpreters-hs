@@ -41,7 +41,7 @@ packages:
     hackage: haskell-lsp-types-0.19.0.0@sha256:b8b462948f506226f324e0e56010cc9b47df90ec9ebad3b18caa9390d5427287,2941
 snapshots:
 - completed:
-    size: 507139
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/3/25.yaml
-    sha256: f996ecedc77bcf836371bdcd6ce08d8a69d9511cd8ce984c500e1052bb7cb474
-  original: nightly-2020-03-25
+    size: 510184
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/4/8.yaml
+    sha256: 21f48f06e3d2229b1543a9574bd85eddd838ff0487c2ff1095d2b71b0fad7ddf
+  original: nightly-2020-04-08
