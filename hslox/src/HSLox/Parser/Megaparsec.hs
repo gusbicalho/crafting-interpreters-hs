@@ -2,6 +2,7 @@ module HSLox.Parser.Megaparsec where
 
 import Control.Effect.Error as ErrorEff
 import Control.Carrier.Writer.Church
+import Control.Monad (when)
 import Control.Monad.Trans (lift)
 import Data.Maybe (catMaybes)
 import Data.Foldable
@@ -47,21 +48,20 @@ manyStmtsUntilEOF handleError =
   where
     recover err = do
       handleError err
-      manyTill anySingle synchronizationPoint
+      skipManyTill anySingle (synchronizationPoint <|> eof)
       pure Nothing
-    synchronizationPoint =
-      asum [ void             $ singleMatching [ Token.SEMICOLON ]
-           , void . lookAhead $ singleMatching [ Token.CLASS
-                                               , Token.FUN
-                                               , Token.VAR
-                                               , Token.FOR
-                                               , Token.IF
-                                               , Token.WHILE
-                                               , Token.PRINT
-                                               , Token.RETURN
-                                               ]
-           , eof
-           ]
+    synchronizationPoint = try $ do
+      tk <- anySingle
+      when (tokenType tk /= Token.SEMICOLON) $
+        void . lookAhead . singleMatching $ [ Token.CLASS
+                                            , Token.FUN
+                                            , Token.VAR
+                                            , Token.FOR
+                                            , Token.IF
+                                            , Token.WHILE
+                                            , Token.PRINT
+                                            , Token.RETURN
+                                            ]
 
 makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
