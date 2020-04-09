@@ -11,6 +11,8 @@ module HSLox.TreeWalk.Interpreter
 
 import Control.Carrier.Error.Church
 import Data.Foldable
+import Data.Function
+import Data.Functor
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
 import HSLox.Output.Carrier.Transform
@@ -40,13 +42,11 @@ interpret :: Has (Output T.Text) sig m
           => RTEnv
           -> AST.Program
           -> m (RTEnv, Maybe RTError)
-interpret env = collectingValuesAndError . evaluate
-  where
-    collectingValuesAndError = Util.runStateToPair env
-                             . runOutputTransform showValue
-                             . fmap (Util.rightToMaybe . Util.swapEither)
-                             . Util.runErrorToEither @RTError
-    evaluate prog = output =<< interpretExpr prog
+interpret env prog = prog & interpretStmt
+                          & Util.runErrorToEither @RTError
+                          & fmap (Util.rightToMaybe . Util.swapEither)
+                          & runOutputTransform showValue
+                          & Util.runStateToPair env
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s
@@ -60,22 +60,27 @@ showValue (ValNum d) = dropZeroDecimal doubleString
       | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
       | otherwise                  = numStr
 
+class StmtInterpreter e m where
+  interpretStmt :: e -> m ()
+
+instance ( Has (Error RTError) sig m
+         , Has (Output RTValue) sig m )
+      => StmtInterpreter AST.Program m where
+  interpretStmt (AST.Program stmts) = for_ stmts interpretStmt
+
+instance ( Has (Error RTError) sig m
+         , Has (Output RTValue) sig m )
+      => StmtInterpreter AST.Stmt m where
+  interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
+  interpretStmt (AST.PrintStmt stmt) = interpretStmt stmt
+
+instance ( Has (Error RTError) sig m
+         , Has (Output RTValue) sig m )
+      => StmtInterpreter AST.Print m where
+  interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
+
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue
-
-instance Has (Error RTError) sig m
-      => ExprInterpreter AST.Program m where
-  interpretExpr (AST.Program stmts) = foldlM (\_ stmt -> interpretExpr stmt) ValNil stmts
-
-instance Has (Error RTError) sig m
-      => ExprInterpreter AST.Stmt m where
-  interpretExpr (AST.ExprStmt expr) = interpretExpr expr
-  interpretExpr (AST.PrintStmt stmt) = interpretExpr stmt
-
-instance Has (Error RTError) sig m
-      => ExprInterpreter AST.Print m where
-  -- todo
-  interpretExpr (AST.Print _ expr) = interpretExpr expr
 
 instance Has (Error RTError) sig m
       => ExprInterpreter AST.Expr m where
