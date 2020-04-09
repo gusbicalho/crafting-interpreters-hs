@@ -164,9 +164,10 @@ unary = (UnaryE <$> singleMatching [Token.MINUS, Token.BANG]
 
 primary :: MonadParsec ParserError TokenStream m => m Expr
 primary =
-  asum [ singleMatching [ Token.FALSE ] $> BoolE False
-       , singleMatching [ Token.TRUE ]  $> BoolE True
-       , singleMatching [ Token.NIL ]   $> NilE
+  asum [ singleMatching [ Token.FALSE ]       $> BoolE False
+       , singleMatching [ Token.TRUE ]        $> BoolE True
+       , singleMatching [ Token.NIL ]         $> NilE
+       , singleMatching [ Token.IDENTIFIER ] <&> VariableE
        , do tk <- singleMatching [ Token.STRING ]
             case tokenLiteral tk of
               Just (Token.LitString s) -> pure (StringE s)

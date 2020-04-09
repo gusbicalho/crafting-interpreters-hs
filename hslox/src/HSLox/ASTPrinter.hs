@@ -27,6 +27,10 @@ instance ASTPrinter Expr where
   printAST (TernaryExpr e) = printAST e
   printAST (GroupingExpr e) = printAST e
   printAST (LiteralExpr e) = printAST e
+  printAST (VariableExpr e) = printAST e
+
+instance ASTPrinter Variable where
+  printAST (Variable tk) = tokenLexeme tk
 
 instance ASTPrinter Literal where
   printAST (LitString t) = T.pack . show $ t

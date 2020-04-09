@@ -30,6 +30,9 @@ pattern TernaryE left op1 middle op2 right = TernaryExpr (Ternary left op1 middl
 pattern GroupingE :: Expr -> Expr
 pattern GroupingE expr = GroupingExpr (Grouping expr)
 
+pattern VariableE :: Token -> Expr
+pattern VariableE tk = VariableExpr (Variable tk)
+
 pattern StringE :: T.Text -> Expr
 pattern StringE t = LiteralExpr (LitString t)
 
@@ -47,6 +50,7 @@ data Expr = UnaryExpr Unary
           | TernaryExpr Ternary
           | GroupingExpr Grouping
           | LiteralExpr Literal
+          | VariableExpr Variable
   deriving (Eq, Show, Ord)
 
 data Ternary = Ternary { ternaryLeft :: Expr
@@ -76,4 +80,7 @@ data Literal
   | LitNum Double
   | LitBool Bool
   | LitNil
+  deriving (Eq, Show, Ord)
+
+newtype Variable = Variable Token
   deriving (Eq, Show, Ord)

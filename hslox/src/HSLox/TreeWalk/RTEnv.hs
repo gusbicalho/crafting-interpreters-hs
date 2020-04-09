@@ -26,10 +26,10 @@ defineM name val = modify $ define name val
 getBoundValue :: BindingName -> RTEnv -> Maybe RTValue
 getBoundValue name env = Map.lookup name (rtEnvBindings env)
 
-getBindingValueM :: Has (State RTEnv) sig m
-                 => Has (Throw RTError) sig m
-                 => Token -> m RTValue
-getBindingValueM tk = do
+getBoundValueM :: Has (State RTEnv) sig m
+               => Has (Throw RTError) sig m
+               => Token -> m RTValue
+getBoundValueM tk = do
   env <- get @RTEnv
   let name = tokenLexeme tk
   case getBoundValue name env of

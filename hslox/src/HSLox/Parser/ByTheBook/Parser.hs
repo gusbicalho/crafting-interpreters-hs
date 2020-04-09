@@ -171,11 +171,13 @@ primary = do
                                         , Token.NUMBER
                                         , Token.STRING
                                         , Token.LEFT_PAREN
+                                        , Token.IDENTIFIER
                                         ])
     case mbTk of
-      Just (Token { tokenType = Token.FALSE }) -> pure (BoolE False)
-      Just (Token { tokenType = Token.TRUE })  -> pure (BoolE True)
-      Just (Token { tokenType = Token.NIL })   -> pure NilE
+      Just (Token { tokenType = Token.FALSE })         -> pure (BoolE False)
+      Just (Token { tokenType = Token.TRUE })          -> pure (BoolE True)
+      Just (Token { tokenType = Token.NIL })           -> pure NilE
+      Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
       Just (Token { tokenType = Token.STRING, tokenLiteral }) ->
         case tokenLiteral of
           Just (Token.LitString s) -> pure (StringE s)

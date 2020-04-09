@@ -82,6 +82,7 @@ instance Runtime sig m => ExprInterpreter AST.Expr m where
   interpretExpr (AST.TernaryExpr t) = interpretExpr t
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
+  interpretExpr (AST.VariableExpr t) = interpretExpr t
 
 instance Runtime sig m => ExprInterpreter AST.Ternary m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
@@ -141,6 +142,9 @@ instance Runtime sig m => ExprInterpreter AST.Literal m where
   interpretExpr (AST.LitNum d)    = pure $ ValNum d
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
   interpretExpr AST.LitNil        = pure $ ValNil
+
+instance Runtime sig m => ExprInterpreter AST.Variable m where
+  interpretExpr (AST.Variable tk) = RTEnv.getBoundValueM tk
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b
