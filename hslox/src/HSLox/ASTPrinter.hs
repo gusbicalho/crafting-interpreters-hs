@@ -12,7 +12,10 @@ instance ASTPrinter Program where
 
 instance ASTPrinter Stmt where
   printAST (ExprStmt e) = printAST e
-  printAST (PrintStmt tk e) = parenthesize (tokenLexeme tk) [e]
+  printAST (PrintStmt print) = printAST print
+
+instance ASTPrinter Print where
+  printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

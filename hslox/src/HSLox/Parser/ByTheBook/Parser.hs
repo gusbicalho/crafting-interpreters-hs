@@ -70,7 +70,7 @@ printStmt :: Has Empty sig m => StmtParser sig m
 printStmt = do
   tk <- match [ Token.PRINT ]
   expr <- expression
-  pure $ PrintStmt tk expr
+  pure . PrintStmt $ Print tk expr
 
 expressionStmt :: StmtParser sig m
 expressionStmt = ExprStmt <$> expression

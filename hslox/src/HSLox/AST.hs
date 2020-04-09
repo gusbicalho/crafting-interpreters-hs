@@ -7,7 +7,9 @@ import HSLox.Token (Token (..))
 newtype Program = Program (Seq Stmt)
 
 data Stmt = ExprStmt Expr
-          | PrintStmt Token Expr
+          | PrintStmt Print
+
+data Print = Print Token Expr
 
 pattern UnaryE :: Token -> Expr -> Expr
 pattern UnaryE op expr = UnaryExpr (Unary op expr)

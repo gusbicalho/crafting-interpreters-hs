@@ -46,7 +46,7 @@ interpret env = collectingValuesAndError . evaluate
                              . runOutputTransform showValue
                              . fmap (Util.rightToMaybe . Util.swapEither)
                              . Util.runErrorToEither @RTError
-    evaluate prog = output =<< interpretAST prog
+    evaluate prog = output =<< interpretExpr prog
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s
@@ -60,48 +60,53 @@ showValue (ValNum d) = dropZeroDecimal doubleString
       | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
       | otherwise                  = numStr
 
-class ASTInterpreter e m where
-  interpretAST :: e -> m RTValue
+class ExprInterpreter e m where
+  interpretExpr :: e -> m RTValue
 
 instance Has (Error RTError) sig m
-      => ASTInterpreter AST.Program m where
-  interpretAST (AST.Program stmts) = foldlM (\_ stmt -> interpretAST stmt) ValNil stmts
+      => ExprInterpreter AST.Program m where
+  interpretExpr (AST.Program stmts) = foldlM (\_ stmt -> interpretExpr stmt) ValNil stmts
 
 instance Has (Error RTError) sig m
-      => ASTInterpreter AST.Stmt m where
-  interpretAST (AST.PrintStmt _ expr) = interpretAST expr -- TODO
-  interpretAST (AST.ExprStmt expr) = interpretAST expr
+      => ExprInterpreter AST.Stmt m where
+  interpretExpr (AST.ExprStmt expr) = interpretExpr expr
+  interpretExpr (AST.PrintStmt stmt) = interpretExpr stmt
 
 instance Has (Error RTError) sig m
-      => ASTInterpreter AST.Expr m where
-  interpretAST (AST.UnaryExpr t) = interpretAST t
-  interpretAST (AST.BinaryExpr t) = interpretAST t
-  interpretAST (AST.TernaryExpr t) = interpretAST t
-  interpretAST (AST.GroupingExpr t) = interpretAST t
-  interpretAST (AST.LiteralExpr t) = interpretAST t
+      => ExprInterpreter AST.Print m where
+  -- todo
+  interpretExpr (AST.Print _ expr) = interpretExpr expr
 
-instance ( ASTInterpreter AST.Expr m
+instance Has (Error RTError) sig m
+      => ExprInterpreter AST.Expr m where
+  interpretExpr (AST.UnaryExpr t) = interpretExpr t
+  interpretExpr (AST.BinaryExpr t) = interpretExpr t
+  interpretExpr (AST.TernaryExpr t) = interpretExpr t
+  interpretExpr (AST.GroupingExpr t) = interpretExpr t
+  interpretExpr (AST.LiteralExpr t) = interpretExpr t
+
+instance ( ExprInterpreter AST.Expr m
          , Has (Error RTError) sig m )
-      => ASTInterpreter AST.Ternary m where
-  interpretAST (AST.Ternary left op1 middle op2 right) = do
-      leftVal <- interpretAST left
+      => ExprInterpreter AST.Ternary m where
+  interpretExpr (AST.Ternary left op1 middle op2 right) = do
+      leftVal <- interpretExpr left
       case (tokenType op1, tokenType op2) of
         (Token.QUESTION_MARK, Token.COLON) ->
           if isTruthy leftVal
-          then interpretAST middle
-          else interpretAST right
+          then interpretExpr middle
+          else interpretExpr right
         _ -> throwRT op2 $ "AST Error: Operator pair "
                         <> tokenLexeme op1
                         <> " and "
                         <> tokenLexeme op2
                         <> " not supported in ternary position"
 
-instance ( ASTInterpreter AST.Expr m
+instance ( ExprInterpreter AST.Expr m
          , Has (Error RTError) sig m )
-      => ASTInterpreter AST.Binary m where
-  interpretAST (AST.Binary left op right) = do
-      leftVal <- interpretAST left
-      rightVal <- interpretAST right
+      => ExprInterpreter AST.Binary m where
+  interpretExpr (AST.Binary left op right) = do
+      leftVal <- interpretExpr left
+      rightVal <- interpretExpr right
       case tokenType op of
         Token.COMMA         -> pure rightVal
         Token.PLUS          -> sumVals op leftVal rightVal
@@ -124,11 +129,11 @@ instance ( ASTInterpreter AST.Expr m
       sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
       sumVals opTk _ _ = throwRT opTk "Operands must be two numbers or two strings."
 
-instance ( ASTInterpreter AST.Expr m
+instance ( ExprInterpreter AST.Expr m
          , Has (Error RTError) sig m )
-      => ASTInterpreter AST.Unary m where
-  interpretAST (AST.Unary op expr) = do
-    val <- interpretAST expr
+      => ExprInterpreter AST.Unary m where
+  interpretExpr (AST.Unary op expr) = do
+    val <- interpretExpr expr
     case tokenType op of
       Token.BANG -> pure . ValBool . not . isTruthy $ val
       Token.MINUS -> ValNum . negate <$> numericOperand op val
@@ -136,14 +141,14 @@ instance ( ASTInterpreter AST.Expr m
                      <> tokenLexeme op
                      <> " not supported in unary position"
 
-instance ASTInterpreter AST.Expr m => ASTInterpreter AST.Grouping m where
-  interpretAST (AST.Grouping expr) = interpretAST expr
+instance ExprInterpreter AST.Expr m => ExprInterpreter AST.Grouping m where
+  interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance Applicative m => ASTInterpreter AST.Literal m where
-  interpretAST (AST.LitString s) = pure $ ValString s
-  interpretAST (AST.LitNum d)    = pure $ ValNum d
-  interpretAST (AST.LitBool b)   = pure $ ValBool b
-  interpretAST AST.LitNil        = pure $ ValNil
+instance Applicative m => ExprInterpreter AST.Literal m where
+  interpretExpr (AST.LitString s) = pure $ ValString s
+  interpretExpr (AST.LitNum d)    = pure $ ValNum d
+  interpretExpr (AST.LitBool b)   = pure $ ValBool b
+  interpretExpr AST.LitNil        = pure $ ValNil
 
 throwRT :: Has (Throw RTError) sig m => Token -> T.Text -> m a
 throwRT tk msg = throwError $ RTError msg tk

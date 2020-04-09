@@ -76,7 +76,7 @@ printStmt :: MonadParsec ParserError TokenStream m => m Stmt
 printStmt = do
   tk <- singleMatching [ Token.PRINT ]
   expr <- expression
-  pure $ PrintStmt tk expr
+  pure . PrintStmt $ Print tk expr
 
 expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
 expressionStmt = ExprStmt <$> expression
