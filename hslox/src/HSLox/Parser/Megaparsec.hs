@@ -43,7 +43,7 @@ manyStmtsUntilEOF :: MonadParsec ParserError TokenStream m
 manyStmtsUntilEOF handleError =
     Seq.fromList . catMaybes <$>
       manyTill
-        (withRecovery recover (Just <$> statement))
+        (withRecovery recover (Just <$> declaration))
         (eof <|> void (singleMatching [ Token.EOF ]))
   where
     recover err = do
@@ -66,11 +66,24 @@ manyStmtsUntilEOF handleError =
 makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
 
+declaration :: MonadParsec ParserError TokenStream m => m Stmt
+declaration = do
+  varDeclaration <|> statement
+
+varDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
+varDeclaration = do
+    singleMatching [Token.VAR]
+    identifier <- consume [Token.IDENTIFIER] "Expect variable name."
+    init <- singleMatching [Token.EQUAL] *> expression
+            <|> pure NilE
+    consume [Token.SEMICOLON] "Expect ';' after variable declaration."
+    pure . DeclarationStmt $ VarDeclaration identifier init
+
 statement :: MonadParsec ParserError TokenStream m => m Stmt
 statement = do
-    stmt <- printStmt <|> expressionStmt
-    consume [ Token.SEMICOLON ] "Expect ';' after expression."
-    pure stmt
+  stmt <- printStmt <|> expressionStmt
+  consume [ Token.SEMICOLON ] "Expect ';' after statement."
+  pure stmt
 
 printStmt :: MonadParsec ParserError TokenStream m => m Stmt
 printStmt = do

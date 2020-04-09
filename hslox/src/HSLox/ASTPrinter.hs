@@ -19,7 +19,7 @@ instance ASTPrinter Print where
   printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
 
 instance ASTPrinter Declaration where
-  printAST (Declaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
+  printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

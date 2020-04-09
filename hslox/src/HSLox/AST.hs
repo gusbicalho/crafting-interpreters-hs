@@ -15,7 +15,7 @@ data Stmt = ExprStmt Expr
 data Print = Print Token Expr
   deriving (Eq, Show, Ord)
 
-data Declaration = Declaration Token Expr
+data Declaration = VarDeclaration Token Expr
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr

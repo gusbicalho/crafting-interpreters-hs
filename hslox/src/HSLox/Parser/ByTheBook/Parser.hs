@@ -26,7 +26,7 @@ parse tokens
   . execWriter @(Seq Stmt)
   . Util.untilEmpty
   $ do
-    stmt' <- Util.runErrorToEither @ParserError statement
+    stmt' <- Util.runErrorToEither @ParserError declaration
     case stmt' of
       Left error -> do
         reportError error
@@ -58,12 +58,28 @@ synchronize = Util.untilEmpty $ do
                                   , Token.RETURN
                                   ]
 
+declaration :: Has Empty sig m => StmtParser sig m
+declaration = do
+  varDeclaration
+    `Util.recoverFromEmptyWith`
+    statement
+
+varDeclaration :: Has Empty sig m => StmtParser sig m
+varDeclaration = do
+    match [Token.VAR]
+    identifier <- consume [Token.IDENTIFIER] "Expect variable name."
+    init <- match [Token.EQUAL] *> expression
+            `Util.recoverFromEmptyWith` pure NilE
+    consume [Token.SEMICOLON] "Expect ';' after variable declaration."
+    pure . DeclarationStmt $ VarDeclaration identifier init
+
 statement :: StmtParser sig m
 statement = do
-    stmt <- printStmt `Util.recoverFromEmptyWith` expressionStmt
+    stmt <- printStmt `Util.recoverFromEmptyWith`
+            expressionStmt
     match [Token.SEMICOLON]
           `Util.recoverFromEmptyWith`
-          throwParserError "Expect ';' after expression."
+          throwParserError "Expect ';' after statement."
     pure stmt
 
 printStmt :: Has Empty sig m => StmtParser sig m
@@ -233,3 +249,10 @@ synchronizeByConsuming termParser =
   ErrorEff.catchError @ParserError
     (void termParser)
     (const $ pure ())
+
+consume :: Foldable t
+        => Has (State ParserState) sig m
+        => Has (ErrorEff.Throw ParserError) sig m
+        => t TokenType -> T.Text -> m Token
+consume tkTypes errorMsg =
+  match tkTypes `Util.recoverFromEmptyWith` throwParserError errorMsg
