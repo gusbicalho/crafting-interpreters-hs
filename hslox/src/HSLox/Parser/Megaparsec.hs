@@ -95,7 +95,22 @@ expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
 expressionStmt = ExprStmt <$> expression
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
-expression = comma
+expression = assignment
+
+assignment :: MonadParsec ParserError TokenStream m => m Expr
+assignment = do
+    left <- comma
+    withRecovery (const $ pure left) $
+      assignTo left
+  where
+    assignTo left = do
+      equals <- singleMatching [ Token.EQUAL ]
+      right <- assignment
+      case left of
+        VariableE tk -> pure $ AssignmentE tk right
+        _ -> do
+          registerFancyFailure (makeError (Just equals) "Invalid assignment target.")
+          empty
 
 comma :: MonadParsec ParserError TokenStream m => m Expr
 comma =

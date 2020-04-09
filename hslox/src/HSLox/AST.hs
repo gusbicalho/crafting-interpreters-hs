@@ -33,6 +33,9 @@ pattern GroupingE expr = GroupingExpr (Grouping expr)
 pattern VariableE :: Token -> Expr
 pattern VariableE tk = VariableExpr (Variable tk)
 
+pattern AssignmentE :: Token -> Expr -> Expr
+pattern AssignmentE tk expr = AssignmentExpr (Assignment tk expr)
+
 pattern StringE :: T.Text -> Expr
 pattern StringE t = LiteralExpr (LitString t)
 
@@ -51,6 +54,7 @@ data Expr = UnaryExpr Unary
           | GroupingExpr Grouping
           | LiteralExpr Literal
           | VariableExpr Variable
+          | AssignmentExpr Assignment
   deriving (Eq, Show, Ord)
 
 data Ternary = Ternary { ternaryLeft :: Expr
@@ -83,4 +87,7 @@ data Literal
   deriving (Eq, Show, Ord)
 
 newtype Variable = Variable Token
+  deriving (Eq, Show, Ord)
+
+data Assignment = Assignment Token Expr
   deriving (Eq, Show, Ord)

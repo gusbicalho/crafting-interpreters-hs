@@ -28,6 +28,10 @@ instance ASTPrinter Expr where
   printAST (GroupingExpr e) = printAST e
   printAST (LiteralExpr e) = printAST e
   printAST (VariableExpr e) = printAST e
+  printAST (AssignmentExpr e) = printAST e
+
+instance ASTPrinter Assignment where
+  printAST (Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]
 
 instance ASTPrinter Variable where
   printAST (Variable tk) = tokenLexeme tk

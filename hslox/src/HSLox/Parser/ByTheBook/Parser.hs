@@ -35,11 +35,13 @@ parse tokens
         tell $ Seq.singleton stmt
     guard . not =<< isAtEnd
 
-type ExprParser sig m = ( Has (ErrorEff.Error ParserError) sig m
+type ExprParser sig m = ( Has (Writer (Seq ParserError)) sig m
+                        , Has (ErrorEff.Error ParserError) sig m
                         , Has (State ParserState) sig m )
                         => m Expr
 
-type StmtParser sig m = ( Has (ErrorEff.Error ParserError) sig m
+type StmtParser sig m = ( Has (Writer (Seq ParserError)) sig m
+                        , Has (ErrorEff.Error ParserError) sig m
                         , Has (State ParserState) sig m )
                         => m Stmt
 
@@ -92,7 +94,22 @@ expressionStmt :: StmtParser sig m
 expressionStmt = ExprStmt <$> expression
 
 expression :: ExprParser sig m
-expression = comma
+expression = assignment
+
+assignment :: ExprParser sig m
+assignment = do
+    left <- comma
+    assignTo left
+      `Util.recoverFromEmptyWith` pure left
+  where
+    assignTo left = do
+      equals <- match [ Token.EQUAL ]
+      right <- assignment
+      case left of
+        VariableE tk -> pure $ AssignmentE tk right
+        _ -> do
+          reportError $ ParserError (Just equals) "Invalid assignment target."
+          empty
 
 comma :: ExprParser sig m
 comma = do
@@ -198,7 +215,7 @@ makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m
                 => T.Text -> m ParserError
 makeParserError msg = do
-    tk <- maybe eof id <$> Util.runEmptyToMaybe peek
+    tk <- peek `Util.recoverFromEmptyWith` pure eof
     pure $ ParserError (Just tk) msg
   where
     eof = Token "" Token.EOF Nothing 0

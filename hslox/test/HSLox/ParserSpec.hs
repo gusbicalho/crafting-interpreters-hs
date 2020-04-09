@@ -44,12 +44,12 @@ spec = do
         ( Seq.empty
         , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) ]"
         )
-  describe "programs with expression, print and declaration statements, and identifier expressions" $ do
+  describe "programs with expression, print and declaration statements, identifier expressions and assignment" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "120 / 2; print 123 + 4 * 7; var x = 2 + 3; print x;")
+        (scan "120 / 2; print 123 + 4 * 7; var x = 2 + 3; var y = 7; print x+y; x = y = 9; print x*y;")
         ( Seq.empty
-        , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) (var x (+ 2.0 3.0)) (print x) ]"
+        , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) (var x (+ 2.0 3.0)) (var y 7.0) (print (+ x y)) (= x (= y 9.0)) (print (* x y)) ]"
         )
 
 testParserImplementations :: Seq Token

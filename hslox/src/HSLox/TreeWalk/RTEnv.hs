@@ -35,3 +35,13 @@ getBoundValueM tk = do
   case getBoundValue name env of
     Just val -> pure val
     Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
+
+assignM :: Has (State RTEnv) sig m
+        => Has (Throw RTError) sig m
+        => Token -> RTValue -> m ()
+assignM tk val = do
+  bindings <- gets rtEnvBindings
+  let name = tokenLexeme tk
+  case Map.lookup name bindings of
+    Just _ -> modify $ define name val
+    Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
