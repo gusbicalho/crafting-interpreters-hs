@@ -6,7 +6,7 @@ module HSLox.TreeWalk.Interpreter
   , RTValue (..)
   , RTError (..)
   , RTEnv (..)
-  , newEnv
+  , RTEnv.newEnv
   ) where
 
 import Control.Carrier.Error.Church
@@ -20,24 +20,12 @@ import HSLox.Output.Carrier.Transform
 import HSLox.Output.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
+import HSLox.TreeWalk.RTEnv (RTEnv (..))
+import qualified HSLox.TreeWalk.RTEnv as RTEnv
+import HSLox.TreeWalk.RTError (RTError (..))
+import qualified HSLox.TreeWalk.RTError as RTError
+import HSLox.TreeWalk.RTValue (RTValue (..))
 import qualified HSLox.Util as Util
-
-data RTValue
-  = ValString T.Text
-  | ValNum Double
-  | ValBool Bool
-  | ValNil
-  deriving (Eq, Show, Ord)
-
-data RTError = RTError { rtErrorMessage :: T.Text
-                       , rtErrorToken :: Token
-                       }
-  deriving (Eq, Show)
-
-data RTEnv = RTEnv
-
-newEnv :: RTEnv
-newEnv = RTEnv
 
 interpret :: Has (Output T.Text) sig m
           => RTEnv
@@ -102,11 +90,11 @@ instance Runtime sig m => ExprInterpreter AST.Ternary m where
           if isTruthy leftVal
           then interpretExpr middle
           else interpretExpr right
-        _ -> throwRT op2 $ "AST Error: Operator pair "
-                        <> tokenLexeme op1
-                        <> " and "
-                        <> tokenLexeme op2
-                        <> " not supported in ternary position"
+        _ -> RTError.throwRT op2 $ "AST Error: Operator pair "
+                                <> tokenLexeme op1
+                                <> " and "
+                                <> tokenLexeme op2
+                                <> " not supported in ternary position"
 
 instance Runtime sig m => ExprInterpreter AST.Binary m where
   interpretExpr (AST.Binary left op right) = do
@@ -124,15 +112,15 @@ instance Runtime sig m => ExprInterpreter AST.Binary m where
         Token.LESS_EQUAL    -> applyComparisonOp op (<=) leftVal rightVal
         Token.EQUAL_EQUAL   -> pure . ValBool       $ isEqual leftVal rightVal
         Token.BANG_EQUAL    -> pure . ValBool . not $ isEqual leftVal rightVal
-        _ -> throwRT op $ "AST Error: Operator "
-                       <> tokenLexeme op
-                       <> " not supported in binary position"
+        _ -> RTError.throwRT op $ "AST Error: Operator "
+                               <> tokenLexeme op
+                               <> " not supported in binary position"
     where
       applyNumericOp    opTk op v1 v2 = ValNum  . uncurry op <$> numericOperands opTk v1 v2
       applyComparisonOp opTk op v1 v2 = ValBool . uncurry op <$> numericOperands opTk v1 v2
       sumVals _ (ValNum d1)    (ValNum d2)    = pure $ ValNum (d1 + d2)
       sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
-      sumVals opTk _ _ = throwRT opTk "Operands must be two numbers or two strings."
+      sumVals opTk _ _ = RTError.throwRT opTk "Operands must be two numbers or two strings."
 
 instance Runtime sig m => ExprInterpreter AST.Unary m where
   interpretExpr (AST.Unary op expr) = do
@@ -140,9 +128,9 @@ instance Runtime sig m => ExprInterpreter AST.Unary m where
     case tokenType op of
       Token.BANG -> pure . ValBool . not . isTruthy $ val
       Token.MINUS -> ValNum . negate <$> numericOperand op val
-      _ -> throwRT op $ "AST Error: Operator "
-                     <> tokenLexeme op
-                     <> " not supported in unary position"
+      _ -> RTError.throwRT op $ "AST Error: Operator "
+                             <> tokenLexeme op
+                             <> " not supported in unary position"
 
 instance Runtime sig m => ExprInterpreter AST.Grouping m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
@@ -152,9 +140,6 @@ instance Runtime sig m => ExprInterpreter AST.Literal m where
   interpretExpr (AST.LitNum d)    = pure $ ValNum d
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
   interpretExpr AST.LitNil        = pure $ ValNil
-
-throwRT :: Has (Throw RTError) sig m => Token -> T.Text -> m a
-throwRT tk msg = throwError $ RTError msg tk
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b
@@ -173,7 +158,7 @@ numericOperand :: Has (Throw RTError) sig m
                 -> RTValue
                 -> m Double
 numericOperand _ (ValNum n) = pure n
-numericOperand opTk _ = throwRT opTk "Operand must be a number."
+numericOperand opTk _ = RTError.throwRT opTk "Operand must be a number."
 
 numericOperands :: Has (Throw RTError) sig m
                 => Token
@@ -181,4 +166,4 @@ numericOperands :: Has (Throw RTError) sig m
                 -> RTValue
                 -> m (Double, Double)
 numericOperands _ (ValNum n1) (ValNum n2) = pure (n1, n2)
-numericOperands opTk _ _ = throwRT opTk "Operands must be numbers."
+numericOperands opTk _ _ = RTError.throwRT opTk "Operands must be numbers."
