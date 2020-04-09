@@ -5,11 +5,18 @@ import qualified Data.Text as T
 import HSLox.Token (Token (..))
 
 newtype Program = Program (Seq Stmt)
+  deriving (Eq, Show, Ord)
 
 data Stmt = ExprStmt Expr
           | PrintStmt Print
+          | DeclarationStmt Declaration
+  deriving (Eq, Show, Ord)
 
 data Print = Print Token Expr
+  deriving (Eq, Show, Ord)
+
+data Declaration = Declaration Token Expr
+  deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr
 pattern UnaryE op expr = UnaryExpr (Unary op expr)

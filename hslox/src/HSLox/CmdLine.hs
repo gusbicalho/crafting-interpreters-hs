@@ -1,7 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module HSLox.CmdLine
-  ( start, runDefaultRepl
+  ( start, runDefaultRepl, runText
   ) where
 
 import Control.Carrier.Error.Church
@@ -55,6 +55,9 @@ start = do
 
 runDefaultRepl :: IO ()
 runDefaultRepl = runApp runRepl
+
+runText :: T.Text -> IO ()
+runText = runApp . runSource
 
 runApp :: _ a -> IO a
 runApp app =

@@ -22,7 +22,7 @@ parse :: Has (Writer (Seq ParserError)) sig m
       => (Seq Token)
       -> m Program
 parse tokens = do
-    stmts' <- runParserT (manyExprsUntilEOF (lift . register)) "" (TokenStream tokens)
+    stmts' <- runParserT (manyStmtsUntilEOF (lift . register)) "" (TokenStream tokens)
     case stmts' of
       Left errorBundle -> do
         for_ (bundleErrors errorBundle) register
@@ -36,10 +36,10 @@ parse tokens = do
     register err =
       ParserError.reportError $ ParserError Nothing (T.pack $ show err)
 
-manyExprsUntilEOF :: MonadParsec ParserError TokenStream m
+manyStmtsUntilEOF :: MonadParsec ParserError TokenStream m
                   => (ParseError TokenStream ParserError -> m ())
                   -> m (Seq Stmt)
-manyExprsUntilEOF handleError =
+manyStmtsUntilEOF handleError =
     Seq.fromList . catMaybes <$>
       manyTill
         (withRecovery recover (Just <$> statement))
@@ -190,10 +190,12 @@ maybeAny = (Just <$> anySingle) <|> pure Nothing
 consume :: Foldable t
         => MonadParsec ParserError TokenStream m
         => t TokenType -> T.Text -> m Token
-consume tkTypes errorMsg
-    = singleMatching tkTypes
-  <|> do tk <- maybeAny
-         fancyFailure (makeError tk errorMsg)
+consume tkTypes errorMsg = do
+  mbTk <- maybeAny
+  case mbTk of
+    Just tk
+      | any ((tokenType tk) ==) tkTypes -> pure tk
+    _ -> fancyFailure (makeError mbTk errorMsg)
 
 checkForKnownErrorProductions
   :: Foldable t

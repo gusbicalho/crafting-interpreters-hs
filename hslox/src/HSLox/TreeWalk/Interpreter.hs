@@ -10,6 +10,7 @@ module HSLox.TreeWalk.Interpreter
   ) where
 
 import Control.Carrier.Error.Church
+import Control.Effect.State
 import Data.Foldable
 import Data.Function
 import Data.Functor
@@ -60,39 +61,40 @@ showValue (ValNum d) = dropZeroDecimal doubleString
       | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
       | otherwise                  = numStr
 
+type Runtime sig m = ( Has (Error RTError) sig m
+                     , Has (Output RTValue) sig m
+                     , Has (State RTEnv) sig m
+                     )
+
 class StmtInterpreter e m where
   interpretStmt :: e -> m ()
 
-instance ( Has (Error RTError) sig m
-         , Has (Output RTValue) sig m )
-      => StmtInterpreter AST.Program m where
+instance Runtime sig m => StmtInterpreter AST.Program m where
   interpretStmt (AST.Program stmts) = for_ stmts interpretStmt
 
-instance ( Has (Error RTError) sig m
-         , Has (Output RTValue) sig m )
-      => StmtInterpreter AST.Stmt m where
+instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
   interpretStmt (AST.PrintStmt stmt) = interpretStmt stmt
+  interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
 
-instance ( Has (Error RTError) sig m
-         , Has (Output RTValue) sig m )
-      => StmtInterpreter AST.Print m where
+instance Runtime sig m => StmtInterpreter AST.Print m where
   interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
+
+instance Runtime sig m => StmtInterpreter AST.Declaration m where
+      -- TODO
+  interpretStmt (AST.Declaration _ expr) = interpretExpr expr $> ()
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue
 
-instance Has (Error RTError) sig m
-      => ExprInterpreter AST.Expr m where
+instance Runtime sig m => ExprInterpreter AST.Expr m where
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.BinaryExpr t) = interpretExpr t
   interpretExpr (AST.TernaryExpr t) = interpretExpr t
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
 
-instance ( ExprInterpreter AST.Expr m
-         , Has (Error RTError) sig m )
-      => ExprInterpreter AST.Ternary m where
+instance Runtime sig m => ExprInterpreter AST.Ternary m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
       leftVal <- interpretExpr left
       case (tokenType op1, tokenType op2) of
@@ -106,9 +108,7 @@ instance ( ExprInterpreter AST.Expr m
                         <> tokenLexeme op2
                         <> " not supported in ternary position"
 
-instance ( ExprInterpreter AST.Expr m
-         , Has (Error RTError) sig m )
-      => ExprInterpreter AST.Binary m where
+instance Runtime sig m => ExprInterpreter AST.Binary m where
   interpretExpr (AST.Binary left op right) = do
       leftVal <- interpretExpr left
       rightVal <- interpretExpr right
@@ -134,9 +134,7 @@ instance ( ExprInterpreter AST.Expr m
       sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
       sumVals opTk _ _ = throwRT opTk "Operands must be two numbers or two strings."
 
-instance ( ExprInterpreter AST.Expr m
-         , Has (Error RTError) sig m )
-      => ExprInterpreter AST.Unary m where
+instance Runtime sig m => ExprInterpreter AST.Unary m where
   interpretExpr (AST.Unary op expr) = do
     val <- interpretExpr expr
     case tokenType op of
@@ -146,10 +144,10 @@ instance ( ExprInterpreter AST.Expr m
                      <> tokenLexeme op
                      <> " not supported in unary position"
 
-instance ExprInterpreter AST.Expr m => ExprInterpreter AST.Grouping m where
+instance Runtime sig m => ExprInterpreter AST.Grouping m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance Applicative m => ExprInterpreter AST.Literal m where
+instance Runtime sig m => ExprInterpreter AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s
   interpretExpr (AST.LitNum d)    = pure $ ValNum d
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
