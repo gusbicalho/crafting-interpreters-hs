@@ -98,8 +98,8 @@ runSource source = do
 
 runRepl :: _ => m ()
 runRepl
-  = Util.untilEmpty
-  . evalState Interpreter.newEnv
+  = evalState Interpreter.newEnv
+  . Util.untilEmpty
   $ do
     line <- readLine
     guard (line /= ":e")

@@ -4,8 +4,8 @@ module HSLox.ParserSpec where
 
 import Control.Carrier.Lift
 import Data.Sequence (Seq)
-import qualified Data.Text as T
 import qualified Data.Sequence as Seq
+import qualified Data.Text as T
 import HSLox.ASTPrinter (printAST)
 import HSLox.Scanner.ScanError (ScanError)
 import qualified HSLox.Scanner.Megaparsec as Scanner

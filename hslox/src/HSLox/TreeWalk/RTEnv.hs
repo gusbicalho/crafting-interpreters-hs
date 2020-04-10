@@ -16,6 +16,7 @@ type BindingName = T.Text
 data RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue
                    , rtEnvEnclosing :: Maybe RTEnv
                    }
+  deriving (Eq, Ord, Show)
 
 newEnv :: RTEnv
 newEnv = RTEnv Map.empty Nothing
