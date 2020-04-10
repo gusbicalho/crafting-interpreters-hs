@@ -38,6 +38,13 @@ peek :: Has Empty sig m
      => m Token
 peek = fst <$> unconsTokens
 
+check :: Has (State ParserState) sig m
+      => Foldable t
+      => t TokenType -> m Bool
+check tkTypes = do
+  tk <- peek `Util.recoverFromEmptyWith` pure (Token "" Token.EOF Nothing 0)
+  pure $ any ((tokenType tk) ==) tkTypes
+
 advance :: Has Empty sig m
         => Has (State ParserState) sig m
         => m Token

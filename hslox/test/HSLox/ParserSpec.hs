@@ -51,6 +51,29 @@ spec = do
         ( Seq.empty
         , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) (var x (+ 2.0 3.0)) (var y 7.0) (print (+ x y)) (= x (= y 9.0)) (print (* x y)) ]"
         )
+  describe "programs with blocks" $ do
+    describe "correct" $ do
+      testParserImplementations
+        (scan "var x = 120 / 2; print x; { var x = 7; print x; x = 3; print x; {}; }; print x;")
+        ( Seq.empty
+        , "[ (var x (/ 120.0 2.0)) (print x) { (var x 7.0) (print x) (= x 3.0) (print x) { } } (print x) ]"
+        )
+    describe "with unterminated block" $ do
+      testParserImplementations
+        (scan "var x = 120 / 2; print x; { var x = 7; print x; { var y = 7; };")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
+            ]
+        , "[ (var x (/ 120.0 2.0)) (print x) ]"
+        )
+    describe "with unterminated statement inside block" $ do
+      testParserImplementations
+        (scan "var x = 120 / 2; print x; { var x = 7 };")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "}" Token.RIGHT_BRACE Nothing 1) "Expect ';' after variable declaration."
+            ]
+        , "[ (var x (/ 120.0 2.0)) (print x) ]"
+        )
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)

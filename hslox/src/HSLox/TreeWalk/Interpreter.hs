@@ -64,6 +64,7 @@ instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
   interpretStmt (AST.PrintStmt stmt) = interpretStmt stmt
   interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
+  interpretStmt (AST.BlockStmt block) = interpretStmt block
 
 instance Runtime sig m => StmtInterpreter AST.Print m where
   interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
@@ -72,6 +73,10 @@ instance Runtime sig m => StmtInterpreter AST.Declaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr expr
     RTEnv.defineM (tokenLexeme tk) val
+
+instance Runtime sig m => StmtInterpreter AST.Block m where
+  -- TODO local scope
+  interpretStmt (AST.Block stmts) = for_ stmts interpretStmt
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue

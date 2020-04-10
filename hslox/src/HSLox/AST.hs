@@ -10,12 +10,16 @@ newtype Program = Program (Seq Stmt)
 data Stmt = ExprStmt Expr
           | PrintStmt Print
           | DeclarationStmt Declaration
+          | BlockStmt Block
   deriving (Eq, Show, Ord)
 
 data Print = Print Token Expr
   deriving (Eq, Show, Ord)
 
 data Declaration = VarDeclaration Token Expr
+  deriving (Eq, Show, Ord)
+
+newtype Block = Block (Seq Stmt)
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr

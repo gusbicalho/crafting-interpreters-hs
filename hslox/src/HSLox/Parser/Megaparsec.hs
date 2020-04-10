@@ -81,9 +81,18 @@ varDeclaration = do
 
 statement :: MonadParsec ParserError TokenStream m => m Stmt
 statement = do
-  stmt <- printStmt <|> expressionStmt
+  stmt <- printStmt <|> blockStmt <|> expressionStmt
   consume [ Token.SEMICOLON ] "Expect ';' after statement."
   pure stmt
+
+blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
+blockStmt = do
+  singleMatching [ Token.LEFT_BRACE ]
+  stmts <- many $ do
+            notFollowedBy $ singleMatching [ Token.RIGHT_BRACE ]
+            declaration
+  consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
+  pure . BlockStmt . Block $ Seq.fromList stmts
 
 printStmt :: MonadParsec ParserError TokenStream m => m Stmt
 printStmt = do

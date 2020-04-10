@@ -14,12 +14,16 @@ instance ASTPrinter Stmt where
   printAST (ExprStmt e) = printAST e
   printAST (PrintStmt print) = printAST print
   printAST (DeclarationStmt decl) = printAST decl
+  printAST (BlockStmt block) = printAST block
 
 instance ASTPrinter Print where
   printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
 
 instance ASTPrinter Declaration where
   printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
+
+instance ASTPrinter Block where
+  printAST (Block stmts) = "{" <> foldMap ((" " <>) . printAST) stmts <> " }"
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

@@ -5,9 +5,9 @@ import Control.Effect.Empty
 import Control.Carrier.Empty.Church (EmptyC)
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
-import Control.Monad (void)
 import Data.Foldable
-import Data.Sequence (Seq)
+import Data.Functor
+import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import HSLox.AST
@@ -78,6 +78,7 @@ varDeclaration = do
 statement :: StmtParser sig m
 statement = do
     stmt <- printStmt `Util.recoverFromEmptyWith`
+            blockStmt `Util.recoverFromEmptyWith`
             expressionStmt
     match [Token.SEMICOLON]
           `Util.recoverFromEmptyWith`
@@ -89,6 +90,21 @@ printStmt = do
   tk <- match [ Token.PRINT ]
   expr <- expression
   pure . PrintStmt $ Print tk expr
+
+blockStmt :: Has Empty sig m => StmtParser sig m
+blockStmt = do
+    match [ Token.LEFT_BRACE ]
+    stmts <- blockBody Seq.empty
+    consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
+    pure . BlockStmt $ Block stmts
+  where
+    blockBody stmts = do
+      endOfBlock <- check [ Token.RIGHT_BRACE, Token.EOF ]
+      if endOfBlock
+      then pure stmts
+      else do
+        stmt <- declaration
+        blockBody (stmts :|> stmt)
 
 expressionStmt :: StmtParser sig m
 expressionStmt = ExprStmt <$> expression
