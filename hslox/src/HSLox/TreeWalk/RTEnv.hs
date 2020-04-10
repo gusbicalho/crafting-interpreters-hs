@@ -1,6 +1,6 @@
 module HSLox.TreeWalk.RTEnv where
 
-import Control.Effect.Throw
+import Control.Effect.Error
 import Control.Effect.State
 import Control.Applicative
 import Data.Map.Strict (Map)
@@ -71,3 +71,16 @@ assignM tk val = do
     Nothing -> RTError.throwRT tk $ "Undefined variable '"
                                  <> tokenLexeme tk
                                  <> "'."
+
+runInChildEnv :: Has (Throw RTError) sig m
+              => Has (Catch RTError) sig m
+              => Has (State RTEnv) sig m
+              => m () -> m ()
+runInChildEnv action = do
+    modify newChildEnv
+    action `catchError` \e -> do
+      restoreParent
+      throwError @RTError e
+    restoreParent
+  where
+    restoreParent = modify $ maybe newEnv id . parentEnv
