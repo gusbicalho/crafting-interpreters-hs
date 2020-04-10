@@ -110,7 +110,7 @@ ifStmt = do
   match [ Token.IF ]
   consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
   condition <- expression
-  consume [ Token.RIGHT_PAREN ] "Expect ')' after 'if' condition."
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after if condition."
   thenStmt <- statement
   elseStmt <- Util.runEmptyToMaybe $ do
                 match [ Token.ELSE ]

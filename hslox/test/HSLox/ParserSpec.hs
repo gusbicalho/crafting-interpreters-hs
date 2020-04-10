@@ -83,11 +83,31 @@ spec = do
         , "[ (var x (/ 120.0 2.0)) (print x) ]"
         )
   describe "programs with if statements" $ do
-    testParserImplementations
-      (scan "if (!(true == false)) if (false) print 1; else print 2; else { if (true) { print 5; } else if (false) print 7; }")
+    describe "correct and nested" $ do
+      testParserImplementations
+        (scan "if (!(true == false)) if (false) print 1; else print 2; else { if (true) { print 5; } else if (false) print 7; }")
         ( Seq.empty
         , "[ (if (! (group (== True False))) (if False (print 1.0) (print 2.0)) { (if True { (print 5.0) } (if False (print 7.0))) }) ]"
         )
+    describe "dangling else" $ do
+      testParserImplementations
+        (scan "if (first) if (second) print 1; else print 2;")
+        ( Seq.empty
+        , "[ (if first (if second (print 1.0) (print 2.0))) ]"
+        )
+    describe "incomplete ifs" $ do
+      testParserImplementations
+        (scan "if;\n if (;\n if (true;\n if (true) else;\n if (true) {} else;\n if (true) else {};\n {}")
+        ( Seq.fromList
+            [ ParserError (Just $ Token ";"    Token.SEMICOLON Nothing 1) "Expect '(' after 'if'."
+            , ParserError (Just $ Token ";"    Token.SEMICOLON Nothing 2) "Expect expression."
+            , ParserError (Just $ Token ";"    Token.SEMICOLON Nothing 3) "Expect ')' after if condition."
+            , ParserError (Just $ Token "else" Token.ELSE      Nothing 4) "Expect expression."
+            , ParserError (Just $ Token ";"    Token.SEMICOLON Nothing 5) "Expect expression."
+            , ParserError (Just $ Token "else" Token.ELSE      Nothing 6) "Expect expression."
+            ]
+        , "[ { } ]")
+
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)

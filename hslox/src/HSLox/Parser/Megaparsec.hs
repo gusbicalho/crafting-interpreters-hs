@@ -87,7 +87,7 @@ ifStmt = do
   singleMatching [ Token.IF ]
   consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
   condition <- expression
-  consume [ Token.RIGHT_PAREN ] "Expect ')' after 'if' condition."
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after if condition."
   thenStmt <- statement
   elseStmt <- do _ <- singleMatching [ Token.ELSE ]
                  Just <$> statement
@@ -243,11 +243,9 @@ consume :: Foldable t
         => MonadParsec ParserError TokenStream m
         => t TokenType -> T.Text -> m Token
 consume tkTypes errorMsg = do
-  mbTk <- maybeAny
-  case mbTk of
-    Just tk
-      | any ((tokenType tk) ==) tkTypes -> pure tk
-    _ -> fancyFailure (makeError mbTk errorMsg)
+  singleMatching tkTypes <|> do
+    mbTk <- lookAhead maybeAny
+    fancyFailure (makeError mbTk errorMsg)
 
 checkForKnownErrorProductions
   :: Foldable t
