@@ -66,6 +66,14 @@ spec = do
             ]
         , "[ (var x (/ 120.0 2.0)) (print x) ]"
         )
+    describe "with nested unterminated blocks" $ do
+      testParserImplementations
+        (scan "{ { }; {")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
+            ]
+        , "[ ]"
+        )
     describe "with unterminated statement inside block" $ do
       testParserImplementations
         (scan "var x = 120 / 2; print x; { var x = 7 };")
