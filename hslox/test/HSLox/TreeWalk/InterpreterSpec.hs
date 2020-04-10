@@ -23,34 +23,36 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "TreeWalk evaluates correctly" $ do
-    it "an empty program" $ do
-      runParser "" `shouldEvaluateTo`
+    it "an empty program" $
+      "" `shouldEvaluateTo`
         (Nothing, Seq.empty)
-    it "a program with blocks, local scope, and a runtime error" $ do
-      runParser
-        ( "var a = \"global a\";\n"
-       <> "var b = \"global b\";\n"
-       <> "var c = \"global c\";\n"
-       <> "{\n"
-       <> "  var a = \"outer a\";\n"
-       <> "  var b = \"outer b\";\n"
-       <> "  {\n"
-       <> "    var a = \"inner a\";\n"
-       <> "    print a;\n"
-       <> "    print b;\n"
-       <> "    print c;\n"
-       <> "  }\n"
-       <> "  print a;\n"
-       <> "  print b;\n"
-       <> "  print c;\n"
-       <> "}\n"
-       <> "print a;\n"
-       <> "print b;\n"
-       <> "print c;\n"
-       <> "print d; // error\n"
-       <> "print \"never printed!\";\n"
-       )
+    it "a program with variables and local scope" $ do
+      "var a = 1; { var a = a + 2; print a; }"
         `shouldEvaluateTo`
+        (Nothing, Seq.fromList [ "3" ])
+    it "a program with variables, local scope, and a runtime error" $
+       ( "var a = \"global a\";\n"
+      <> "var b = \"global b\";\n"
+      <> "var c = \"global c\";\n"
+      <> "{\n"
+      <> "  var a = \"outer a\";\n"
+      <> "  var b = \"outer b\";\n"
+      <> "  {\n"
+      <> "    var a = \"inner a\";\n"
+      <> "    print a;\n"
+      <> "    print b;\n"
+      <> "    print c;\n"
+      <> "  }\n"
+      <> "  print a;\n"
+      <> "  print b;\n"
+      <> "  print c;\n"
+      <> "}\n"
+      <> "print a;\n"
+      <> "print b;\n"
+      <> "print c;\n"
+      <> "print d; // error\n"
+      <> "print \"never printed!\";\n"
+      ) `shouldEvaluateTo`
         ( Just (RTError "Undefined variable 'd'." $ Token "d" Token.IDENTIFIER Nothing 20)
         , Seq.fromList
             [ "inner a"
@@ -64,14 +66,15 @@ spec = do
             , "global c"
             ])
 
-shouldEvaluateTo :: AST.Program -> (Maybe RTError, Seq T.Text) -> Expectation
-ast `shouldEvaluateTo` (error, output) =
-  (ast & Interpreter.interpret RTEnv.newEnv
-       & fmap snd
-       & runOutputToWriter @T.Text Seq.singleton
-       & Util.runWriterToPair @(Seq T.Text)
-       & run
-       & swap)
+shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
+source `shouldEvaluateTo` (error, output) =
+  (source & runParser
+          & Interpreter.interpret RTEnv.newEnv
+          & fmap snd
+          & runOutputToWriter @T.Text Seq.singleton
+          & Util.runWriterToPair @(Seq T.Text)
+          & run
+          & swap)
   `shouldBe` (error, output)
 
 runParser :: T.Text -> AST.Program
