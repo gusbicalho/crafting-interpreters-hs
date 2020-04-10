@@ -75,8 +75,15 @@ instance Runtime sig m => StmtInterpreter AST.Declaration m where
     RTEnv.defineM (tokenLexeme tk) val
 
 instance Runtime sig m => StmtInterpreter AST.Block m where
-  -- TODO local scope
-  interpretStmt (AST.Block stmts) = for_ stmts interpretStmt
+  interpretStmt (AST.Block stmts) = do
+      modify RTEnv.newChildEnv
+      for_ stmts interpretStmt
+        `catchError` \e -> do
+          restoreParent
+          throwError @RTError e
+      restoreParent
+    where
+      restoreParent = modify $ maybe RTEnv.newEnv id . RTEnv.parentEnv
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue

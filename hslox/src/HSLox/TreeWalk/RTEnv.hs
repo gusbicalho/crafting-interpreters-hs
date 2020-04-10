@@ -20,6 +20,12 @@ data RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue
 newEnv :: RTEnv
 newEnv = RTEnv Map.empty Nothing
 
+newChildEnv :: RTEnv -> RTEnv
+newChildEnv parent = RTEnv Map.empty (Just parent)
+
+parentEnv :: RTEnv -> Maybe RTEnv
+parentEnv = rtEnvEnclosing
+
 overBindings :: (Map BindingName RTValue -> Map BindingName RTValue) -> RTEnv -> RTEnv
 overBindings f env = env { rtEnvBindings = f (rtEnvBindings env) }
 
