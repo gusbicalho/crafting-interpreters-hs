@@ -80,10 +80,7 @@ varDeclaration = do
     pure . DeclarationStmt $ VarDeclaration identifier init
 
 statement :: MonadParsec ParserError TokenStream m => m Stmt
-statement = do
-  stmt <- printStmt <|> blockStmt <|> expressionStmt
-  consume [ Token.SEMICOLON ] "Expect ';' after statement."
-  pure stmt
+statement = printStmt <|> blockStmt <|> expressionStmt
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
 blockStmt = do
@@ -98,10 +95,14 @@ printStmt :: MonadParsec ParserError TokenStream m => m Stmt
 printStmt = do
   tk <- singleMatching [ Token.PRINT ]
   expr <- expression
+  consume [ Token.SEMICOLON ] "Expect ';' after value."
   pure . PrintStmt $ Print tk expr
 
 expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
-expressionStmt = ExprStmt <$> expression
+expressionStmt = do
+  expr <- expression
+  consume [ Token.SEMICOLON ] "Expect ';' after statement."
+  pure $ ExprStmt expr
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
 expression = assignment

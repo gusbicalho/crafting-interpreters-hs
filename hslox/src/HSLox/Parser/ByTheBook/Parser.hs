@@ -80,15 +80,13 @@ statement = do
     stmt <- printStmt `Util.recoverFromEmptyWith`
             blockStmt `Util.recoverFromEmptyWith`
             expressionStmt
-    match [Token.SEMICOLON]
-          `Util.recoverFromEmptyWith`
-          throwParserError "Expect ';' after statement."
     pure stmt
 
 printStmt :: Has Empty sig m => StmtParser sig m
 printStmt = do
   tk <- match [ Token.PRINT ]
   expr <- expression
+  consume [Token.SEMICOLON] "Expect ';' after value."
   pure . PrintStmt $ Print tk expr
 
 blockStmt :: Has Empty sig m => StmtParser sig m
@@ -107,7 +105,10 @@ blockStmt = do
         blockBody (stmts :|> stmt)
 
 expressionStmt :: StmtParser sig m
-expressionStmt = ExprStmt <$> expression
+expressionStmt = do
+  expr <- expression
+  consume [Token.SEMICOLON] "Expect ';' after expression."
+  pure $ ExprStmt expr
 
 expression :: ExprParser sig m
 expression = assignment
