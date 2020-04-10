@@ -15,6 +15,7 @@ instance ASTPrinter Stmt where
   printAST (PrintStmt print) = printAST print
   printAST (DeclarationStmt decl) = printAST decl
   printAST (BlockStmt block) = printAST block
+  printAST (IfStmt ifStmt) = printAST ifStmt
 
 instance ASTPrinter Print where
   printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
@@ -24,6 +25,13 @@ instance ASTPrinter Declaration where
 
 instance ASTPrinter Block where
   printAST (Block stmts) = "{" <> foldMap ((" " <>) . printAST) stmts <> " }"
+
+instance ASTPrinter If where
+  printAST (If cond thenStmt elseStmt) = "(if"
+                                      <> " " <> printAST cond
+                                      <> " " <> printAST thenStmt
+                                      <> maybe "" ((" " <>) . printAST) elseStmt
+                                      <> ")"
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

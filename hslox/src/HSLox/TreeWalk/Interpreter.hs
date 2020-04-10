@@ -65,6 +65,7 @@ instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.PrintStmt stmt) = interpretStmt stmt
   interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
   interpretStmt (AST.BlockStmt block) = interpretStmt block
+  interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
 
 instance Runtime sig m => StmtInterpreter AST.Print m where
   interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
@@ -77,6 +78,13 @@ instance Runtime sig m => StmtInterpreter AST.Declaration m where
 instance Runtime sig m => StmtInterpreter AST.Block m where
   interpretStmt (AST.Block stmts) =
     RTEnv.runInChildEnv $ for_ stmts interpretStmt
+
+instance Runtime sig m => StmtInterpreter AST.If m where
+  interpretStmt (AST.If cond thenStmt elseStmt) = do
+    cond <- interpretExpr cond
+    if isTruthy cond
+    then interpretStmt thenStmt
+    else maybe (pure ()) interpretStmt elseStmt
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue

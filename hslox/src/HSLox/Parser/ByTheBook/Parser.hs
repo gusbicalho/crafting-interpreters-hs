@@ -79,6 +79,7 @@ statement :: StmtParser sig m
 statement = do
     stmt <- printStmt `Util.recoverFromEmptyWith`
             blockStmt `Util.recoverFromEmptyWith`
+            ifStmt `Util.recoverFromEmptyWith`
             expressionStmt
     pure stmt
 
@@ -103,6 +104,18 @@ blockStmt = do
       else do
         stmt <- declaration
         blockBody (stmts :|> stmt)
+
+ifStmt :: Has Empty sig m => StmtParser sig m
+ifStmt = do
+  match [ Token.IF ]
+  consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
+  condition <- expression
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after 'if' condition."
+  thenStmt <- statement
+  elseStmt <- Util.runEmptyToMaybe $ do
+                match [ Token.ELSE ]
+                statement
+  pure . IfStmt $ If condition thenStmt elseStmt
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do

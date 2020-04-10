@@ -82,6 +82,12 @@ spec = do
             ]
         , "[ (var x (/ 120.0 2.0)) (print x) ]"
         )
+  describe "programs with if statements" $ do
+    testParserImplementations
+      (scan "if (!(true == false)) if (false) print 1; else print 2; else { if (true) { print 5; } else if (false) print 7; }")
+        ( Seq.empty
+        , "[ (if (! (group (== True False))) (if False (print 1.0) (print 2.0)) { (if True { (print 5.0) } (if False (print 7.0))) }) ]"
+        )
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)

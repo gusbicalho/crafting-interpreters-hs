@@ -80,7 +80,20 @@ varDeclaration = do
     pure . DeclarationStmt $ VarDeclaration identifier init
 
 statement :: MonadParsec ParserError TokenStream m => m Stmt
-statement = printStmt <|> blockStmt <|> expressionStmt
+statement = printStmt <|> blockStmt <|> ifStmt <|> expressionStmt
+
+ifStmt :: MonadParsec ParserError TokenStream m => m Stmt
+ifStmt = do
+  singleMatching [ Token.IF ]
+  consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
+  condition <- expression
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after 'if' condition."
+  thenStmt <- statement
+  elseStmt <- do _ <- singleMatching [ Token.ELSE ]
+                 Just <$> statement
+              <|> pure Nothing
+  pure . IfStmt $ If condition thenStmt elseStmt
+
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
 blockStmt = do

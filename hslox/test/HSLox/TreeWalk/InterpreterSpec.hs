@@ -65,6 +65,16 @@ spec = do
             , "global b"
             , "global c"
             ])
+    describe "a program with conditionals and local scope" $ do
+      let source condition = "var x = 1; if (" <> condition <> ") print x; else { x = 3; var x = 2; print x; } print x;"
+      it "taking the 'then' branch" $ do
+        source "3 == 3"
+          `shouldEvaluateTo`
+          (Nothing, Seq.fromList ["1", "1"])
+      it "taking the 'else' branch" $ do
+        source "3 != 3"
+          `shouldEvaluateTo`
+          (Nothing, Seq.fromList ["2", "3"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

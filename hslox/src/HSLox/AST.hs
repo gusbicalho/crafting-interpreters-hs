@@ -11,6 +11,7 @@ data Stmt = ExprStmt Expr
           | PrintStmt Print
           | DeclarationStmt Declaration
           | BlockStmt Block
+          | IfStmt If
   deriving (Eq, Show, Ord)
 
 data Print = Print Token Expr
@@ -20,6 +21,12 @@ data Declaration = VarDeclaration Token Expr
   deriving (Eq, Show, Ord)
 
 newtype Block = Block (Seq Stmt)
+  deriving (Eq, Show, Ord)
+
+data If = If { ifCondition :: Expr
+             , ifThenStmt :: Stmt
+             , ifElseStmt :: Maybe Stmt
+             }
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr
