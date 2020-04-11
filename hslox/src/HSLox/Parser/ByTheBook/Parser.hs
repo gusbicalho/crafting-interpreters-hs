@@ -80,6 +80,7 @@ statement = do
     stmt <- printStmt `Util.recoverFromEmptyWith`
             blockStmt `Util.recoverFromEmptyWith`
             ifStmt `Util.recoverFromEmptyWith`
+            whileStmt `Util.recoverFromEmptyWith`
             expressionStmt
     pure stmt
 
@@ -116,6 +117,15 @@ ifStmt = do
                 _ <- match [ Token.ELSE ]
                 statement
   pure . IfStmt $ If condition thenStmt elseStmt
+
+whileStmt :: Has Empty sig m => StmtParser sig m
+whileStmt = do
+  match [ Token.WHILE ]
+  consume [ Token.LEFT_PAREN ] "Expect '(' after 'while'."
+  condition <- expression
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after while condition."
+  body <- statement
+  pure . WhileStmt $ While condition body
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do

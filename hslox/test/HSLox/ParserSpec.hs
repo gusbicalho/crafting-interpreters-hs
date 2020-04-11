@@ -113,6 +113,12 @@ spec = do
         (scan "if (false or true and false) print 1; else print 2;")
         ( Seq.empty
         , "[ (if (or False (and True False)) (print 1.0) (print 2.0)) ]")
+  describe "programs with while statements" $ do
+    describe "correct" $ do
+      testParserImplementations
+        (scan "var x = 0; while (x < 5) { print x; x = x + 1; }")
+        ( Seq.empty
+        , "[ (var x 0.0) (while (< x 5.0) { (print x) (= x (+ x 1.0)) }) ]")
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)

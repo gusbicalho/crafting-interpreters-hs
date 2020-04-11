@@ -16,6 +16,7 @@ instance ASTPrinter Stmt where
   printAST (DeclarationStmt decl) = printAST decl
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
+  printAST (WhileStmt whileStmt) = printAST whileStmt
 
 instance ASTPrinter Print where
   printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
@@ -32,6 +33,12 @@ instance ASTPrinter If where
                                       <> " " <> printAST thenStmt
                                       <> maybe "" ((" " <>) . printAST) elseStmt
                                       <> ")"
+
+instance ASTPrinter While where
+  printAST (While cond body) = "(while"
+                            <> " " <> printAST cond
+                            <> " " <> printAST body
+                            <> ")"
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

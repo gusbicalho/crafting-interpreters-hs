@@ -12,6 +12,7 @@ data Stmt = ExprStmt Expr
           | DeclarationStmt Declaration
           | BlockStmt Block
           | IfStmt If
+          | WhileStmt While
   deriving (Eq, Show, Ord)
 
 data Print = Print Token Expr
@@ -27,6 +28,11 @@ data If = If { ifCondition :: Expr
              , ifThenStmt :: Stmt
              , ifElseStmt :: Maybe Stmt
              }
+  deriving (Eq, Show, Ord)
+
+data While = While { whileCondition :: Expr
+                   , whileBody :: Stmt
+                   }
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr

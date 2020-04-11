@@ -66,6 +66,7 @@ instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
   interpretStmt (AST.BlockStmt block) = interpretStmt block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
+  interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
 
 instance Runtime sig m => StmtInterpreter AST.Print m where
   interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
@@ -85,6 +86,11 @@ instance Runtime sig m => StmtInterpreter AST.If m where
     if isTruthy cond
     then interpretStmt thenStmt
     else maybe (pure ()) interpretStmt elseStmt
+
+instance Runtime sig m => StmtInterpreter AST.While m where
+  interpretStmt (AST.While cond body) =
+    Util.whileM (isTruthy <$> interpretExpr cond) $
+      interpretStmt body
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue

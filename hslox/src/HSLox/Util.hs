@@ -89,3 +89,12 @@ swapEither (Right b) = Left b
 rightToMaybe :: Either b a -> Maybe a
 rightToMaybe (Right r) = Just r
 rightToMaybe _         = Nothing
+
+whileM :: Monad m => m Bool -> m () -> m ()
+whileM cond action = do
+  b <- cond
+  if not b
+  then pure ()
+  else do
+    action
+    whileM cond action
