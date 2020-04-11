@@ -32,6 +32,9 @@ data If = If { ifCondition :: Expr
 pattern UnaryE :: Token -> Expr -> Expr
 pattern UnaryE op expr = UnaryExpr (Unary op expr)
 
+pattern LogicalE :: Expr -> Token -> Expr -> Expr
+pattern LogicalE left op right = LogicalExpr (Logical left op right)
+
 pattern BinaryE :: Expr -> Token -> Expr -> Expr
 pattern BinaryE left op right = BinaryExpr (Binary left op right)
 
@@ -60,6 +63,7 @@ pattern NilE :: Expr
 pattern NilE = LiteralExpr LitNil
 
 data Expr = UnaryExpr Unary
+          | LogicalExpr Logical
           | BinaryExpr Binary
           | TernaryExpr Ternary
           | GroupingExpr Grouping
@@ -80,6 +84,12 @@ data Binary = Binary { binaryLeft :: Expr
                      , binaryOperator :: Token
                      , binaryRight :: Expr
                      }
+  deriving (Eq, Show, Ord)
+
+data Logical = Logical { logicalLeft :: Expr
+                       , logicalOperator :: Token
+                       , logicalRight :: Expr
+                       }
   deriving (Eq, Show, Ord)
 
 data Unary = Unary { unaryOperator :: Token

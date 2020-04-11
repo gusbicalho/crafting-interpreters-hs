@@ -139,13 +139,13 @@ comma :: MonadParsec ParserError TokenStream m => m Expr
 comma =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
-      <|> leftAssociativeBinaryOp conditional opTypes
+      <|> leftAssociativeBinaryOp BinaryE conditional opTypes
   where
     opTypes = [ Token.COMMA ]
 
 conditional :: MonadParsec ParserError TokenStream m => m Expr
 conditional = do
-    left <- equality
+    left <- orExpr
     conditionalBody left <|> pure left
   where
     conditionalBody left = do
@@ -155,11 +155,27 @@ conditional = do
       right <- conditional
       pure $ TernaryE left op1 middle op2 right
 
+orExpr :: MonadParsec ParserError TokenStream m => m Expr
+orExpr =
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression andExpr opTypes ]
+      <|> leftAssociativeBinaryOp LogicalE andExpr opTypes
+  where
+    opTypes = [ Token.OR ]
+
+andExpr :: MonadParsec ParserError TokenStream m => m Expr
+andExpr =
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression equality opTypes ]
+      <|> leftAssociativeBinaryOp LogicalE equality opTypes
+  where
+    opTypes = [ Token.AND ]
+
 equality :: MonadParsec ParserError TokenStream m => m Expr
 equality =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
-      <|> leftAssociativeBinaryOp comparison opTypes
+      <|> leftAssociativeBinaryOp BinaryE comparison opTypes
   where
     opTypes = [ Token.EQUAL_EQUAL
               , Token.BANG_EQUAL
@@ -169,7 +185,7 @@ comparison :: MonadParsec ParserError TokenStream m => m Expr
 comparison =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression addition opTypes ]
-      <|> leftAssociativeBinaryOp addition opTypes
+      <|> leftAssociativeBinaryOp BinaryE addition opTypes
   where
     opTypes = [ Token.GREATER
               , Token.GREATER_EQUAL
@@ -181,15 +197,15 @@ addition :: MonadParsec ParserError TokenStream m => m Expr
 addition =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
-      <|> leftAssociativeBinaryOp multiplication [ Token.MINUS
-                                           , Token.PLUS
-                                           ]
+      <|> leftAssociativeBinaryOp BinaryE multiplication [ Token.MINUS
+                                                         , Token.PLUS
+                                                         ]
 
 multiplication :: MonadParsec ParserError TokenStream m => m Expr
 multiplication =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression unary opTypes ]
-      <|> leftAssociativeBinaryOp unary opTypes
+      <|> leftAssociativeBinaryOp BinaryE unary opTypes
   where
     opTypes = [ Token.STAR
               , Token.SLASH
@@ -224,12 +240,15 @@ primary =
 
 leftAssociativeBinaryOp :: Foldable t
                         => MonadParsec ParserError TokenStream m
-                        => m Expr -> t TokenType -> m Expr
-leftAssociativeBinaryOp termParser opTypes = do
+                        => (Expr -> Token -> Expr -> Expr)
+                        -> m Expr
+                        -> t TokenType
+                        -> m Expr
+leftAssociativeBinaryOp makeExpr termParser opTypes = do
   left <- termParser
   following <- many ((,) <$> singleMatching opTypes
                          <*> termParser)
-  pure $ foldl' (\l (op, r) -> BinaryE l op r) left following
+  pure $ foldl' (\l (op, r) -> makeExpr l op r) left following
 
 singleMatching :: Foldable t
                => MonadParsec ParserError TokenStream m

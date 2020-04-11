@@ -113,7 +113,7 @@ ifStmt = do
   consume [ Token.RIGHT_PAREN ] "Expect ')' after if condition."
   thenStmt <- statement
   elseStmt <- Util.runEmptyToMaybe $ do
-                match [ Token.ELSE ]
+                _ <- match [ Token.ELSE ]
                 statement
   pure . IfStmt $ If condition thenStmt elseStmt
 
@@ -145,13 +145,13 @@ comma :: ExprParser sig m
 comma = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
-    leftAssociativeBinaryOp conditional opTypes
+    leftAssociativeBinaryOp BinaryE conditional opTypes
   where
     opTypes = [ Token.COMMA ]
 
 conditional :: ExprParser sig m
 conditional = do
-  left <- equality
+  left <- orExpr
   mbTk <- Util.runEmptyToMaybe $ match [ Token.QUESTION_MARK ]
   case mbTk of
     Nothing -> pure left
@@ -163,11 +163,27 @@ conditional = do
       right <- conditional
       pure $ TernaryE  left op1 middle op2 right
 
+orExpr :: ExprParser sig m
+orExpr = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression andExpr opTypes ]
+    leftAssociativeBinaryOp LogicalE andExpr opTypes
+  where
+    opTypes = [ Token.OR ]
+
+andExpr :: ExprParser sig m
+andExpr = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression equality opTypes ]
+    leftAssociativeBinaryOp LogicalE equality opTypes
+  where
+    opTypes = [ Token.AND ]
+
 equality :: ExprParser sig m
 equality = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
-    leftAssociativeBinaryOp comparison opTypes
+    leftAssociativeBinaryOp BinaryE comparison opTypes
   where
     opTypes = [ Token.EQUAL_EQUAL
               , Token.BANG_EQUAL
@@ -177,7 +193,7 @@ comparison :: ExprParser sig m
 comparison = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression addition opTypes ]
-    leftAssociativeBinaryOp addition opTypes
+    leftAssociativeBinaryOp BinaryE addition opTypes
   where
     opTypes = [ Token.GREATER
               , Token.GREATER_EQUAL
@@ -189,15 +205,15 @@ addition :: ExprParser sig m
 addition = do
   checkForKnownErrorProductions
     [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
-  leftAssociativeBinaryOp multiplication [ Token.MINUS
-                                         , Token.PLUS
-                                         ]
+  leftAssociativeBinaryOp BinaryE multiplication [ Token.MINUS
+                                                 , Token.PLUS
+                                                 ]
 
 multiplication :: ExprParser sig m
 multiplication = do
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression unary opTypes ]
-    leftAssociativeBinaryOp unary opTypes
+    leftAssociativeBinaryOp BinaryE unary opTypes
   where
     opTypes =  [ Token.STAR
                , Token.SLASH
@@ -256,16 +272,17 @@ throwParserError :: Has (ErrorEff.Throw ParserError) sig m
 throwParserError msg = ErrorEff.throwError =<< makeParserError msg
 
 leftAssociativeBinaryOp :: Foldable t
-                        => (forall sig m. ExprParser sig m)
+                        => (Expr -> Token -> Expr -> Expr)
+                        -> (forall sig m. ExprParser sig m)
                         -> t TokenType
                         -> ExprParser sig m
-leftAssociativeBinaryOp termParser opTypes = do
+leftAssociativeBinaryOp makeExpr termParser opTypes = do
   left <- termParser
   e <- execState left . Util.untilEmpty $ do
     left <- get
     op <- match opTypes
     right <- termParser
-    put $ BinaryE left op right
+    put $ makeExpr left op right
   pure e
 
 checkForKnownErrorProductions

@@ -75,6 +75,11 @@ spec = do
         source "3 != 3"
           `shouldEvaluateTo`
           (Nothing, Seq.fromList ["2", "3"])
+    it "programs with logical operators" $ do
+      "if (false or true and false) print 1; else print 2;"
+        `shouldEvaluateTo`
+        ( Nothing
+        , Seq.fromList ["2"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

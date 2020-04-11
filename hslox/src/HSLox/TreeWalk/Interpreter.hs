@@ -91,6 +91,7 @@ class ExprInterpreter e m where
 
 instance Runtime sig m => ExprInterpreter AST.Expr m where
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
+  interpretExpr (AST.LogicalExpr t) = interpretExpr t
   interpretExpr (AST.BinaryExpr t) = interpretExpr t
   interpretExpr (AST.TernaryExpr t) = interpretExpr t
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
@@ -111,6 +112,20 @@ instance Runtime sig m => ExprInterpreter AST.Ternary m where
                                 <> " and "
                                 <> tokenLexeme op2
                                 <> " not supported in ternary position"
+
+instance Runtime sig m => ExprInterpreter AST.Logical m where
+  interpretExpr (AST.Logical left op right) = do
+    leftVal <- interpretExpr left
+    case tokenType op of
+      Token.OR -> if isTruthy leftVal
+                  then pure leftVal
+                  else interpretExpr right
+      Token.AND -> if not . isTruthy $ leftVal
+                   then pure leftVal
+                   else interpretExpr right
+      _ -> RTError.throwRT op $ "AST Error: Operator "
+                             <> tokenLexeme op
+                             <> " not supported in logical position"
 
 instance Runtime sig m => ExprInterpreter AST.Binary m where
   interpretExpr (AST.Binary left op right) = do

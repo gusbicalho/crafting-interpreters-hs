@@ -35,6 +35,7 @@ instance ASTPrinter If where
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e
+  printAST (LogicalExpr e) = printAST e
   printAST (BinaryExpr e) = printAST e
   printAST (TernaryExpr e) = printAST e
   printAST (GroupingExpr e) = printAST e
@@ -62,6 +63,9 @@ instance ASTPrinter Unary where
 
 instance ASTPrinter Binary where
   printAST (Binary left op right) = parenthesize (tokenLexeme op) [left, right]
+
+instance ASTPrinter Logical where
+  printAST (Logical left op right) = parenthesize (tokenLexeme op) [left, right]
 
 instance ASTPrinter Ternary where
   printAST (Ternary left op1 middle op2 right)

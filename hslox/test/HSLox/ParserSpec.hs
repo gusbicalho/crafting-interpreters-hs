@@ -107,7 +107,12 @@ spec = do
             , ParserError (Just $ Token "else" Token.ELSE      Nothing 6) "Expect expression."
             ]
         , "[ { } ]")
-
+  describe "programs with logical operators" $ do
+    describe "correct" $ do
+      testParserImplementations
+        (scan "if (false or true and false) print 1; else print 2;")
+        ( Seq.empty
+        , "[ (if (or False (and True False)) (print 1.0) (print 2.0)) ]")
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)
