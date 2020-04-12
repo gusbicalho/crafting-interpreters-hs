@@ -119,6 +119,17 @@ spec = do
         (scan "var x = 0; while (x < 5) { print x; x = x + 1; }")
         ( Seq.empty
         , "[ (var x 0.0) (while (< x 5.0) { (print x) (= x (+ x 1.0)) }) ]")
+  describe "programs with for statements" $ do
+    describe "loop forever" $ do
+      testParserImplementations
+        (scan "for (;;) print 1;")
+        ( Seq.empty
+        , "[ (while True (print 1.0)) ]")
+    describe "count to 5" $ do
+      testParserImplementations
+        (scan "for (var i = 1;i <= 5;i = i + 1) { print i; }")
+        ( Seq.empty
+        , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
 
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)

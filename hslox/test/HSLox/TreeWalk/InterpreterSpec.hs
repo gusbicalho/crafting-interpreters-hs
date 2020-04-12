@@ -85,6 +85,11 @@ spec = do
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["0", "1", "2", "3", "4"] )
+    it "a program with for statement" $ do
+      "for (var x = 0; x < 5; x = x + 1) { print x; }"
+        `shouldEvaluateTo`
+        ( Nothing
+        , Seq.fromList ["0", "1", "2", "3", "4"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

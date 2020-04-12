@@ -12,6 +12,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import HSLox.AST
+import HSLox.AST.Sugar
 import HSLox.Parser.ParserError (ParserError (..))
 import qualified HSLox.Parser.ParserError as ParserError
 import HSLox.Token (Token (..), TokenType)
@@ -84,6 +85,7 @@ statement = asum [ printStmt
                  , blockStmt
                  , ifStmt
                  , whileStmt
+                 , forStmt
                  , expressionStmt
                  ]
 
@@ -102,11 +104,30 @@ ifStmt = do
 whileStmt :: MonadParsec ParserError TokenStream m => m Stmt
 whileStmt = do
   singleMatching [ Token.WHILE ]
-  consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
+  consume [ Token.LEFT_PAREN ] "Expect '(' after 'while'."
   condition <- expression
-  consume [ Token.RIGHT_PAREN ] "Expect ')' after if condition."
+  consume [ Token.RIGHT_PAREN ] "Expect ')' after while condition."
   body <- statement
   pure . WhileStmt $ While condition body
+
+forStmt :: MonadParsec ParserError TokenStream m => m Stmt
+forStmt = do
+    singleMatching [ Token.FOR ]
+    consume [ Token.LEFT_PAREN ] "Expect '(' after 'for'."
+    init      <- asum [ (singleMatching [ Token.SEMICOLON ] $> Nothing)
+                      , (Just <$> varDeclaration)
+                      , (Just <$> expressionStmt)
+                      ]
+    condition <- asum [ (singleMatching [ Token.SEMICOLON ] $> Nothing)
+                      , (Just <$> expression
+                          <* consume [ Token.SEMICOLON ] "Expect ';' after for condition.")
+                      ]
+    increment <- asum [ (singleMatching [ Token.RIGHT_PAREN ] $> Nothing)
+                      , (Just <$> expression
+                          <* consume [ Token.RIGHT_PAREN ] "Expect ')' after for increment.")
+                      ]
+    body <- statement
+    pure $ buildFor init condition increment body
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
 blockStmt = do

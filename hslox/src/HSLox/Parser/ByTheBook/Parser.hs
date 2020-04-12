@@ -11,6 +11,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import HSLox.AST
+import HSLox.AST.Sugar
 import HSLox.Parser.ParserError
 import HSLox.Parser.ByTheBook.ParserState
 import HSLox.Token (Token (..), TokenType)
@@ -81,6 +82,7 @@ statement = do
             blockStmt `Util.recoverFromEmptyWith`
             ifStmt `Util.recoverFromEmptyWith`
             whileStmt `Util.recoverFromEmptyWith`
+            forStmt `Util.recoverFromEmptyWith`
             expressionStmt
     pure stmt
 
@@ -126,6 +128,24 @@ whileStmt = do
   consume [ Token.RIGHT_PAREN ] "Expect ')' after while condition."
   body <- statement
   pure . WhileStmt $ While condition body
+
+forStmt :: Has Empty sig m => StmtParser sig m
+forStmt = do
+    match [ Token.FOR ]
+    consume [ Token.LEFT_PAREN ] "Expect '(' after 'for'."
+    init <- (match [ Token.SEMICOLON ] $> Nothing)
+            `Util.recoverFromEmptyWith`
+              (Just <$> varDeclaration)
+            `Util.recoverFromEmptyWith`
+              (Just <$> expressionStmt)
+    condition <- (match [ Token.SEMICOLON ] $> Nothing)
+                  `Util.recoverFromEmptyWith`
+                    (Just <$> expression <* consume [ Token.SEMICOLON ] "Expect ';' after loop condition.")
+    increment <- (match [ Token.RIGHT_PAREN ] $> Nothing)
+                  `Util.recoverFromEmptyWith`
+                    (Just <$> expression <* consume [ Token.RIGHT_PAREN ] "Expect ')' after for clauses.")
+    body <- statement
+    pure $ buildFor init condition increment body
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do
