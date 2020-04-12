@@ -85,6 +85,11 @@ spec = do
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["0", "1", "2", "3", "4"] )
+    it "a program that prints the first Fibonacci numbers" $ do
+      "var a = 0; var b = 1; while (a < 100) { print b; var temp = a; a = b; b = b + temp; }"
+        `shouldEvaluateTo`
+        ( Nothing
+        , Seq.fromList ["1","1","2","3","5","8","13","21","34","55","89","144"] )
     it "a program with for statement" $ do
       "for (var x = 0; x < 5; x = x + 1) { print x; }"
         `shouldEvaluateTo`
