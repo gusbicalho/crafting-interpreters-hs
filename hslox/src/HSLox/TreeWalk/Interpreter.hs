@@ -14,6 +14,7 @@ import Control.Effect.State
 import Data.Foldable
 import Data.Function
 import Data.Functor
+import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
 import HSLox.Output.Carrier.Transform
@@ -24,7 +25,7 @@ import HSLox.TreeWalk.RTEnv (RTEnv (..))
 import qualified HSLox.TreeWalk.RTEnv as RTEnv
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
-import HSLox.TreeWalk.RTValue (RTValue (..))
+import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..))
 import qualified HSLox.Util as Util
 
 interpret :: Has (Output T.Text) sig m
@@ -42,6 +43,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
+showValue (ValFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
     doubleString = T.pack $ show d
@@ -190,11 +192,17 @@ instance Runtime sig m => ExprInterpreter AST.Assignment m where
 
 instance Runtime sig m => ExprInterpreter AST.Call m where
   interpretExpr (AST.Call callee paren args) = do
-    _calleeVal <- interpretExpr callee
-    _argVals <- traverse interpretExpr args
-    -- TODO actually call the fn
-    RTError.throwRT paren "Function calls are not implemented yet"
-    pure ValNil
+    calleeVal <- interpretExpr callee
+    argVals <- traverse interpretExpr args
+    case calleeVal of
+      ValFn fn -> loxCall paren fn argVals
+      _ -> RTError.throwRT paren "Can only call functions and classes."
+
+class LoxCallable e m where
+  loxCall :: Token -> e -> Seq RTValue -> m RTValue
+
+instance Runtime e m => LoxCallable LoxFn m where
+  loxCall tk (LoxFn) _args = RTError.throwRT tk "Function calls are not implemented yet"
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b

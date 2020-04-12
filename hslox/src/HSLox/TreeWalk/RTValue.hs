@@ -7,4 +7,8 @@ data RTValue
   | ValNum Double
   | ValBool Bool
   | ValNil
+  | ValFn LoxFn
+  deriving (Eq, Show, Ord)
+
+data LoxFn = LoxFn
   deriving (Eq, Show, Ord)
