@@ -154,11 +154,19 @@ expressionStmt = do
   pure $ ExprStmt expr
 
 expression :: ExprParser sig m
-expression = assignment
+expression = comma
+
+comma :: ExprParser sig m
+comma = do
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression assignment opTypes ]
+    leftAssociativeBinaryOp BinaryE assignment opTypes
+  where
+    opTypes = [ Token.COMMA ]
 
 assignment :: ExprParser sig m
 assignment = do
-    left <- comma
+    left <- conditional
     assignTo left
       `Util.recoverFromEmptyWith` pure left
   where
@@ -170,14 +178,6 @@ assignment = do
         _ -> do
           reportError $ ParserError (Just equals) "Invalid assignment target."
           empty
-
-comma :: ExprParser sig m
-comma = do
-    checkForKnownErrorProductions
-      [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
-    leftAssociativeBinaryOp BinaryE conditional opTypes
-  where
-    opTypes = [ Token.COMMA ]
 
 conditional :: ExprParser sig m
 conditional = do
@@ -253,8 +253,32 @@ unary :: ExprParser sig m
 unary = do
   mbTk <- Util.runEmptyToMaybe (match [Token.MINUS, Token.BANG])
   case mbTk of
-    Nothing -> primary
+    Nothing -> call
     Just tk -> UnaryE tk <$> unary
+
+call :: ExprParser sig m
+call = primary >>= sequenceOfCalls
+  where
+    sequenceOfCalls callee = do
+      nextCallParen <- Util.runEmptyToBool $ match [ Token.LEFT_PAREN ]
+      if nextCallParen
+      then do
+        args <- arguments
+        paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
+        sequenceOfCalls (CallE callee paren args)
+      else pure callee
+    arguments = do
+      endOfArgsList <- check [ Token.RIGHT_PAREN ]
+      if endOfArgsList
+      then pure Seq.empty
+      else argumentsList Seq.empty
+    argumentsList args = do
+      arg <- assignment
+      followedByComma <- Util.runEmptyToBool $ match [ Token.COMMA ]
+      args <- pure $ args :|> arg
+      if followedByComma
+      then argumentsList args
+      else pure args
 
 primary :: ExprParser sig m
 primary = do

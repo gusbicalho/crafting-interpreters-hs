@@ -56,6 +56,9 @@ pattern VariableE tk = VariableExpr (Variable tk)
 pattern AssignmentE :: Token -> Expr -> Expr
 pattern AssignmentE tk expr = AssignmentExpr (Assignment tk expr)
 
+pattern CallE :: Expr -> Token -> Seq Expr -> Expr
+pattern CallE callee paren args = CallExpr (Call callee paren args)
+
 pattern StringE :: T.Text -> Expr
 pattern StringE t = LiteralExpr (LitString t)
 
@@ -76,6 +79,7 @@ data Expr = UnaryExpr Unary
           | LiteralExpr Literal
           | VariableExpr Variable
           | AssignmentExpr Assignment
+          | CallExpr Call
   deriving (Eq, Show, Ord)
 
 data Ternary = Ternary { ternaryLeft :: Expr
@@ -117,4 +121,10 @@ newtype Variable = Variable Token
   deriving (Eq, Show, Ord)
 
 data Assignment = Assignment Token Expr
+  deriving (Eq, Show, Ord)
+
+data Call = Call { callCallee :: Expr
+                 , callParen :: Token
+                 , callArguments :: Seq Expr
+                 }
   deriving (Eq, Show, Ord)

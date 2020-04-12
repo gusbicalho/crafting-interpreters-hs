@@ -25,34 +25,6 @@ spec = do
   describe "Implementations are equivalent" $ do
     prop "ByTheBook and Megaparsec implementations give the same results" $
       parserImplementationsAreEquivalent
-  describe "regressions" $ do
-    describe "1" $
-      testParserImplementations
-        (scan "true\n;\n\"foo\"\n=\nreturn\n_\n/\n-\nvar\nif\n<\n.\nprint")
-        ( Seq.fromList
-            [ ParserError (Just $ Token "return" Token.RETURN Nothing  5) "Expect expression."
-            , ParserError (Just $ Token "if"     Token.IF     Nothing 10) "Expect variable name."
-            , ParserError (Just $ Token ""       Token.EOF    Nothing 13) "Expect expression."
-            ]
-        , "[ True ]"
-        )
-    describe "2" $
-      testParserImplementations
-        (scan
-         $ "+\n.\nif\n!=\n.\nclass\n)\n+\nand\nwhile\n+\n*\nclass\nvar\n_\n>=\n:\nand\n)\n*\nclass\nprint\n-12.722450642149237\n:\n!=\n}\nzZz\n{\nvar\nzZz\n")
-        ( Seq.fromList
-            [ ParserError (Just $ Token "+"     Token.PLUS          Nothing  1) "Binary operator + found at the beginning of expression."
-            , ParserError (Just $ Token "!="    Token.BANG_EQUAL    Nothing  4) "Expect '(' after 'if'."
-            , ParserError (Just $ Token "class" Token.CLASS         Nothing  6) "Expect expression."
-            , ParserError (Just $ Token "+"     Token.PLUS          Nothing 11) "Expect '(' after 'while'."
-            , ParserError (Just $ Token "class" Token.CLASS         Nothing 13) "Expect expression."
-            , ParserError (Just $ Token ">="    Token.GREATER_EQUAL Nothing 16) "Expect ';' after variable declaration."
-            , ParserError (Just $ Token "class" Token.CLASS         Nothing 21) "Expect expression."
-            , ParserError (Just $ Token ":"     Token.COLON         Nothing 24) "Expect ';' after value."
-            , ParserError (Just $ Token ""      Token.EOF           Nothing 31) "Expect ';' after variable declaration."
-            ]
-        , "[ ]"
-        )
   describe "empty program" $ do
     testParserImplementations
       (scan "")
@@ -170,6 +142,11 @@ spec = do
         (scan "for (var i = 1;i <= 5;i = i + 1) { print i; }")
         ( Seq.empty
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
+  describe "programs with function calls" $ do
+    testParserImplementations
+      (scan "print x(1,2,3*4, y(false)(true));")
+      ( Seq.empty
+      , "[ (print (x 1.0 2.0 (* 3.0 4.0) ((y False) True))) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

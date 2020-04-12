@@ -1,5 +1,6 @@
 module HSLox.ASTPrinter where
 
+import Data.Foldable
 import qualified Data.Text as T
 import HSLox.AST
 import HSLox.Token (Token (..))
@@ -49,6 +50,10 @@ instance ASTPrinter Expr where
   printAST (LiteralExpr e) = printAST e
   printAST (VariableExpr e) = printAST e
   printAST (AssignmentExpr e) = printAST e
+  printAST (CallExpr e) = printAST e
+
+instance ASTPrinter Call where
+  printAST (Call callee _ args) = parenthesize (printAST callee) (toList args)
 
 instance ASTPrinter Assignment where
   printAST (Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]

@@ -158,11 +158,19 @@ expressionStmt = do
   pure $ ExprStmt expr
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
-expression = assignment
+expression = comma
+
+comma :: MonadParsec ParserError TokenStream m => m Expr
+comma =
+    checkForKnownErrorProductions
+      [ binaryOperatorAtBeginningOfExpression assignment opTypes ]
+      <|> leftAssociativeBinaryOp BinaryE assignment opTypes
+  where
+    opTypes = [ Token.COMMA ]
 
 assignment :: MonadParsec ParserError TokenStream m => m Expr
 assignment = do
-    left <- comma
+    left <- conditional
     assignTo left <|> pure left
   where
     assignTo left = do
@@ -173,14 +181,6 @@ assignment = do
         _ -> do
           registerFancyFailure (makeError (Just equals) "Invalid assignment target.")
           empty
-
-comma :: MonadParsec ParserError TokenStream m => m Expr
-comma =
-    checkForKnownErrorProductions
-      [ binaryOperatorAtBeginningOfExpression conditional opTypes ]
-      <|> leftAssociativeBinaryOp BinaryE conditional opTypes
-  where
-    opTypes = [ Token.COMMA ]
 
 conditional :: MonadParsec ParserError TokenStream m => m Expr
 conditional = do
@@ -253,7 +253,32 @@ multiplication =
 unary :: MonadParsec ParserError TokenStream m => m Expr
 unary = (UnaryE <$> singleMatching [Token.MINUS, Token.BANG]
                 <*> unary)
-    <|> primary
+    <|> call
+
+call :: MonadParsec ParserError TokenStream m => m Expr
+call = primary >>= sequenceOfCalls
+  where
+    sequenceOfCalls callee = do
+      nextCallParen <- (True <$ singleMatching [ Token.LEFT_PAREN ]) <|> pure False
+      if nextCallParen
+      then do
+        args <- arguments
+        paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
+        sequenceOfCalls (CallE callee paren args)
+      else pure callee
+    arguments = do
+      endOfArgsList <- lookAhead $ (True <$ singleMatching [ Token.LEFT_PAREN ])
+                               <|> pure False
+      if endOfArgsList
+      then pure Seq.empty
+      else argumentsList Seq.empty
+    argumentsList args = do
+      arg <- assignment
+      followedByComma <- (True <$ singleMatching [ Token.COMMA ]) <|> pure False
+      args <- pure $ args Seq.:|> arg
+      if followedByComma
+      then argumentsList args
+      else pure args
 
 primary :: MonadParsec ParserError TokenStream m => m Expr
 primary =

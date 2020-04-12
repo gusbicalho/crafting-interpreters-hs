@@ -104,6 +104,7 @@ instance Runtime sig m => ExprInterpreter AST.Expr m where
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
+  interpretExpr (AST.CallExpr t) = interpretExpr t
 
 instance Runtime sig m => ExprInterpreter AST.Ternary m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
@@ -186,6 +187,14 @@ instance Runtime sig m => ExprInterpreter AST.Assignment m where
     val <- interpretExpr expr
     RTEnv.assignM tk val
     pure val
+
+instance Runtime sig m => ExprInterpreter AST.Call m where
+  interpretExpr (AST.Call callee paren args) = do
+    _calleeVal <- interpretExpr callee
+    _argVals <- traverse interpretExpr args
+    -- TODO actually call the fn
+    RTError.throwRT paren "Function calls are not implemented yet"
+    pure ValNil
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b
