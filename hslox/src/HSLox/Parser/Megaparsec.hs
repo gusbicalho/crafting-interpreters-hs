@@ -75,8 +75,9 @@ varDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
 varDeclaration = do
     singleMatching [Token.VAR]
     identifier <- consume [Token.IDENTIFIER] "Expect variable name."
-    init <- singleMatching [Token.EQUAL] *> expression
-            <|> pure NilE
+    init <- asum [ singleMatching [Token.EQUAL] *> expression
+                 , pure NilE
+                 ]
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
     pure . DeclarationStmt $ VarDeclaration identifier init
 
@@ -131,12 +132,17 @@ forStmt = do
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
 blockStmt = do
-  singleMatching [ Token.LEFT_BRACE ]
-  stmts <- many $ do
-            notFollowedBy $ singleMatching [ Token.RIGHT_BRACE ]
-            declaration
-  consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
-  pure . BlockStmt . Block $ Seq.fromList stmts
+    singleMatching [ Token.LEFT_BRACE ]
+    stmts <- blockBody Seq.empty
+    consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
+    pure . BlockStmt . Block $ stmts
+  where
+    blockBody stmts =
+      do (void . lookAhead $ singleMatching [ Token.RIGHT_BRACE, Token.EOF ]) <|> eof
+         pure stmts
+      <|> do stmt <- declaration
+             blockBody (stmts Seq.:|> stmt)
+
 
 printStmt :: MonadParsec ParserError TokenStream m => m Stmt
 printStmt = do
@@ -148,7 +154,7 @@ printStmt = do
 expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
 expressionStmt = do
   expr <- expression
-  consume [ Token.SEMICOLON ] "Expect ';' after statement."
+  consume [ Token.SEMICOLON ] "Expect ';' after expression."
   pure $ ExprStmt expr
 
 expression :: MonadParsec ParserError TokenStream m => m Expr
@@ -157,8 +163,7 @@ expression = assignment
 assignment :: MonadParsec ParserError TokenStream m => m Expr
 assignment = do
     left <- comma
-    withRecovery (const $ pure left) $
-      assignTo left
+    assignTo left <|> pure left
   where
     assignTo left = do
       equals <- singleMatching [ Token.EQUAL ]
@@ -263,7 +268,7 @@ primary =
        , do tk <- singleMatching [ Token.NUMBER ]
             case tokenLiteral tk of
               Just (Token.LitNum n) -> pure (NumE n)
-              _ -> fancyFailure $ makeError (Just tk) "SCANNER ERROR: Expected number literal in NUMBER token."
+              _ -> fancyFailure $ makeError (Just tk) "SCANNER ERROR: Expected numeric literal in NUMBER token."
        , do singleMatching [ Token.LEFT_PAREN ]
             expr <- expression
             consume [ Token.RIGHT_PAREN ] "Expect ')' after expression."

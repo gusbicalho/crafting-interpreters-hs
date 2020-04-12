@@ -27,6 +27,7 @@ parse tokens
   . execWriter @(Seq Stmt)
   . Util.untilEmpty
   $ do
+    guard . not =<< isAtEnd
     stmt' <- Util.runErrorToEither @ParserError declaration
     case stmt' of
       Left error -> do
@@ -34,7 +35,6 @@ parse tokens
         synchronize
       Right stmt -> do
         tell $ Seq.singleton stmt
-    guard . not =<< isAtEnd
 
 type ExprParser sig m = ( Has (Writer (Seq ParserError)) sig m
                         , Has (ErrorEff.Error ParserError) sig m
@@ -71,7 +71,7 @@ varDeclaration :: Has Empty sig m => StmtParser sig m
 varDeclaration = do
     match [Token.VAR]
     identifier <- consume [Token.IDENTIFIER] "Expect variable name."
-    init <- match [Token.EQUAL] *> expression
+    init <- (match [Token.EQUAL] *> expression)
             `Util.recoverFromEmptyWith` pure NilE
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
     pure . DeclarationStmt $ VarDeclaration identifier init

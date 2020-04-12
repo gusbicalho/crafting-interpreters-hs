@@ -63,4 +63,4 @@ data TokenType
   | WHILE
   -- EOF
   | EOF
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show)

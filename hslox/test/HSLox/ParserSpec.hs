@@ -3,6 +3,7 @@
 module HSLox.ParserSpec where
 
 import Control.Carrier.Lift
+import Data.Functor
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
@@ -16,9 +17,48 @@ import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 import Test.Hspec
+import Test.Hspec.QuickCheck
+import qualified Test.QuickCheck as QC
 
 spec :: Spec
 spec = do
+  describe "Implementations are equivalent" $ do
+    prop "ByTheBook and Megaparsec implementations give the same results" $
+      parserImplementationsAreEquivalent
+  describe "regressions" $ do
+    describe "1" $
+      testParserImplementations
+        (scan "true\n;\n\"foo\"\n=\nreturn\n_\n/\n-\nvar\nif\n<\n.\nprint")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "return" Token.RETURN Nothing  5) "Expect expression."
+            , ParserError (Just $ Token "if"     Token.IF     Nothing 10) "Expect variable name."
+            , ParserError (Just $ Token ""       Token.EOF    Nothing 13) "Expect expression."
+            ]
+        , "[ True ]"
+        )
+    describe "2" $
+      testParserImplementations
+        (scan
+         $ "+\n.\nif\n!=\n.\nclass\n)\n+\nand\nwhile\n+\n*\nclass\nvar\n_\n>=\n:\nand\n)\n*\nclass\nprint\n-12.722450642149237\n:\n!=\n}\nzZz\n{\nvar\nzZz\n")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "+"     Token.PLUS          Nothing  1) "Binary operator + found at the beginning of expression."
+            , ParserError (Just $ Token "!="    Token.BANG_EQUAL    Nothing  4) "Expect '(' after 'if'."
+            , ParserError (Just $ Token "class" Token.CLASS         Nothing  6) "Expect expression."
+            , ParserError (Just $ Token "+"     Token.PLUS          Nothing 11) "Expect '(' after 'while'."
+            , ParserError (Just $ Token "class" Token.CLASS         Nothing 13) "Expect expression."
+            , ParserError (Just $ Token ">="    Token.GREATER_EQUAL Nothing 16) "Expect ';' after variable declaration."
+            , ParserError (Just $ Token "class" Token.CLASS         Nothing 21) "Expect expression."
+            , ParserError (Just $ Token ":"     Token.COLON         Nothing 24) "Expect ';' after value."
+            , ParserError (Just $ Token ""      Token.EOF           Nothing 31) "Expect ';' after variable declaration."
+            ]
+        , "[ ]"
+        )
+  describe "empty program" $ do
+    testParserImplementations
+      (scan "")
+      ( Seq.empty
+      , "[ ]"
+      )
   describe "expression without identifiers and keywords" $ do
     describe "correct" $ do
       testParserImplementations
@@ -131,20 +171,89 @@ spec = do
         ( Seq.empty
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
 
+parserImplementationsAreEquivalent :: QC.Property
+parserImplementationsAreEquivalent
+  = QC.forAll genTokens $ \tokens ->
+      let byTheBookResult = runParser ByTheBook.parse tokens
+          megaparsecResult = runParser Megaparsec.parse tokens
+      in megaparsecResult `shouldBe` byTheBookResult
+  where
+    genTokens :: QC.Gen (Seq Token)
+    genTokens = do
+      tokens <- QC.listOf genToken
+                <&> (Token "" Token.EOF Nothing 0 :)
+                <&> reverse
+      pure . Seq.fromList $ zipWith (\tk line -> tk { tokenLine = line }) tokens [0..]
+    genIdentifier :: QC.Gen T.Text
+    genIdentifier = QC.elements ["_", "_a", "asd123", "zZz"]
+    genToken :: QC.Gen Token
+    genToken = do
+      tkType <- QC.arbitraryBoundedEnum @Token.TokenType
+                `QC.suchThat` (/= Token.EOF)
+      (tkLexeme, tkLit) <- case tkType of
+        Token.LEFT_PAREN    -> pure ("(", Nothing)
+        Token.RIGHT_PAREN   -> pure (")", Nothing)
+        Token.LEFT_BRACE    -> pure ("{", Nothing)
+        Token.RIGHT_BRACE   -> pure ("}", Nothing)
+        Token.COLON         -> pure (":", Nothing)
+        Token.COMMA         -> pure (",", Nothing)
+        Token.DOT           -> pure (".", Nothing)
+        Token.MINUS         -> pure ("-", Nothing)
+        Token.PLUS          -> pure ("+", Nothing)
+        Token.QUESTION_MARK -> pure ("?", Nothing)
+        Token.SEMICOLON     -> pure (";", Nothing)
+        Token.SLASH         -> pure ("/", Nothing)
+        Token.STAR          -> pure ("*", Nothing)
+        Token.BANG          -> pure ("!", Nothing)
+        Token.BANG_EQUAL    -> pure ("!=", Nothing)
+        Token.EQUAL         -> pure ("=", Nothing)
+        Token.EQUAL_EQUAL   -> pure ("==", Nothing)
+        Token.GREATER       -> pure (">", Nothing)
+        Token.GREATER_EQUAL -> pure (">=", Nothing)
+        Token.LESS          -> pure ("<", Nothing)
+        Token.LESS_EQUAL    -> pure ("<=", Nothing)
+        Token.AND           -> pure ("and", Nothing)
+        Token.CLASS         -> pure ("class", Nothing)
+        Token.ELSE          -> pure ("else", Nothing)
+        Token.FALSE         -> pure ("false", Nothing)
+        Token.FUN           -> pure ("fun", Nothing)
+        Token.FOR           -> pure ("for", Nothing)
+        Token.IF            -> pure ("if", Nothing)
+        Token.NIL           -> pure ("nil", Nothing)
+        Token.OR            -> pure ("or", Nothing)
+        Token.PRINT         -> pure ("print", Nothing)
+        Token.RETURN        -> pure ("return", Nothing)
+        Token.SUPER         -> pure ("super", Nothing)
+        Token.THIS          -> pure ("this", Nothing)
+        Token.TRUE          -> pure ("true", Nothing)
+        Token.VAR           -> pure ("var", Nothing)
+        Token.WHILE         -> pure ("while", Nothing)
+
+        Token.IDENTIFIER    -> genIdentifier <&> (, Nothing)
+        Token.STRING -> do
+          s <- T.pack <$> QC.arbitrary
+          pure ("\"" <> s <> "\"", Just $ Token.LitString s)
+        Token.NUMBER -> do
+          d <- QC.arbitrary
+          pure (T.pack $ show d, Just $ Token.LitNum d)
+        _ -> pure ("", Nothing)
+      tkLine <- QC.getSize
+      pure $ Token tkLexeme tkType tkLit tkLine
+
 testParserImplementations :: Seq Token
                           -> (Seq ParserError, T.Text)
                           -> Spec
 testParserImplementations tokens expected = do
   describe "ByTheBook" $
     it "parses correctly" $
-      runParser ByTheBook.parse tokens `shouldReturn` expected
+      runParser ByTheBook.parse tokens `shouldBe` expected
   describe "Megaparsec" $
     it "parses correctly" $
-      runParser Megaparsec.parse tokens `shouldReturn` expected
+      runParser Megaparsec.parse tokens `shouldBe` expected
 
-runParser :: _ -> Seq Token -> IO (Seq ParserError, T.Text)
-runParser parse = (fmap . fmap) printAST
-                . runM @IO
+runParser :: _ -> Seq Token -> (Seq ParserError, T.Text)
+runParser parse = fmap printAST
+                . run
                 . Util.runWriterToPair @(Seq ParserError)
                 . parse
 
