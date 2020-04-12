@@ -7,7 +7,7 @@ import Control.Monad.Trans (lift)
 import Data.Maybe (catMaybes)
 import Data.Foldable
 import Data.Functor
-import Data.Sequence (Seq)
+import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -273,9 +273,11 @@ call = primary >>= sequenceOfCalls
       then pure Seq.empty
       else argumentsList Seq.empty
     argumentsList args = do
-      arg <- assignment
+      when (Seq.length args >= 255) $ do
+        tk <- maybeAny
+        registerFancyFailure $ makeError tk "Cannot have more than 255 arguments."
+      args <- (args :|>) <$> assignment
       followedByComma <- (True <$ singleMatching [ Token.COMMA ]) <|> pure False
-      args <- pure $ args Seq.:|> arg
       if followedByComma
       then argumentsList args
       else pure args

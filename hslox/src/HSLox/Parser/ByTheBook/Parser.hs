@@ -5,6 +5,7 @@ import Control.Effect.Empty
 import Control.Carrier.Empty.Church (EmptyC)
 import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
+import Control.Monad (when)
 import Data.Foldable
 import Data.Functor
 import Data.Sequence (Seq (..))
@@ -273,9 +274,11 @@ call = primary >>= sequenceOfCalls
       then pure Seq.empty
       else argumentsList Seq.empty
     argumentsList args = do
-      arg <- assignment
+      when (Seq.length args >= 255) $ do
+        tk <- Util.runEmptyToMaybe peek
+        reportError $ ParserError tk "Cannot have more than 255 arguments."
+      args <- (args :|>) <$> assignment
       followedByComma <- Util.runEmptyToBool $ match [ Token.COMMA ]
-      args <- pure $ args :|> arg
       if followedByComma
       then argumentsList args
       else pure args
