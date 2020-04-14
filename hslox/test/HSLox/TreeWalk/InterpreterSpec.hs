@@ -15,7 +15,6 @@ import HSLox.Scanner.ScanError (ScanError)
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
-import qualified HSLox.TreeWalk.RTEnv as RTEnv
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.Util as Util
 import Test.Hspec
@@ -95,12 +94,17 @@ spec = do
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["0", "1", "2", "3", "4"] )
+    it "a program that tries to call a number as a function and fails" $ do
+      "print (1 + 3)(5);"
+      `shouldEvaluateTo`
+      ( Just (RTError "Can only call functions and classes."
+                    $ Token ")" Token.RIGHT_PAREN Nothing 1)
+      , Seq.empty )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
   (source & runParser
-          & Interpreter.interpret RTEnv.newEnv
-          & fmap snd
+          & Interpreter.interpret
           & runOutputToWriter @T.Text Seq.singleton
           & Util.runWriterToPair @(Seq T.Text)
           & run

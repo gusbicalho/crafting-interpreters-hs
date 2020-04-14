@@ -10,5 +10,5 @@ data RTValue
   | ValFn LoxFn
   deriving (Eq, Show, Ord)
 
-data LoxFn = LoxFn
+data LoxFn = LoxFn { loxFnArity :: Int }
   deriving (Eq, Show, Ord)

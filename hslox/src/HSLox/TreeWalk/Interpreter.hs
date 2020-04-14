@@ -3,18 +3,21 @@
 {-# LANGUAGE UndecidableInstances #-}
 module HSLox.TreeWalk.Interpreter
   ( interpret
+  , interpretNext
   , RTValue (..)
   , RTError (..)
   , RTEnv (..)
-  , RTEnv.newEnv
+  , baseEnv
   ) where
 
 import Control.Carrier.Error.Church
 import Control.Effect.State
+import Control.Monad (when)
 import Data.Foldable
 import Data.Function
 import Data.Functor
 import Data.Sequence (Seq (..))
+import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
 import HSLox.Output.Carrier.Transform
@@ -28,11 +31,21 @@ import qualified HSLox.TreeWalk.RTError as RTError
 import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..))
 import qualified HSLox.Util as Util
 
+baseEnv :: Applicative m => m RTEnv
+baseEnv = pure RTEnv.newEnv
+
 interpret :: Has (Output T.Text) sig m
-          => RTEnv
-          -> AST.Program
-          -> m (RTEnv, Maybe RTError)
-interpret env prog = prog & interpretStmt
+          => AST.Program -> m (Maybe RTError)
+interpret prog = do
+  env <- baseEnv
+  (_, rtError) <- interpretNext env prog
+  pure rtError
+
+interpretNext :: Has (Output T.Text) sig m
+              => RTEnv
+              -> AST.Program
+              -> m (RTEnv, Maybe RTError)
+interpretNext env prog = prog & interpretStmt
                           & Util.runErrorToEither @RTError
                           & fmap (Util.rightToMaybe . Util.swapEither)
                           & runOutputTransform showValue
@@ -191,18 +204,29 @@ instance Runtime sig m => ExprInterpreter AST.Assignment m where
     pure val
 
 instance Runtime sig m => ExprInterpreter AST.Call m where
-  interpretExpr (AST.Call callee paren args) = do
-    calleeVal <- interpretExpr callee
-    argVals <- traverse interpretExpr args
-    case calleeVal of
-      ValFn fn -> loxCall paren fn argVals
-      _ -> RTError.throwRT paren "Can only call functions and classes."
+  interpretExpr (AST.Call calleeExpr paren argExprs) = do
+      callee <- interpretExpr calleeExpr
+      args <- traverse interpretExpr argExprs
+      case callee of
+        ValFn fn -> call paren fn args
+        _ -> RTError.throwRT paren "Can only call functions and classes."
+
+call :: LoxCallable e m
+     => Has (Throw RTError) sig m
+     => Token -> e -> Seq RTValue -> m RTValue
+call paren callee args = do
+  arity <- loxArity callee
+  when (arity /= Seq.length args) $
+    RTError.throwRT paren ""
+  loxCall paren callee args
 
 class LoxCallable e m where
+  loxArity :: e -> m Int
   loxCall :: Token -> e -> Seq RTValue -> m RTValue
 
 instance Runtime e m => LoxCallable LoxFn m where
-  loxCall tk (LoxFn) _args = RTError.throwRT tk "Function calls are not implemented yet"
+  loxArity (LoxFn arity) = pure arity
+  loxCall tk (LoxFn _arity) _args = RTError.throwRT tk "Function calls are not implemented yet"
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b

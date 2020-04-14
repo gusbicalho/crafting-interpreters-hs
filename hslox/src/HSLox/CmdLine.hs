@@ -91,16 +91,15 @@ runSource source = do
       reportReadErrors readErrors
       sendM @IO $ exitWith (ExitFailure 65)
     Right exprs -> do
-      rtError <- snd <$> Interpreter.interpret Interpreter.newEnv exprs
+      rtError <- Interpreter.interpret exprs
       for_ rtError $ \error -> do
         sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
 
 runRepl :: _ => m ()
-runRepl
-  = evalState Interpreter.newEnv
-  . Util.untilEmpty
-  $ do
+runRepl = do
+  newEnv <- Interpreter.baseEnv
+  evalState newEnv . Util.untilEmpty $ do
     line <- readLine
     guard (line /= ":e")
     exprs' <- readSource line
@@ -109,7 +108,7 @@ runRepl
         reportReadErrors readErrors
       Right exprs -> do
         rtEnv <- get
-        (rtEnv, rtError) <- Interpreter.interpret rtEnv exprs
+        (rtEnv, rtError) <- Interpreter.interpretNext rtEnv exprs
         put rtEnv
         for_ rtError $ \error -> do
           sendM @IO $ putStrLn (show error)
