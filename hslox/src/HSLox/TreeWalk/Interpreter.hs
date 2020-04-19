@@ -6,12 +6,12 @@ module HSLox.TreeWalk.Interpreter
   , interpretNext
   , RTValue (..)
   , RTError (..)
-  , RTEnv (..)
+  , RTState (..)
   , baseEnv
   ) where
 
 import Control.Carrier.Error.Church
-import Control.Effect.State
+import Control.Carrier.State.Church
 import Control.Monad (when)
 import Data.Foldable
 import Data.Function
@@ -24,15 +24,16 @@ import HSLox.Output.Carrier.Transform
 import HSLox.Output.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
-import HSLox.TreeWalk.RTEnv (RTEnv (..))
-import qualified HSLox.TreeWalk.RTEnv as RTEnv
+import HSLox.TreeWalk.RTState (RTState (..))
+import qualified HSLox.TreeWalk.RTState as RTState
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
-import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..))
+import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), runNativeFnImpl)
+import HSLox.TreeWalk.Runtime (Runtime)
 import qualified HSLox.Util as Util
 
-baseEnv :: Applicative m => m RTEnv
-baseEnv = pure RTEnv.newEnv
+baseEnv :: Applicative m => m RTState
+baseEnv = pure RTState.newState
 
 interpret :: Has (Output T.Text) sig m
           => AST.Program -> m (Maybe RTError)
@@ -42,14 +43,14 @@ interpret prog = do
   pure rtError
 
 interpretNext :: Has (Output T.Text) sig m
-              => RTEnv
+              => RTState
               -> AST.Program
-              -> m (RTEnv, Maybe RTError)
+              -> m (RTState, Maybe RTError)
 interpretNext env prog = prog & interpretStmt
-                          & Util.runErrorToEither @RTError
-                          & fmap (Util.rightToMaybe . Util.swapEither)
-                          & runOutputTransform showValue
-                          & Util.runStateToPair env
+                              & Util.runErrorToEither @RTError
+                              & fmap (Util.rightToMaybe . Util.swapEither)
+                              & runOutputTransform showValue
+                              & Util.runStateToPair env
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s
@@ -57,17 +58,13 @@ showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
 showValue (ValFn fn) = T.pack $ show fn
+showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
     doubleString = T.pack $ show d
     dropZeroDecimal numStr
       | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
       | otherwise                  = numStr
-
-type Runtime sig m = ( Has (Error RTError) sig m
-                     , Has (Output RTValue) sig m
-                     , Has (State RTEnv) sig m
-                     )
 
 class StmtInterpreter e m where
   interpretStmt :: e -> m ()
@@ -89,11 +86,11 @@ instance Runtime sig m => StmtInterpreter AST.Print m where
 instance Runtime sig m => StmtInterpreter AST.Declaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr expr
-    RTEnv.defineM (tokenLexeme tk) val
+    RTState.defineM (tokenLexeme tk) val
 
 instance Runtime sig m => StmtInterpreter AST.Block m where
   interpretStmt (AST.Block stmts) =
-    RTEnv.runInChildEnv $ for_ stmts interpretStmt
+    RTState.runInChildEnv $ for_ stmts interpretStmt
 
 instance Runtime sig m => StmtInterpreter AST.If m where
   interpretStmt (AST.If cond thenStmt elseStmt) = do
@@ -195,12 +192,12 @@ instance Runtime sig m => ExprInterpreter AST.Literal m where
   interpretExpr AST.LitNil        = pure $ ValNil
 
 instance Runtime sig m => ExprInterpreter AST.Variable m where
-  interpretExpr (AST.Variable tk) = RTEnv.getBoundValueM tk
+  interpretExpr (AST.Variable tk) = RTState.getBoundValueM tk
 
 instance Runtime sig m => ExprInterpreter AST.Assignment m where
   interpretExpr (AST.Assignment tk expr) = do
     val <- interpretExpr expr
-    RTEnv.assignM tk val
+    RTState.assignM tk val
     pure val
 
 instance Runtime sig m => ExprInterpreter AST.Call m where
@@ -209,6 +206,7 @@ instance Runtime sig m => ExprInterpreter AST.Call m where
       args <- traverse interpretExpr argExprs
       case callee of
         ValFn fn -> call paren fn args
+        ValNativeFn nativeFn -> call paren nativeFn args
         _ -> RTError.throwRT paren "Can only call functions and classes."
 
 call :: LoxCallable e m
@@ -227,6 +225,10 @@ class LoxCallable e m where
 instance Runtime e m => LoxCallable LoxFn m where
   loxArity (LoxFn arity) = pure arity
   loxCall tk (LoxFn _arity) _args = RTError.throwRT tk "Function calls are not implemented yet"
+
+instance Runtime e m => LoxCallable LoxNativeFn m where
+  loxArity (LoxNativeFn arity _ _) = pure arity
+  loxCall tk (LoxNativeFn _ _ impl) args = runNativeFnImpl impl tk args
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b

@@ -107,9 +107,9 @@ runRepl = do
       Left readErrors -> do
         reportReadErrors readErrors
       Right exprs -> do
-        rtEnv <- get
-        (rtEnv, rtError) <- Interpreter.interpretNext rtEnv exprs
-        put rtEnv
+        rtState <- get
+        (rtState, rtError) <- Interpreter.interpretNext rtState exprs
+        put rtState
         for_ rtError $ \error -> do
           sendM @IO $ putStrLn (show error)
 
