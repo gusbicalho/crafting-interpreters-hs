@@ -14,7 +14,7 @@ import qualified Data.Sequence as Seq
 import qualified HSLox.AST as AST
 import HSLox.CmdLine.ReadLine
 import HSLox.ErrorReport (ErrorReport, toErrorReport)
-import HSLox.MonotonicClock.Carrier.SystemClock (runMonotonicSystemClock)
+import HSLox.NativeFns.Carrier.NativeFnsOnIO (runNativeFnsOnIO)
 import HSLox.Output.Carrier.ToIO
 import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
@@ -64,7 +64,7 @@ runApp :: _ a -> IO a
 runApp app =
   app & runReadLine
       & runOutputText stdout
-      & runMonotonicSystemClock
+      & runNativeFnsOnIO
       & runTrace
       & runM @IO
 

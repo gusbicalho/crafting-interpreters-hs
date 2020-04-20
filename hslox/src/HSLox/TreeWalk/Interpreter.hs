@@ -20,7 +20,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
-import qualified HSLox.MonotonicClock.Effect as MonoClock
+import qualified HSLox.NativeFns.Effect as NativeFns
 import HSLox.Output.Carrier.Transform
 import HSLox.Output.Effect
 import HSLox.Token (Token (..))
@@ -33,14 +33,12 @@ import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), patte
 import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
 
-import Debug.Trace (traceM)
-
 baseEnv :: Algebra sig m => m RTState
 baseEnv = execState RTState.newState $ do
   RTState.defineM "clock" $ NativeDef 0 (\_ _ ->
-    ValNum . fromIntegral <$> MonoClock.getSeconds)
+    ValNum . fromIntegral <$> NativeFns.clock)
 
-interpret :: Has MonoClock.MonotonicClock sig m
+interpret :: Has NativeFns.NativeFns sig m
           => Has (Output T.Text) sig m
           => AST.Program -> m (Maybe RTError)
 interpret prog = do
@@ -48,7 +46,7 @@ interpret prog = do
   (_, rtError) <- interpretNext env prog
   pure rtError
 
-interpretNext :: Has MonoClock.MonotonicClock sig m
+interpretNext :: Has NativeFns.NativeFns sig m
               => Has (Output T.Text) sig m
               => RTState
               -> AST.Program

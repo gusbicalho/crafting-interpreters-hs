@@ -18,7 +18,7 @@ import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.Util as Util
 import Test.Hspec
-import HSLox.Test.MockClock (runIncClock)
+import HSLox.Test.NativeFnsMock (runNativeFnsMock)
 
 spec :: Spec
 spec = do
@@ -113,7 +113,7 @@ source `shouldEvaluateTo` (error, output) =
           & Interpreter.interpret
           & runOutputToWriter @T.Text Seq.singleton
           & Util.runWriterToPair @(Seq T.Text)
-          & runIncClock 0
+          & runNativeFnsMock
           & run
           & swap)
   `shouldBe` (error, output)
