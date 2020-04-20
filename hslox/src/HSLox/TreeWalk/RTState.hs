@@ -17,29 +17,42 @@ type BindingName = T.Text
 data RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue
                    }
 
+data RTFrame = RTFrame { rtFrameEnv :: RTEnv
+                       , rtFrameEnclosing :: Maybe RTFrame
+                       }
+
 data RTState = RTState { rtStateGlobalEnv :: RTEnv
-                       , rtStateLocalEnvs :: [RTEnv]
+                       , rtStateLocalFrame :: Maybe RTFrame
                        }
 
 newEnv :: RTEnv
 newEnv = RTEnv Map.empty
 
 newState :: RTState
-newState = RTState newEnv []
+newState = RTState newEnv Nothing
+
+addAsChildFrame :: RTEnv -> RTState -> RTState
+addAsChildFrame env state =
+  let newFrame = RTFrame env (rtStateLocalFrame state)
+  in state { rtStateLocalFrame = Just newFrame }
 
 atNewChildEnv :: RTState -> RTState
-atNewChildEnv state = state { rtStateLocalEnvs = newEnv : rtStateLocalEnvs state }
+atNewChildEnv state = addAsChildFrame newEnv state
+
+overFrameEnv :: (RTEnv -> RTEnv) -> RTFrame -> RTFrame
+overFrameEnv f frame =
+  frame { rtFrameEnv = f (rtFrameEnv frame)}
 
 overCurrentEnv :: (RTEnv -> RTEnv) -> RTState -> RTState
 overCurrentEnv f state =
-  case rtStateLocalEnvs state of
-    (env : envs) -> state { rtStateLocalEnvs = f env : envs }
-    [] -> state { rtStateGlobalEnv = f (rtStateGlobalEnv state)}
+  case rtStateLocalFrame state of
+    Just frame -> state { rtStateLocalFrame = Just (overFrameEnv f frame) }
+    Nothing -> state { rtStateGlobalEnv = f (rtStateGlobalEnv state)}
 
 currentEnv :: RTState -> RTEnv
-currentEnv state = case rtStateLocalEnvs state of
-  (env : _) -> env
-  [] -> rtStateGlobalEnv state
+currentEnv state = case rtStateLocalFrame state of
+  Just frame -> rtFrameEnv frame
+  Nothing -> rtStateGlobalEnv state
 
 overBindings :: (Map BindingName RTValue -> Map BindingName RTValue) -> RTEnv -> RTEnv
 overBindings f env = env { rtEnvBindings = f (rtEnvBindings env) }
@@ -52,10 +65,9 @@ defineM name val = modify $ bindNameToValue name val
 
 getBoundValue :: BindingName -> RTState -> Maybe RTValue
 getBoundValue name state
-    = (go $ rtStateLocalEnvs state) <|> lookup (rtStateGlobalEnv state)
+    = (go =<< rtStateLocalFrame state) <|> lookup (rtStateGlobalEnv state)
   where
-    go [] = Nothing
-    go (env : envs) = lookup env <|> go envs
+    go (RTFrame env parent) = lookup env <|> (go =<< parent)
     lookup env = Map.lookup name (rtEnvBindings env)
 
 getBoundValueM :: Has (State RTState) sig m
@@ -69,9 +81,9 @@ getBoundValueM tk = do
     Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
 
 atParentEnv :: RTState -> Maybe (RTEnv, RTState)
-atParentEnv state = case rtStateLocalEnvs state of
-  [] -> Nothing
-  (env : envs) -> Just (env, state { rtStateLocalEnvs = envs })
+atParentEnv state = case rtStateLocalFrame state of
+  Nothing -> Nothing
+  Just frame -> Just (rtFrameEnv frame, state { rtStateLocalFrame = rtFrameEnclosing frame })
 
 assign :: Token -> RTValue -> RTState -> Maybe RTState
 assign tk val state = go state
@@ -82,7 +94,7 @@ assign tk val state = go state
       else do
         (local, parent) <- atParentEnv state
         parent <- go parent
-        pure $ parent { rtStateLocalEnvs = local : rtStateLocalEnvs parent }
+        pure $ addAsChildFrame local parent
     found state = currentEnv state
                 & rtEnvBindings
                 & Map.lookup (tokenLexeme tk)
