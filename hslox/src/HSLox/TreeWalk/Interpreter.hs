@@ -27,6 +27,7 @@ import HSLox.TreeWalk.RTState (RTState (..))
 import qualified HSLox.TreeWalk.RTState as RTState
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
+import qualified HSLox.TreeWalk.RTReturn as RTReturn
 import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), pattern NativeDef, runNativeFnImpl)
 import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
@@ -53,6 +54,7 @@ interpretNext :: Has NativeFns.NativeFns sig m
               -> AST.Program
               -> m (RTState, Maybe RTError)
 interpretNext env prog = prog & interpretStmt
+                              & RTReturn.runReturn
                               & Util.runErrorToEither @RTError
                               & fmap (Util.rightToMaybe . Util.swapEither)
                               & Util.runStateToPair env
@@ -113,8 +115,8 @@ instance Runtime sig m => StmtInterpreter AST.Function m where
 
 instance Runtime sig m => StmtInterpreter AST.Return m where
   interpretStmt (AST.Return tk expr) = do
-    -- TODO
-    RTError.throwRT tk "No return, sorry"
+    val <- interpretExpr expr
+    RTReturn.throwReturn tk val
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue
@@ -242,11 +244,12 @@ class LoxCallable e m where
 instance Runtime sig m => LoxCallable LoxFn m where
   loxArity (LoxFn (AST.Function _ params _)) = pure (Seq.length params)
   loxCall _ (LoxFn (AST.Function _ params body)) args = do
-    RTState.runInChildEnvOf Nothing $ do
-      for_ (Seq.zip params args) $ \(param, arg) -> do
-        RTState.defineM (tokenLexeme param) arg
-      interpretStmt body
-      pure ValNil
+    RTReturn.catchReturn $
+      RTState.runInChildEnvOf Nothing $ do
+        for_ (Seq.zip params args) $ \(param, arg) -> do
+          RTState.defineM (tokenLexeme param) arg
+        interpretStmt body
+        pure ValNil
 
 instance Runtime sig m => LoxCallable LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity

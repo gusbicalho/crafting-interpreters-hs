@@ -110,6 +110,16 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["16"] )
+    it "a program that uses the return value of a function" $ do
+      "fun square(x) { return x*x; } print(square(4));"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["16"] )
+    it "a global recursive function" $ do
+      "fun factorial(x) { if (x <= 0) return 1; else return x*factorial(x-1); } print(factorial(4));"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["24"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
