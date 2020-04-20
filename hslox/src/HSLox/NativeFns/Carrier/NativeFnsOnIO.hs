@@ -4,6 +4,7 @@ module HSLox.NativeFns.Carrier.NativeFnsOnIO where
 import Control.Algebra
 import Control.Carrier.Lift
 import Data.Int (Int64)
+import qualified Data.Text.IO as T.IO
 import HSLox.NativeFns.Effect
 import qualified System.Clock as SysClock
 
@@ -16,6 +17,9 @@ instance Has (Lift IO) sig m
     L Clock -> do
       secs <- sendM @IO getSystemMonotonicClockSeconds
       pure (secs <$ ctx)
+    L (PrintText t) -> do
+      sendM @IO $ T.IO.putStrLn t
+      pure ctx
     R other -> alg (runNativeFnsOnIO . hdl) other ctx
   {-# INLINE alg #-}
 

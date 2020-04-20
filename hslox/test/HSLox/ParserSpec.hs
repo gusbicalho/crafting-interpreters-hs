@@ -49,30 +49,28 @@ spec = do
             ]
         , "[ (- (- 1.0) 1.0) ]"
         )
-  describe "programs with expression and print statements" $ do
+  describe "programs with function calls" $ do
+    testParserImplementations
+      (scan "print(x(1,2,3*4, y(false)(true), z()));")
+      ( Seq.empty
+      , "[ (print (x 1.0 2.0 (* 3.0 4.0) ((y False) True) (z))) ]")
+  describe "programs with expression and declaration statements, identifier expressions and assignment" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "120 / 2; print 123 + 4 * 7;")
-        ( Seq.empty
-        , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) ]"
-        )
-  describe "programs with expression, print and declaration statements, identifier expressions and assignment" $ do
-    describe "correct" $ do
-      testParserImplementations
-        (scan "120 / 2; print 123 + 4 * 7; var x = 2 + 3; var y = 7; print x+y; x = y = 9; print x*y;")
+        (scan "120 / 2; print(123 + 4 * 7); var x = 2 + 3; var y = 7; print(x+y); x = y = 9; print(x*y);")
         ( Seq.empty
         , "[ (/ 120.0 2.0) (print (+ 123.0 (* 4.0 7.0))) (var x (+ 2.0 3.0)) (var y 7.0) (print (+ x y)) (= x (= y 9.0)) (print (* x y)) ]"
         )
   describe "programs with blocks" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "var x = 120 / 2; print x; { var x = 7; print x; x = 3; print x; {} } print x;")
+        (scan "var x = 120 / 2; print(x); { var x = 7; print(x); x = 3; print(x); {} } print(x);")
         ( Seq.empty
         , "[ (var x (/ 120.0 2.0)) (print x) { (var x 7.0) (print x) (= x 3.0) (print x) { } } (print x) ]"
         )
     describe "with unterminated block" $ do
       testParserImplementations
-        (scan "var x = 120 / 2; print x; { var x = 7; print x; { var y = 7; }")
+        (scan "var x = 120 / 2; print(x); { var x = 7; print(x); { var y = 7; }")
         ( Seq.fromList
             [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
             ]
@@ -88,7 +86,7 @@ spec = do
         )
     describe "with unterminated statement inside block" $ do
       testParserImplementations
-        (scan "var x = 120 / 2; print x; { var x = 7 }")
+        (scan "var x = 120 / 2; print(x); { var x = 7 }")
         ( Seq.fromList
             [ ParserError (Just $ Token "}" Token.RIGHT_BRACE Nothing 1) "Expect ';' after variable declaration."
             ]
@@ -97,13 +95,13 @@ spec = do
   describe "programs with if statements" $ do
     describe "correct and nested" $ do
       testParserImplementations
-        (scan "if (!(true == false)) if (false) print 1; else print 2; else { if (true) { print 5; } else if (false) print 7; }")
+        (scan "if (!(true == false)) if (false) print(1); else print(2); else { if (true) { print(5); } else if (false) print(7); }")
         ( Seq.empty
         , "[ (if (! (group (== True False))) (if False (print 1.0) (print 2.0)) { (if True { (print 5.0) } (if False (print 7.0))) }) ]"
         )
     describe "dangling else" $ do
       testParserImplementations
-        (scan "if (first) if (second) print 1; else print 2;")
+        (scan "if (first) if (second) print(1); else print(2);")
         ( Seq.empty
         , "[ (if first (if second (print 1.0) (print 2.0))) ]"
         )
@@ -122,31 +120,26 @@ spec = do
   describe "programs with logical operators" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "if (false or true and false) print 1; else print 2;")
+        (scan "if (false or true and false) print(1); else print(2);")
         ( Seq.empty
         , "[ (if (or False (and True False)) (print 1.0) (print 2.0)) ]")
   describe "programs with while statements" $ do
     describe "correct" $ do
       testParserImplementations
-        (scan "var x = 0; while (x < 5) { print x; x = x + 1; }")
+        (scan "var x = 0; while (x < 5) { print(x); x = x + 1; }")
         ( Seq.empty
         , "[ (var x 0.0) (while (< x 5.0) { (print x) (= x (+ x 1.0)) }) ]")
   describe "programs with for statements" $ do
     describe "loop forever" $ do
       testParserImplementations
-        (scan "for (;;) print 1;")
+        (scan "for (;;) print(1);")
         ( Seq.empty
         , "[ (while True (print 1.0)) ]")
     describe "count to 5" $ do
       testParserImplementations
-        (scan "for (var i = 1;i <= 5;i = i + 1) { print i; }")
+        (scan "for (var i = 1;i <= 5;i = i + 1) { print(i); }")
         ( Seq.empty
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
-  describe "programs with function calls" $ do
-    testParserImplementations
-      (scan "print x(1,2,3*4, y(false)(true), z());")
-      ( Seq.empty
-      , "[ (print (x 1.0 2.0 (* 3.0 4.0) ((y False) True) (z))) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent
@@ -198,7 +191,7 @@ parserImplementationsAreEquivalent
         Token.IF            -> pure ("if", Nothing)
         Token.NIL           -> pure ("nil", Nothing)
         Token.OR            -> pure ("or", Nothing)
-        Token.PRINT         -> pure ("print", Nothing)
+        -- Token.PRINT         -> pure ("print", Nothing)
         Token.RETURN        -> pure ("return", Nothing)
         Token.SUPER         -> pure ("super", Nothing)
         Token.THIS          -> pure ("this", Nothing)

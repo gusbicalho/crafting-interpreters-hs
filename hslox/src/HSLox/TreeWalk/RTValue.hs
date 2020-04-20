@@ -4,9 +4,7 @@ import Control.Effect.Error
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import HSLox.NativeFns.Effect
-import HSLox.Output.Effect
 import HSLox.Token (Token)
-import HSLox.TreeWalk.RTError (RTError)
 
 data RTValue
   = ValString T.Text

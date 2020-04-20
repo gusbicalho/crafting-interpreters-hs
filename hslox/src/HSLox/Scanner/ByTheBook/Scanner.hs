@@ -170,7 +170,6 @@ lexemeToKeywordType =
                , ("if",     Token.IF)
                , ("nil",    Token.NIL)
                , ("or",     Token.OR)
-               , ("print",  Token.PRINT)
                , ("return", Token.RETURN)
                , ("super",  Token.SUPER)
                , ("this",   Token.THIS)

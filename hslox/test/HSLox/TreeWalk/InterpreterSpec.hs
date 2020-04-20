@@ -27,7 +27,7 @@ spec = do
       "" `shouldEvaluateTo`
         (Nothing, Seq.empty)
     it "a program with variables and local scope" $ do
-      "var a = 1; { var a = a + 2; print a; }"
+      "var a = 1; { var a = a + 2; print(a); }"
         `shouldEvaluateTo`
         (Nothing, Seq.fromList [ "3" ])
     it "a program with variables, local scope, and a runtime error" $
@@ -39,19 +39,19 @@ spec = do
       <> "  var b = \"outer b\";\n"
       <> "  {\n"
       <> "    var a = \"inner a\";\n"
-      <> "    print a;\n"
-      <> "    print b;\n"
-      <> "    print c;\n"
+      <> "    print(a);\n"
+      <> "    print(b);\n"
+      <> "    print(c);\n"
       <> "  }\n"
-      <> "  print a;\n"
-      <> "  print b;\n"
-      <> "  print c;\n"
+      <> "  print(a);\n"
+      <> "  print(b);\n"
+      <> "  print(c);\n"
       <> "}\n"
-      <> "print a;\n"
-      <> "print b;\n"
-      <> "print c;\n"
-      <> "print d; // error\n"
-      <> "print \"never printed!\";\n"
+      <> "print(a);\n"
+      <> "print(b);\n"
+      <> "print(c);\n"
+      <> "print(d); // error\n"
+      <> "print(\"never printed!\");\n"
       ) `shouldEvaluateTo`
         ( Just (RTError "Undefined variable 'd'." $ Token "d" Token.IDENTIFIER Nothing 20)
         , Seq.fromList
@@ -66,7 +66,7 @@ spec = do
             , "global c"
             ])
     describe "a program with conditionals and local scope" $ do
-      let source condition = "var x = 1; if (" <> condition <> ") print x; else { x = 3; var x = 2; print x; } print x;"
+      let source condition = "var x = 1; if (" <> condition <> ") print(x); else { x = 3; var x = 2; print(x); } print(x);"
       it "taking the 'then' branch" $ do
         source "3 == 3"
           `shouldEvaluateTo`
@@ -76,33 +76,33 @@ spec = do
           `shouldEvaluateTo`
           (Nothing, Seq.fromList ["2", "3"])
     it "a program with logical operators" $ do
-      "if (false or true and false) print 1; else print 2;"
+      "if (false or true and false) print(1); else print(2);"
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["2"] )
     it "a program with while statement" $ do
-      "var x = 0; while (x < 5) { print x; x = x + 1; }"
+      "var x = 0; while (x < 5) { print(x); x = x + 1; }"
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["0", "1", "2", "3", "4"] )
     it "a program that prints the first Fibonacci numbers" $ do
-      "var a = 0; var b = 1; while (a < 100) { print b; var temp = a; a = b; b = b + temp; }"
+      "var a = 0; var b = 1; while (a < 100) { print(b); var temp = a; a = b; b = b + temp; }"
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["1","1","2","3","5","8","13","21","34","55","89","144"] )
     it "a program with for statement" $ do
-      "for (var x = 0; x < 5; x = x + 1) { print x; }"
+      "for (var x = 0; x < 5; x = x + 1) { print(x); }"
         `shouldEvaluateTo`
         ( Nothing
         , Seq.fromList ["0", "1", "2", "3", "4"] )
     it "a program that tries to call a number as a function and fails" $ do
-      "print (1 + 3)(5);"
+      "print((1 + 3)(5));"
       `shouldEvaluateTo`
       ( Just (RTError "Can only call functions and classes."
                     $ Token ")" Token.RIGHT_PAREN Nothing 1)
       , Seq.empty )
     it "a program the calls clock()" $ do
-      "print clock(); print clock(); print clock();"
+      "print(clock()); print(clock()); print(clock());"
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["0", "1", "2"] )
@@ -112,8 +112,8 @@ source `shouldEvaluateTo` (error, output) =
   (source & runParser
           & Interpreter.interpret
           & runOutputToWriter @T.Text Seq.singleton
-          & Util.runWriterToPair @(Seq T.Text)
           & runNativeFnsMock
+          & Util.runWriterToPair @(Seq T.Text)
           & run
           & swap)
   `shouldBe` (error, output)

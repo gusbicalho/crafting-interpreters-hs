@@ -58,7 +58,6 @@ synchronize = Util.untilEmpty $ do
                                   , Token.FOR
                                   , Token.IF
                                   , Token.WHILE
-                                  , Token.PRINT
                                   , Token.RETURN
                                   ]
 
@@ -79,20 +78,12 @@ varDeclaration = do
 
 statement :: StmtParser sig m
 statement = do
-    stmt <- printStmt `Util.recoverFromEmptyWith`
-            blockStmt `Util.recoverFromEmptyWith`
+    stmt <- blockStmt `Util.recoverFromEmptyWith`
             ifStmt `Util.recoverFromEmptyWith`
             whileStmt `Util.recoverFromEmptyWith`
             forStmt `Util.recoverFromEmptyWith`
             expressionStmt
     pure stmt
-
-printStmt :: Has Empty sig m => StmtParser sig m
-printStmt = do
-  tk <- match [ Token.PRINT ]
-  expr <- expression
-  consume [Token.SEMICOLON] "Expect ';' after value."
-  pure . PrintStmt $ Print tk expr
 
 blockStmt :: Has Empty sig m => StmtParser sig m
 blockStmt = do

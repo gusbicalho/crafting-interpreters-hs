@@ -60,7 +60,6 @@ manyStmtsUntilEOF handleError =
                                             , Token.FOR
                                             , Token.IF
                                             , Token.WHILE
-                                            , Token.PRINT
                                             , Token.RETURN
                                             ]
 
@@ -82,8 +81,7 @@ varDeclaration = do
     pure . DeclarationStmt $ VarDeclaration identifier init
 
 statement :: MonadParsec ParserError TokenStream m => m Stmt
-statement = asum [ printStmt
-                 , blockStmt
+statement = asum [ blockStmt
                  , ifStmt
                  , whileStmt
                  , forStmt
@@ -142,14 +140,6 @@ blockStmt = do
          pure stmts
       <|> do stmt <- declaration
              blockBody (stmts Seq.:|> stmt)
-
-
-printStmt :: MonadParsec ParserError TokenStream m => m Stmt
-printStmt = do
-  tk <- singleMatching [ Token.PRINT ]
-  expr <- expression
-  consume [ Token.SEMICOLON ] "Expect ';' after value."
-  pure . PrintStmt $ Print tk expr
 
 expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
 expressionStmt = do

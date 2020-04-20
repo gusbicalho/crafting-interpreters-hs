@@ -37,6 +37,11 @@ baseEnv :: Algebra sig m => m RTState
 baseEnv = execState RTState.newState $ do
   RTState.defineM "clock" $ NativeDef 0 (\_ _ ->
     ValNum . fromIntegral <$> NativeFns.clock)
+  RTState.defineM "print" $ NativeDef 1 (\_ args -> case args of
+    arg :<| _ -> do
+      NativeFns.printText (showValue arg)
+      pure ValNil
+    _ -> pure ValNil)
 
 interpret :: Has NativeFns.NativeFns sig m
           => Has (Output T.Text) sig m
@@ -79,14 +84,10 @@ instance Runtime sig m => StmtInterpreter AST.Program m where
 
 instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
-  interpretStmt (AST.PrintStmt stmt) = interpretStmt stmt
   interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
   interpretStmt (AST.BlockStmt block) = interpretStmt block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
-
-instance Runtime sig m => StmtInterpreter AST.Print m where
-  interpretStmt (AST.Print _ expr) = output =<< interpretExpr expr
 
 instance Runtime sig m => StmtInterpreter AST.Declaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do

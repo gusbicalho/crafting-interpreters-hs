@@ -8,14 +8,10 @@ newtype Program = Program (Seq Stmt)
   deriving (Eq, Show, Ord)
 
 data Stmt = ExprStmt Expr
-          | PrintStmt Print
           | DeclarationStmt Declaration
           | BlockStmt Block
           | IfStmt If
           | WhileStmt While
-  deriving (Eq, Show, Ord)
-
-data Print = Print Token Expr
   deriving (Eq, Show, Ord)
 
 data Declaration = VarDeclaration Token Expr

@@ -13,14 +13,10 @@ instance ASTPrinter Program where
 
 instance ASTPrinter Stmt where
   printAST (ExprStmt e) = printAST e
-  printAST (PrintStmt print) = printAST print
   printAST (DeclarationStmt decl) = printAST decl
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
   printAST (WhileStmt whileStmt) = printAST whileStmt
-
-instance ASTPrinter Print where
-  printAST (Print tk expr) = parenthesize (tokenLexeme tk) [expr]
 
 instance ASTPrinter Declaration where
   printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
