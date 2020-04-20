@@ -267,7 +267,7 @@ call = primary >>= sequenceOfCalls
         sequenceOfCalls (CallE callee paren args)
       else pure callee
     arguments = do
-      endOfArgsList <- lookAhead $ (True <$ singleMatching [ Token.LEFT_PAREN ])
+      endOfArgsList <- lookAhead $ (True <$ singleMatching [ Token.RIGHT_PAREN ])
                                <|> pure False
       if endOfArgsList
       then pure Seq.empty
