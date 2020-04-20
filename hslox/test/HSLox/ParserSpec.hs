@@ -144,9 +144,9 @@ spec = do
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
   describe "programs with function calls" $ do
     testParserImplementations
-      (scan "print x(1,2,3*4, y(false)(true));")
+      (scan "print x(1,2,3*4, y(false)(true), z());")
       ( Seq.empty
-      , "[ (print (x 1.0 2.0 (* 3.0 4.0) ((y False) True))) ]")
+      , "[ (print (x 1.0 2.0 (* 3.0 4.0) ((y False) True) (z))) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

@@ -20,6 +20,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import qualified HSLox.MonotonicClock.Effect as MonoClock
 import HSLox.Output.Carrier.Transform
 import HSLox.Output.Effect
 import HSLox.Token (Token (..))
@@ -28,21 +29,27 @@ import HSLox.TreeWalk.RTState (RTState (..))
 import qualified HSLox.TreeWalk.RTState as RTState
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
-import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), runNativeFnImpl)
-import HSLox.TreeWalk.Runtime (Runtime)
+import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), pattern NativeDef, runNativeFnImpl)
+import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
 
-baseEnv :: Applicative m => m RTState
-baseEnv = pure RTState.newState
+import Debug.Trace (traceM)
 
-interpret :: Has (Output T.Text) sig m
+baseEnv :: Algebra sig m => m RTState
+baseEnv = execState RTState.newState $ do
+  RTState.defineM "clock" $ NativeDef 0 (\_ _ ->
+    ValNum . fromIntegral <$> MonoClock.getSeconds)
+
+interpret :: Has MonoClock.MonotonicClock sig m
+          => Has (Output T.Text) sig m
           => AST.Program -> m (Maybe RTError)
 interpret prog = do
   env <- baseEnv
   (_, rtError) <- interpretNext env prog
   pure rtError
 
-interpretNext :: Has (Output T.Text) sig m
+interpretNext :: Has MonoClock.MonotonicClock sig m
+              => Has (Output T.Text) sig m
               => RTState
               -> AST.Program
               -> m (RTState, Maybe RTError)
@@ -214,21 +221,26 @@ call :: LoxCallable e m
      => Token -> e -> Seq RTValue -> m RTValue
 call paren callee args = do
   arity <- loxArity callee
-  when (arity /= Seq.length args) $
-    RTError.throwRT paren ""
+  let argCount = Seq.length args
+  when (arity /= argCount) $
+    RTError.throwRT paren $ "Expected "
+                         <> T.pack (show arity)
+                         <> " arguments, but got "
+                         <> T.pack (show argCount)
+                         <> "."
   loxCall paren callee args
 
 class LoxCallable e m where
   loxArity :: e -> m Int
   loxCall :: Token -> e -> Seq RTValue -> m RTValue
 
-instance Runtime e m => LoxCallable LoxFn m where
+instance Runtime sig m => LoxCallable LoxFn m where
   loxArity (LoxFn arity) = pure arity
   loxCall tk (LoxFn _arity) _args = RTError.throwRT tk "Function calls are not implemented yet"
 
-instance Runtime e m => LoxCallable LoxNativeFn m where
-  loxArity (LoxNativeFn arity _ _) = pure arity
-  loxCall tk (LoxNativeFn _ _ impl) args = runNativeFnImpl impl tk args
+instance Runtime sig m => LoxCallable LoxNativeFn m where
+  loxArity (LoxNativeFn arity _) = pure arity
+  loxCall tk (LoxNativeFn _ impl) args = runNativeFnImpl impl tk args
 
 isTruthy :: RTValue -> Bool
 isTruthy (ValBool b) = b

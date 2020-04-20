@@ -18,6 +18,7 @@ import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.Util as Util
 import Test.Hspec
+import HSLox.Test.MockClock (runIncClock)
 
 spec :: Spec
 spec = do
@@ -100,6 +101,11 @@ spec = do
       ( Just (RTError "Can only call functions and classes."
                     $ Token ")" Token.RIGHT_PAREN Nothing 1)
       , Seq.empty )
+    it "a program the calls clock()" $ do
+      "print clock(); print clock(); print clock();"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["0", "1", "2"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
@@ -107,6 +113,7 @@ source `shouldEvaluateTo` (error, output) =
           & Interpreter.interpret
           & runOutputToWriter @T.Text Seq.singleton
           & Util.runWriterToPair @(Seq T.Text)
+          & runIncClock 0
           & run
           & swap)
   `shouldBe` (error, output)

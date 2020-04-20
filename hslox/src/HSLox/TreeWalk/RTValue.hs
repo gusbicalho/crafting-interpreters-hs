@@ -3,6 +3,7 @@ module HSLox.TreeWalk.RTValue where
 import Control.Effect.Error
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
+import HSLox.MonotonicClock.Effect
 import HSLox.Output.Effect
 import HSLox.Token (Token)
 import HSLox.TreeWalk.RTError (RTError)
@@ -19,17 +20,25 @@ data RTValue
 data LoxFn = LoxFn { loxFnArity :: Int }
   deriving (Eq, Show, Ord)
 
+pattern NativeDef :: Int
+                  -> (forall sig m. NativeFnImplFn sig m)
+                  -> RTValue
+pattern NativeDef arity impl = ValNativeFn (LoxNativeFn arity (NativeFnImpl impl))
+
 data LoxNativeFn = LoxNativeFn { loxNativeFnArity :: Int
-                               , loxNativeFnName :: T.Text
                                , loxNativeFnNameImpl :: NativeFnImpl
                                }
   deriving (Show)
 
+type NativeFnRuntime sig m = ( Has (Throw RTError) sig m
+                             , Has (Output RTValue) sig m
+                             , Has MonotonicClock sig m
+                             )
+
+type NativeFnImplFn sig m = NativeFnRuntime sig m => Token -> Seq RTValue -> m RTValue
+
 newtype NativeFnImpl
-  = NativeFnImpl { runNativeFnImpl :: forall sig m
-                                    . ( Has (Throw RTError) sig m
-                                      , Has (Output RTValue) sig m )
-                                   => Token -> Seq RTValue -> m RTValue }
+  = NativeFnImpl { runNativeFnImpl :: forall sig m. NativeFnImplFn sig m }
 
 instance Show NativeFnImpl where
   show _ = "<NativeFnImpl>"
