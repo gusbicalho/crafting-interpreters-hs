@@ -4,6 +4,7 @@ import Data.Foldable
 import qualified Data.Text as T
 import HSLox.AST
 import HSLox.Token (Token (..))
+import qualified HSLox.Util as Util
 
 class ASTPrinter e where
   printAST :: e -> T.Text
@@ -17,6 +18,7 @@ instance ASTPrinter Stmt where
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
   printAST (WhileStmt whileStmt) = printAST whileStmt
+  printAST (FunctionDeclarationStmt function) = printFunction "fun" function
 
 instance ASTPrinter Declaration where
   printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
@@ -36,6 +38,19 @@ instance ASTPrinter While where
                             <> " " <> printAST cond
                             <> " " <> printAST body
                             <> ")"
+
+instance ASTPrinter Function where
+  printAST fn = printFunction "*" fn
+
+printFunction :: T.Text -> Function -> T.Text
+printFunction kind (Function tk args body)
+  = "("
+ <> kind
+ <> " "
+ <> tokenLexeme tk
+ <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
+ <> printAST body
+ <> ")"
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

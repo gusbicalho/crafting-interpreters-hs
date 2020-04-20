@@ -140,6 +140,11 @@ spec = do
         (scan "for (var i = 1;i <= 5;i = i + 1) { print(i); }")
         ( Seq.empty
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
+  describe "programs with function declarations" $ do
+    testParserImplementations
+      (scan "fun printTwo(x, y) { print(x); print(y); } printTwo(3,4);")
+      ( Seq.empty
+      , "[ (fun printTwo [x y] { (print x) (print y) }) (printTwo 3.0 4.0) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

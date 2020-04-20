@@ -37,15 +37,14 @@ parse tokens
       Right stmt -> do
         tell $ Seq.singleton stmt
 
-type ExprParser sig m = ( Has (Writer (Seq ParserError)) sig m
-                        , Has (ErrorEff.Error ParserError) sig m
-                        , Has (State ParserState) sig m )
-                        => m Expr
+type LoxParser t sig m = ( Has (Writer (Seq ParserError)) sig m
+                         , Has (ErrorEff.Error ParserError) sig m
+                         , Has (State ParserState) sig m )
+                         => m t
 
-type StmtParser sig m = ( Has (Writer (Seq ParserError)) sig m
-                        , Has (ErrorEff.Error ParserError) sig m
-                        , Has (State ParserState) sig m )
-                        => m Stmt
+type ExprParser sig m = LoxParser Expr sig m
+
+type StmtParser sig m = LoxParser Stmt sig m
 
 synchronize :: Has (State ParserState) sig m => m ()
 synchronize = Util.untilEmpty $ do
@@ -61,11 +60,11 @@ synchronize = Util.untilEmpty $ do
                                   , Token.RETURN
                                   ]
 
-declaration :: Has Empty sig m => StmtParser sig m
+declaration :: StmtParser sig m
 declaration = do
   varDeclaration
-    `Util.recoverFromEmptyWith`
-    statement
+  `Util.recoverFromEmptyWith` funDeclaration
+  `Util.recoverFromEmptyWith` statement
 
 varDeclaration :: Has Empty sig m => StmtParser sig m
 varDeclaration = do
@@ -75,6 +74,35 @@ varDeclaration = do
             `Util.recoverFromEmptyWith` pure NilE
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
     pure . DeclarationStmt $ VarDeclaration identifier init
+
+funDeclaration :: Has Empty sig m => StmtParser sig m
+funDeclaration = FunctionDeclarationStmt <$> (match [Token.FUN] *> function "function")
+
+function :: T.Text -> LoxParser Function sig m
+function kind = do
+    name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
+    consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
+    args <- arguments
+    consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
+    consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
+    body <- finishBlock
+    pure $ Function name args body
+  where
+    arguments = do
+      endOfArgsList <- check [ Token.RIGHT_PAREN ]
+      if endOfArgsList
+      then pure Seq.empty
+      else argsList Seq.empty
+    argsList args = do
+      when (Seq.length args >= 255) $ do
+        tk <- Util.runEmptyToMaybe peek
+        reportError $ ParserError tk "Cannot have more than 255 parameters."
+      arg <- consume [Token.IDENTIFIER] "Expect parameter name."
+      let newArgs = args :|> arg
+      comma <- Util.runEmptyToMaybe $ match [Token.COMMA]
+      case comma of
+        Just _ -> argsList newArgs
+        Nothing -> pure newArgs
 
 statement :: StmtParser sig m
 statement = do
@@ -86,11 +114,13 @@ statement = do
     pure stmt
 
 blockStmt :: Has Empty sig m => StmtParser sig m
-blockStmt = do
-    match [ Token.LEFT_BRACE ]
+blockStmt = BlockStmt <$> (match [ Token.LEFT_BRACE ] *> finishBlock)
+
+finishBlock :: LoxParser Block sig m
+finishBlock = do
     stmts <- blockBody Seq.empty
     consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
-    pure . BlockStmt $ Block stmts
+    pure $ Block stmts
   where
     blockBody stmts = do
       endOfBlock <- check [ Token.RIGHT_BRACE, Token.EOF ]

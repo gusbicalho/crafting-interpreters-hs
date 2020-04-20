@@ -105,6 +105,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["0", "1", "2"] )
+    it "a program the defines and calls a function" $ do
+      "fun square(x) { print(x*x); } square(4);"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["16"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

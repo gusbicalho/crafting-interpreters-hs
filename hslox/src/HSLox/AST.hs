@@ -12,6 +12,7 @@ data Stmt = ExprStmt Expr
           | BlockStmt Block
           | IfStmt If
           | WhileStmt While
+          | FunctionDeclarationStmt Function
   deriving (Eq, Show, Ord)
 
 data Declaration = VarDeclaration Token Expr
@@ -29,6 +30,12 @@ data If = If { ifCondition :: Expr
 data While = While { whileCondition :: Expr
                    , whileBody :: Stmt
                    }
+  deriving (Eq, Show, Ord)
+
+data Function = Function { functionName :: Token
+                         , functionArgs :: Seq Token
+                         , functionBody :: Block
+                         }
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr

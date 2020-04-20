@@ -68,7 +68,7 @@ makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
 
 declaration :: MonadParsec ParserError TokenStream m => m Stmt
 declaration = do
-  varDeclaration <|> statement
+  varDeclaration <|> funDeclaration <|> statement
 
 varDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
 varDeclaration = do
@@ -79,6 +79,34 @@ varDeclaration = do
                  ]
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
     pure . DeclarationStmt $ VarDeclaration identifier init
+
+funDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
+funDeclaration = FunctionDeclarationStmt <$> (singleMatching [Token.FUN] *> function "function")
+
+function :: MonadParsec ParserError TokenStream m => T.Text -> m Function
+function kind = do
+    name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
+    consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
+    args <- arguments
+    consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
+    consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
+    body <- finishBlock
+    pure $ Function name args body
+  where
+    arguments = do
+      endOfArgsList <- check [ Token.RIGHT_PAREN ]
+      if endOfArgsList
+      then pure Seq.empty
+      else argsList Seq.empty
+    argsList args = do
+      when (Seq.length args >= 255) $ do
+        tk <- lookAhead maybeAny
+        fancyFailure $ makeError tk "Cannot have more than 255 parameters."
+      arg <- consume [Token.IDENTIFIER] "Expect parameter name."
+      let newArgs = args :|> arg
+      (singleMatching [Token.COMMA]
+        *> argsList newArgs)
+        <|> pure newArgs
 
 statement :: MonadParsec ParserError TokenStream m => m Stmt
 statement = asum [ blockStmt
@@ -129,11 +157,13 @@ forStmt = do
     pure $ buildFor init condition increment body
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
-blockStmt = do
-    singleMatching [ Token.LEFT_BRACE ]
+blockStmt = BlockStmt <$> (singleMatching [ Token.LEFT_BRACE ] *> finishBlock)
+
+finishBlock :: MonadParsec ParserError TokenStream m => m Block
+finishBlock = do
     stmts <- blockBody Seq.empty
     consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
-    pure . BlockStmt . Block $ stmts
+    pure . Block $ stmts
   where
     blockBody stmts =
       do (void . lookAhead $ singleMatching [ Token.RIGHT_BRACE, Token.EOF ]) <|> eof
@@ -249,16 +279,13 @@ call :: MonadParsec ParserError TokenStream m => m Expr
 call = primary >>= sequenceOfCalls
   where
     sequenceOfCalls callee = do
-      nextCallParen <- (True <$ singleMatching [ Token.LEFT_PAREN ]) <|> pure False
-      if nextCallParen
-      then do
-        args <- arguments
-        paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
-        sequenceOfCalls (CallE callee paren args)
-      else pure callee
+      (do _ <- singleMatching [ Token.LEFT_PAREN ]
+          args <- arguments
+          paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
+          sequenceOfCalls (CallE callee paren args))
+        <|> pure callee
     arguments = do
-      endOfArgsList <- lookAhead $ (True <$ singleMatching [ Token.RIGHT_PAREN ])
-                               <|> pure False
+      endOfArgsList <- check [ Token.RIGHT_PAREN ]
       if endOfArgsList
       then pure Seq.empty
       else argumentsList Seq.empty
@@ -267,10 +294,9 @@ call = primary >>= sequenceOfCalls
         tk <- maybeAny
         registerFancyFailure $ makeError tk "Cannot have more than 255 arguments."
       args <- (args :|>) <$> assignment
-      followedByComma <- (True <$ singleMatching [ Token.COMMA ]) <|> pure False
-      if followedByComma
-      then argumentsList args
-      else pure args
+      (do _ <- singleMatching [ Token.COMMA ]
+          argumentsList args)
+        <|> pure args
 
 primary :: MonadParsec ParserError TokenStream m => m Expr
 primary =
@@ -310,6 +336,10 @@ singleMatching :: Foldable t
                => MonadParsec ParserError TokenStream m
                => t TokenType -> m Token
 singleMatching tkTypes = try $ satisfy (\tk -> any ((tokenType tk) ==) tkTypes)
+
+check :: (Foldable t, MonadParsec ParserError TokenStream m) => t TokenType -> m Bool
+check tkTypes = lookAhead $ (True <$ singleMatching tkTypes)
+                        <|> pure False
 
 maybeAny :: MonadParsec ParserError TokenStream m => m (Maybe Token)
 maybeAny = (Just <$> anySingle) <|> pure Nothing

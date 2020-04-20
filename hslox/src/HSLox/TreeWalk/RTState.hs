@@ -54,6 +54,9 @@ currentEnv state = case rtStateLocalFrame state of
   Just frame -> rtFrameEnv frame
   Nothing -> rtStateGlobalEnv state
 
+globalEnv :: RTState -> RTEnv
+globalEnv = rtStateGlobalEnv
+
 overBindings :: (Map BindingName RTValue -> Map BindingName RTValue) -> RTEnv -> RTEnv
 overBindings f env = env { rtEnvBindings = f (rtEnvBindings env) }
 
@@ -112,8 +115,7 @@ assignM tk val = do
                                  <> tokenLexeme tk
                                  <> "'."
 
-runInChildEnv :: Has (Throw RTError) sig m
-              => Has (Catch RTError) sig m
+runInChildEnv :: Has (Error RTError) sig m
               => Has (State RTState) sig m
               => m () -> m ()
 runInChildEnv action = do
@@ -124,3 +126,17 @@ runInChildEnv action = do
     restoreParent
   where
     restoreParent = modify $ maybe newState snd . atParentEnv
+
+runInChildEnvOf :: Has (Error RTError) sig m
+                => Has (State RTState) sig m
+                => Maybe RTFrame -> m a -> m a
+runInChildEnvOf frame action = do
+    currentFrame <- gets rtStateLocalFrame
+    modify $ \state -> state { rtStateLocalFrame = Just $ RTFrame newEnv frame }
+    result <- action `catchError` \(e :: RTError) -> do
+      restore currentFrame
+      throwError e
+    restore currentFrame
+    pure result
+  where
+    restore frame = modify $ \state -> state { rtStateLocalFrame = frame }

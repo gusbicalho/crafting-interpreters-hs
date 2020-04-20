@@ -62,7 +62,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn fn) = T.pack $ show fn
+showValue (ValFn (LoxFn (AST.Function tk _ _))) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -83,6 +83,7 @@ instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.BlockStmt block) = interpretStmt block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
+  interpretStmt (AST.FunctionDeclarationStmt function) = interpretStmt function
 
 instance Runtime sig m => StmtInterpreter AST.Declaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
@@ -104,6 +105,10 @@ instance Runtime sig m => StmtInterpreter AST.While m where
   interpretStmt (AST.While cond body) =
     Util.whileM (isTruthy <$> interpretExpr cond) $
       interpretStmt body
+
+instance Runtime sig m => StmtInterpreter AST.Function m where
+  interpretStmt fn@(AST.Function tk _ _) = do
+    RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn)
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue
@@ -229,8 +234,13 @@ class LoxCallable e m where
   loxCall :: Token -> e -> Seq RTValue -> m RTValue
 
 instance Runtime sig m => LoxCallable LoxFn m where
-  loxArity (LoxFn arity) = pure arity
-  loxCall tk (LoxFn _arity) _args = RTError.throwRT tk "Function calls are not implemented yet"
+  loxArity (LoxFn (AST.Function _ params _)) = pure (Seq.length params)
+  loxCall _ (LoxFn (AST.Function _ params body)) args = do
+    RTState.runInChildEnvOf Nothing $ do
+      for_ (Seq.zip params args) $ \(param, arg) -> do
+        RTState.defineM (tokenLexeme param) arg
+      interpretStmt body
+      pure ValNil
 
 instance Runtime sig m => LoxCallable LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity

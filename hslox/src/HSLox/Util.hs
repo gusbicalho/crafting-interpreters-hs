@@ -13,6 +13,7 @@ import Control.Carrier.State.Church
 import Control.Carrier.Writer.Church
 import Control.Effect.Trace
 import Control.Monad (forever)
+import Data.Foldable
 
 runEmptyToMaybe :: Applicative m => EmptyC m a -> m (Maybe a)
 runEmptyToMaybe = runEmpty (pure Nothing) (pure . Just)
@@ -98,3 +99,9 @@ whileM cond action = do
   else do
     action
     whileM cond action
+
+foldMapIntersperse :: (Foldable t, Monoid m) => (a -> m) -> m -> t a -> m
+foldMapIntersperse toMonoid separator elems =
+  case toList elems of
+    [] -> mempty
+    (a:as) -> toMonoid a <> (foldMap ((separator <>) . toMonoid) as)

@@ -4,6 +4,7 @@ import Control.Effect.Error
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import HSLox.NativeFns.Effect
+import qualified HSLox.AST as AST
 import HSLox.Token (Token)
 
 data RTValue
@@ -15,7 +16,7 @@ data RTValue
   | ValNativeFn LoxNativeFn
   deriving (Show)
 
-data LoxFn = LoxFn { loxFnArity :: Int }
+data LoxFn = LoxFn { loxFnAST :: AST.Function }
   deriving (Eq, Show, Ord)
 
 pattern NativeDef :: Int
