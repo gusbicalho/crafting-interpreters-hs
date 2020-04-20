@@ -13,6 +13,7 @@ data Stmt = ExprStmt Expr
           | IfStmt If
           | WhileStmt While
           | FunctionDeclarationStmt Function
+          | ReturnStmt Return
   deriving (Eq, Show, Ord)
 
 data Declaration = VarDeclaration Token Expr
@@ -36,6 +37,11 @@ data Function = Function { functionName :: Token
                          , functionArgs :: Seq Token
                          , functionBody :: Block
                          }
+  deriving (Eq, Show, Ord)
+
+data Return = Return { returnToken :: Token
+                     , returnValue :: Expr
+                     }
   deriving (Eq, Show, Ord)
 
 pattern UnaryE :: Token -> Expr -> Expr

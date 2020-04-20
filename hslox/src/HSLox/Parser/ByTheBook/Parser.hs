@@ -110,6 +110,7 @@ statement = do
             ifStmt `Util.recoverFromEmptyWith`
             whileStmt `Util.recoverFromEmptyWith`
             forStmt `Util.recoverFromEmptyWith`
+            returnStmt `Util.recoverFromEmptyWith`
             expressionStmt
     pure stmt
 
@@ -168,6 +169,14 @@ forStmt = do
                     (Just <$> expression <* consume [ Token.RIGHT_PAREN ] "Expect ')' after for clauses.")
     body <- statement
     pure $ buildFor init condition increment body
+
+returnStmt :: Has Empty sig m => StmtParser sig m
+returnStmt = do
+  returnTk <- match [ Token.RETURN ]
+  expr <- (NilE <$ match [Token.SEMICOLON])
+          `Util.recoverFromEmptyWith`
+          (expression <* consume [Token.SEMICOLON] "Expect ';' after expression.")
+  pure . ReturnStmt $ Return returnTk expr
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do

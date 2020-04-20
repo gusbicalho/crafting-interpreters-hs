@@ -18,7 +18,8 @@ instance ASTPrinter Stmt where
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
   printAST (WhileStmt whileStmt) = printAST whileStmt
-  printAST (FunctionDeclarationStmt function) = printFunction "fun" function
+  printAST (FunctionDeclarationStmt functionDecl) = printFunction "fun" functionDecl
+  printAST (ReturnStmt returnStmt) = printAST returnStmt
 
 instance ASTPrinter Declaration where
   printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
@@ -51,6 +52,9 @@ printFunction kind (Function tk args body)
  <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
  <> printAST body
  <> ")"
+
+instance ASTPrinter Return where
+  printAST (Return tk expr) = parenthesize (tokenLexeme tk) [expr]
 
 instance ASTPrinter Expr where
   printAST (UnaryExpr e) = printAST e

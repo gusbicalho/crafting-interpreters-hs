@@ -84,6 +84,7 @@ instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
   interpretStmt (AST.FunctionDeclarationStmt function) = interpretStmt function
+  interpretStmt (AST.ReturnStmt return) = interpretStmt return
 
 instance Runtime sig m => StmtInterpreter AST.Declaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
@@ -109,6 +110,11 @@ instance Runtime sig m => StmtInterpreter AST.While m where
 instance Runtime sig m => StmtInterpreter AST.Function m where
   interpretStmt fn@(AST.Function tk _ _) = do
     RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn)
+
+instance Runtime sig m => StmtInterpreter AST.Return m where
+  interpretStmt (AST.Return tk expr) = do
+    -- TODO
+    RTError.throwRT tk "No return, sorry"
 
 class ExprInterpreter e m where
   interpretExpr :: e -> m RTValue

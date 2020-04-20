@@ -24,18 +24,27 @@ parse :: Has (Writer (Seq ParserError)) sig m
       => (Seq Token)
       -> m Program
 parse tokens = do
-    stmts' <- runParserT (manyStmtsUntilEOF (lift . register)) "" (TokenStream tokens)
+    stmts' <- runParserT parseStmts "" (TokenStream tokens)
     case stmts' of
       Left errorBundle -> do
-        for_ (bundleErrors errorBundle) register
+        for_ (bundleErrors errorBundle) report
         pure $ Program Seq.empty
       Right stmts -> pure $ Program stmts
   where
-    register (FancyError _ errs) = do
+    parseStmts = do
+      stmts <- manyStmtsUntilEOF (lift . report)
+      reportAndClearDelayedErrors
+      pure stmts
+    reportAndClearDelayedErrors = do
+      state <- getParserState
+      let delayedErrors = stateParseErrors state
+      updateParserState $ \state -> state { stateParseErrors = [] }
+      for_ delayedErrors (lift . report)
+    report (FancyError _ errs) = do
       for_ errs $ \case
         ErrorCustom e -> ParserError.reportError e
         err -> ParserError.reportError $ ParserError Nothing (T.pack $ show err)
-    register err =
+    report err =
       ParserError.reportError $ ParserError Nothing (T.pack $ show err)
 
 manyStmtsUntilEOF :: MonadParsec ParserError TokenStream m
@@ -113,6 +122,7 @@ statement = asum [ blockStmt
                  , ifStmt
                  , whileStmt
                  , forStmt
+                 , returnStmt
                  , expressionStmt
                  ]
 
@@ -171,6 +181,15 @@ finishBlock = do
       <|> do stmt <- declaration
              blockBody (stmts Seq.:|> stmt)
 
+returnStmt :: MonadParsec ParserError TokenStream m => m Stmt
+returnStmt = do
+  returnTk <- singleMatching [ Token.RETURN ]
+  expr <- (NilE <$ singleMatching [Token.SEMICOLON])
+          <|> (do expr <- expression
+                  consume [Token.SEMICOLON] "Expect ';' after expression."
+                  pure expr)
+  pure . ReturnStmt $ Return returnTk expr
+
 expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
 expressionStmt = do
   expr <- expression
@@ -200,7 +219,7 @@ assignment = do
         VariableE tk -> pure $ AssignmentE tk right
         _ -> do
           registerFancyFailure (makeError (Just equals) "Invalid assignment target.")
-          empty
+          pure left
 
 conditional :: MonadParsec ParserError TokenStream m => m Expr
 conditional = do

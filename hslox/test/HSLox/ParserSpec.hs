@@ -141,10 +141,23 @@ spec = do
         ( Seq.empty
         , "[ { (var i 1.0) (while (<= i 5.0) { { (print i) } (= i (+ i 1.0)) }) } ]")
   describe "programs with function declarations" $ do
-    testParserImplementations
-      (scan "fun printTwo(x, y) { print(x); print(y); } printTwo(3,4);")
-      ( Seq.empty
-      , "[ (fun printTwo [x y] { (print x) (print y) }) (printTwo 3.0 4.0) ]")
+    describe "without returns" $ do
+      testParserImplementations
+        (scan "fun printTwo(x, y) { print(x); print(y); } printTwo(3,4);")
+        ( Seq.empty
+        , "[ (fun printTwo [x y] { (print x) (print y) }) (printTwo 3.0 4.0) ]")
+    describe "with return values" $ do
+      testParserImplementations
+        (scan "fun square(x) { return x*x; } print(square(3));")
+        ( Seq.empty
+        , "[ (fun square [x] { (return (* x x)) }) (print (square 3.0)) ]")
+    describe "using return as assignment target" $ do
+      testParserImplementations
+        (scan "return true = nil;")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+            ]
+        , "[ (return True) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent
