@@ -21,8 +21,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
 import qualified HSLox.NativeFns.Effect as NativeFns
-import HSLox.Output.Carrier.Transform
-import HSLox.Output.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import HSLox.TreeWalk.RTState (RTState (..))
@@ -44,7 +42,6 @@ baseEnv = execState RTState.newState $ do
     _ -> pure ValNil)
 
 interpret :: Has NativeFns.NativeFns sig m
-          => Has (Output T.Text) sig m
           => AST.Program -> m (Maybe RTError)
 interpret prog = do
   env <- baseEnv
@@ -52,14 +49,12 @@ interpret prog = do
   pure rtError
 
 interpretNext :: Has NativeFns.NativeFns sig m
-              => Has (Output T.Text) sig m
               => RTState
               -> AST.Program
               -> m (RTState, Maybe RTError)
 interpretNext env prog = prog & interpretStmt
                               & Util.runErrorToEither @RTError
                               & fmap (Util.rightToMaybe . Util.swapEither)
-                              & runOutputTransform showValue
                               & Util.runStateToPair env
 
 showValue :: RTValue -> T.Text

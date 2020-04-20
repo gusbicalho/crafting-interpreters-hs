@@ -7,7 +7,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import Data.Tuple (swap)
 import qualified HSLox.AST as AST
-import HSLox.Output.Carrier.ToWriter
 import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.Scanner.Megaparsec as Scanner
@@ -111,7 +110,6 @@ shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
   (source & runParser
           & Interpreter.interpret
-          & runOutputToWriter @T.Text Seq.singleton
           & runNativeFnsMock
           & Util.runWriterToPair @(Seq T.Text)
           & run

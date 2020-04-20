@@ -15,7 +15,6 @@ import qualified HSLox.AST as AST
 import HSLox.CmdLine.ReadLine
 import HSLox.ErrorReport (ErrorReport, toErrorReport)
 import HSLox.NativeFns.Carrier.NativeFnsOnIO (runNativeFnsOnIO)
-import HSLox.Output.Carrier.ToIO
 import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
@@ -28,7 +27,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import qualified System.Environment as Env
 import System.Exit (exitWith, ExitCode (..))
-import System.IO (hPutStrLn, stdin, stdout, stderr)
+import System.IO (hPutStrLn, stdin, stderr)
 
 data Args = Args (Maybe FilePath)
   deriving (Eq, Show)
@@ -62,9 +61,8 @@ runText = runApp . runSource
 
 runApp :: _ a -> IO a
 runApp app =
-  app & runReadLine
-      & runOutputText stdout
-      & runNativeFnsOnIO
+  app & runNativeFnsOnIO
+      & runReadLine
       & runTrace
       & runM @IO
 
