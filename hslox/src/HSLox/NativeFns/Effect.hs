@@ -5,14 +5,13 @@ module HSLox.NativeFns.Effect
 
 import Control.Algebra
 import Data.Kind
-import Data.Int (Int64)
 import qualified Data.Text as T
 
 data NativeFns (m :: Type -> Type) k where
-  Clock :: NativeFns m Int64
+  Clock :: NativeFns m Integer
   PrintText :: T.Text -> NativeFns m ()
 
-clock :: Has NativeFns sig m => m Int64
+clock :: Has NativeFns sig m => m Integer
 clock = send Clock
 
 printText :: Has NativeFns sig m => T.Text -> m ()

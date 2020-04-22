@@ -3,7 +3,7 @@ module HSLox.NativeFns.Carrier.NativeFnsOnIO where
 
 import Control.Algebra
 import Control.Carrier.Lift
-import Data.Int (Int64)
+import Data.Functor
 import qualified Data.Text.IO as T.IO
 import HSLox.NativeFns.Effect
 import qualified System.Clock as SysClock
@@ -15,7 +15,7 @@ instance Has (Lift IO) sig m
          => Algebra (NativeFns :+: sig) (NativeFnsOnIOC m) where
   alg hdl sig ctx = NativeFnsOnIOC $ case sig of
     L Clock -> do
-      secs <- sendM @IO getSystemMonotonicClockSeconds
+      secs <- sendM @IO getSystemMonotonicClockMillis
       pure (secs <$ ctx)
     L (PrintText t) -> do
       sendM @IO $ T.IO.putStrLn t
@@ -23,6 +23,8 @@ instance Has (Lift IO) sig m
     R other -> alg (runNativeFnsOnIO . hdl) other ctx
   {-# INLINE alg #-}
 
-getSystemMonotonicClockSeconds :: IO Int64
-getSystemMonotonicClockSeconds =
-  SysClock.sec <$> SysClock.getTime SysClock.Monotonic
+getSystemMonotonicClockMillis :: IO Integer
+getSystemMonotonicClockMillis =
+  SysClock.getTime SysClock.Monotonic
+    <&> SysClock.toNanoSecs
+    <&> (`div` 1000000)
