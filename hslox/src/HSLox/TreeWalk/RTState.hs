@@ -10,12 +10,14 @@ import qualified Data.Text as T
 import HSLox.Token (Token (..))
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
+import HSLox.TreeWalk.RTReturn (RTReturn (..))
 import HSLox.TreeWalk.RTValue (RTValue (..))
 
 type BindingName = T.Text
 
 data RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue
                    }
+  deriving (Show)
 
 data RTFrame = RTFrame { rtFrameEnv :: RTEnv
                        , rtFrameEnclosing :: Maybe RTFrame
@@ -115,28 +117,47 @@ assignM tk val = do
                                  <> tokenLexeme tk
                                  <> "'."
 
+finallyOnErrorOrReturn :: Has (Error RTReturn) sig m
+                       => Has (Error RTError) sig m
+                       => m a -> m () -> m a
+finallyOnErrorOrReturn action restore = do
+  v <- action
+        & (`catchError` \(e :: RTError) -> do
+            restore
+            throwError e)
+        & (`catchError` \(e :: RTReturn) -> do
+            restore
+            throwError e)
+  restore
+  pure v
+
 runInChildEnv :: Has (Error RTError) sig m
+              => Has (Error RTReturn) sig m
               => Has (State RTState) sig m
               => m () -> m ()
 runInChildEnv action = do
     modify atNewChildEnv
-    action `catchError` \e -> do
-      restoreParent
-      throwError @RTError e
-    restoreParent
+    action
+      `finallyOnErrorOrReturn` restoreParent
   where
     restoreParent = modify $ maybe newState snd . atParentEnv
 
 runInChildEnvOf :: Has (Error RTError) sig m
+                => Has (Error RTReturn) sig m
                 => Has (State RTState) sig m
                 => Maybe RTFrame -> m a -> m a
 runInChildEnvOf frame action = do
     currentFrame <- gets rtStateLocalFrame
     modify $ \state -> state { rtStateLocalFrame = Just $ RTFrame newEnv frame }
-    result <- action `catchError` \(e :: RTError) -> do
-      restore currentFrame
-      throwError e
-    restore currentFrame
-    pure result
+    action
+      `finallyOnErrorOrReturn` restore currentFrame
   where
     restore frame = modify $ \state -> state { rtStateLocalFrame = frame }
+
+envStack :: Has (State RTState) sig m => m [RTEnv]
+envStack = do
+    state <- get
+    pure $ rtStateGlobalEnv state : go [] (rtStateLocalFrame state)
+  where
+    go acc Nothing = acc
+    go acc (Just frame) = go (rtFrameEnv frame : acc) (rtFrameEnclosing frame)
