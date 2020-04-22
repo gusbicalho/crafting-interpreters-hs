@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.RTReturn where
 
 import Control.Carrier.Error.Church

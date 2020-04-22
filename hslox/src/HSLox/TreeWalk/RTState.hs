@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.RTState where
 
 import Control.Effect.Error
@@ -15,8 +16,7 @@ import HSLox.TreeWalk.RTValue (RTValue (..))
 
 type BindingName = T.Text
 
-data RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue
-                   }
+newtype RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue }
   deriving (Show)
 
 data RTFrame = RTFrame { rtFrameEnv :: RTEnv

@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module HSLox.AST where
 
 import Data.Sequence (Seq)

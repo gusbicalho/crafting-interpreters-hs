@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.RTValue where
 
 import Control.Effect.Error
