@@ -1,13 +1,14 @@
 {-# LANGUAGE StrictData #-}
-module HSLox.TreeWalk.RTReturn where
+module HSLox.TreeWalk.RTReturn
+  ( RTReturn (..)
+  , module HSLox.TreeWalk.RTReturn
+  ) where
 
 import Control.Carrier.Error.Church
 import HSLox.TreeWalk.RTError (RTError)
 import qualified HSLox.TreeWalk.RTError as RTError
-import HSLox.TreeWalk.RTValue (RTValue)
+import HSLox.TreeWalk.Runtime (RTReturn (..), RTValue)
 import HSLox.Token (Token)
-
-data RTReturn = RTReturn Token RTValue
 
 runReturn :: Has (Throw RTError) sig m => ErrorC RTReturn m b -> m b
 runReturn = runError @RTReturn returnOutsideFunctionCall pure

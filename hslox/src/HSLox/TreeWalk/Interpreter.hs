@@ -23,12 +23,9 @@ import qualified HSLox.AST as AST
 import qualified HSLox.NativeFns.Effect as NativeFns
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
-import HSLox.TreeWalk.RTState (RTState (..))
 import qualified HSLox.TreeWalk.RTState as RTState
-import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
 import qualified HSLox.TreeWalk.RTReturn as RTReturn
-import HSLox.TreeWalk.RTValue (RTValue (..), LoxFn (..), LoxNativeFn (..), pattern NativeDef, runNativeFnImpl)
 import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
 
@@ -97,7 +94,8 @@ instance Runtime sig m => StmtInterpreter AST.VarDeclaration m where
 
 instance Runtime sig m => StmtInterpreter AST.Block m where
   interpretStmt (AST.Block stmts) =
-    RTState.runInChildEnv $ for_ stmts interpretStmt
+    RTState.runInChildEnv $ do
+      for_ stmts interpretStmt
 
 instance Runtime sig m => StmtInterpreter AST.If m where
   interpretStmt (AST.If cond thenStmt elseStmt) = do

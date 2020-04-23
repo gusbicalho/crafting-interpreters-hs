@@ -1,5 +1,8 @@
 {-# LANGUAGE StrictData #-}
-module HSLox.TreeWalk.RTState where
+module HSLox.TreeWalk.RTState
+  ( RTState (..)
+  , module HSLox.TreeWalk.RTState
+  ) where
 
 import Control.Effect.Error
 import Control.Effect.State
@@ -7,25 +10,11 @@ import Control.Applicative
 import Data.Function
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import HSLox.Token (Token (..))
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.TreeWalk.RTError as RTError
 import HSLox.TreeWalk.RTReturn (RTReturn (..))
-import HSLox.TreeWalk.RTValue (RTValue (..))
-
-type BindingName = T.Text
-
-newtype RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue }
-  deriving (Show)
-
-data RTFrame = RTFrame { rtFrameEnv :: RTEnv
-                       , rtFrameEnclosing :: Maybe RTFrame
-                       }
-
-data RTState = RTState { rtStateGlobalEnv :: RTEnv
-                       , rtStateLocalFrame :: Maybe RTFrame
-                       }
+import HSLox.TreeWalk.Runtime (RTState (..), RTEnv (..), RTFrame (..), BindingName, RTValue)
 
 newEnv :: RTEnv
 newEnv = RTEnv Map.empty
