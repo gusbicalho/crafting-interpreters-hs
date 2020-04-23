@@ -9,21 +9,7 @@ var time = clock();
 for (var n = 0; n < maxN; n = n + 1) {
   print(fibonacci(n));
 }
-for (var n = 0; n < maxN; n = n + 1) {
-  print(fibonacci(n));
-}
-for (var n = 0; n < maxN; n = n + 1) {
-  print(fibonacci(n));
-}
-for (var n = 0; n < maxN; n = n + 1) {
-  print(fibonacci(n));
-}
-for (var n = 0; n < maxN; n = n + 1) {
-  print(fibonacci(n));
-}
 time = clock() - time;
 
 print("Time Spent:");
 print(time);
-print("Avg Time Spent:");
-print(time/5);
