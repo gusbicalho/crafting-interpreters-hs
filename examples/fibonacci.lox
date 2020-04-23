@@ -3,9 +3,21 @@ fun fibonacci(n) {
   return fibonacci(n - 2) + fibonacci(n - 1);
 }
 
-var maxN = 22;
+var maxN = 23;
 
 var time = clock();
+for (var n = 0; n < maxN; n = n + 1) {
+  print(fibonacci(n));
+}
+for (var n = 0; n < maxN; n = n + 1) {
+  print(fibonacci(n));
+}
+for (var n = 0; n < maxN; n = n + 1) {
+  print(fibonacci(n));
+}
+for (var n = 0; n < maxN; n = n + 1) {
+  print(fibonacci(n));
+}
 for (var n = 0; n < maxN; n = n + 1) {
   print(fibonacci(n));
 }
@@ -13,3 +25,5 @@ time = clock() - time;
 
 print("Time Spent:");
 print(time);
+print("Avg Time Spent:");
+print(time/5);
