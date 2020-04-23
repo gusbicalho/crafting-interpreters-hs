@@ -83,14 +83,14 @@ instance Runtime sig m => StmtInterpreter AST.Program m where
 
 instance Runtime sig m => StmtInterpreter AST.Stmt m where
   interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
-  interpretStmt (AST.DeclarationStmt decl) = interpretStmt decl
+  interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt decl
   interpretStmt (AST.BlockStmt block) = interpretStmt block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
-  interpretStmt (AST.FunctionDeclarationStmt function) = interpretStmt function
+  interpretStmt (AST.FunctionVarDeclarationStmt function) = interpretStmt function
   interpretStmt (AST.ReturnStmt return) = interpretStmt return
 
-instance Runtime sig m => StmtInterpreter AST.Declaration m where
+instance Runtime sig m => StmtInterpreter AST.VarDeclaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr expr
     RTState.defineM (tokenLexeme tk) val

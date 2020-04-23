@@ -87,10 +87,10 @@ varDeclaration = do
                  , pure NilE
                  ]
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
-    pure . DeclarationStmt $ VarDeclaration identifier init
+    pure . VarDeclarationStmt $ VarDeclaration identifier init
 
 funDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
-funDeclaration = FunctionDeclarationStmt <$> (singleMatching [Token.FUN] *> function "function")
+funDeclaration = FunctionVarDeclarationStmt <$> (singleMatching [Token.FUN] *> function "function")
 
 function :: MonadParsec ParserError TokenStream m => T.Text -> m Function
 function kind = do

@@ -73,10 +73,10 @@ varDeclaration = do
     init <- (match [Token.EQUAL] *> expression)
             `Util.recoverFromEmptyWith` pure NilE
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
-    pure . DeclarationStmt $ VarDeclaration identifier init
+    pure . VarDeclarationStmt $ VarDeclaration identifier init
 
 funDeclaration :: Has Empty sig m => StmtParser sig m
-funDeclaration = FunctionDeclarationStmt <$> (match [Token.FUN] *> function "function")
+funDeclaration = FunctionVarDeclarationStmt <$> (match [Token.FUN] *> function "function")
 
 function :: T.Text -> LoxParser Function sig m
 function kind = do

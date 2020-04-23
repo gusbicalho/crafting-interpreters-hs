@@ -9,15 +9,15 @@ newtype Program = Program (Seq Stmt)
   deriving (Eq, Show, Ord)
 
 data Stmt = ExprStmt Expr
-          | DeclarationStmt Declaration
+          | VarDeclarationStmt VarDeclaration
           | BlockStmt Block
           | IfStmt If
           | WhileStmt While
-          | FunctionDeclarationStmt Function
+          | FunctionVarDeclarationStmt Function
           | ReturnStmt Return
   deriving (Eq, Show, Ord)
 
-data Declaration = VarDeclaration Token Expr
+data VarDeclaration = VarDeclaration Token Expr
   deriving (Eq, Show, Ord)
 
 newtype Block = Block (Seq Stmt)
