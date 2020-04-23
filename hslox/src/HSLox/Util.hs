@@ -17,24 +17,31 @@ import Data.Foldable
 
 runEmptyToMaybe :: Applicative m => EmptyC m a -> m (Maybe a)
 runEmptyToMaybe = runEmpty (pure Nothing) (pure . Just)
+{-# INLINE runEmptyToMaybe #-}
 
 runEmptyToUnit :: Applicative m => EmptyC m a -> m ()
 runEmptyToUnit = runEmpty (pure ()) (const $ pure ())
+{-# INLINE runEmptyToUnit #-}
 
 runEmptyToBool :: Applicative m => EmptyC m a -> m Bool
 runEmptyToBool = runEmpty (pure False) (const $ pure True)
+{-# INLINE runEmptyToBool #-}
 
 recoverFromEmptyWith :: Applicative m => EmptyC m a -> m a -> m a
 recoverFromEmptyWith ma recover = runEmpty recover pure ma
+{-# INLINE recoverFromEmptyWith #-}
 
 untilEmpty :: Applicative m => EmptyC m a -> m ()
 untilEmpty = runEmptyToUnit . forever
+{-# INLINE untilEmpty #-}
 
 runErrorToEither :: forall e m a. Applicative m => ErrorC e m a -> m (Either e a)
 runErrorToEither = runError (pure . Left) (pure . Right)
+{-# INLINE runErrorToEither #-}
 
 runErrorToUnit :: forall e m a. Applicative m => ErrorC e m a -> m ()
 runErrorToUnit = runError (const $ pure ()) (const $ pure ())
+{-# INLINE runErrorToUnit #-}
 
 anyM :: (Foldable f, Monad m) => (a -> m Bool) -> f a -> m Bool
 anyM predicate = foldr (orNext . predicate) (pure False)
@@ -56,6 +63,7 @@ restoringState action = do
   result <- action
   put @s s
   pure result
+{-# INLINE restoringState #-}
 
 tap :: (Has Trace sig m, Show a) => a -> m a
 tap a = trace (show a) >> pure a
@@ -68,9 +76,11 @@ tapM ma = do
 
 runStateToPair :: forall s m a. Applicative m => s -> StateC s m a -> m (s, a)
 runStateToPair = runState (\s a -> pure (s, a))
+{-# INLINE runStateToPair #-}
 
 runWriterToPair :: forall w m a. (Monoid w, Applicative m) => WriterC w m a -> m (w, a)
 runWriterToPair = runWriter (\w a -> pure (w, a))
+{-# INLINE runWriterToPair #-}
 
 -- | Holds a reference to the current monadic state, then calls the
 -- provided fn with a restore action, which can be used to restore
@@ -86,10 +96,12 @@ backingUpState action = do
 swapEither :: Either b a -> Either a b
 swapEither (Left a) = Right a
 swapEither (Right b) = Left b
+{-# INLINE swapEither #-}
 
 rightToMaybe :: Either b a -> Maybe a
 rightToMaybe (Right r) = Just r
 rightToMaybe _         = Nothing
+{-# INLINE rightToMaybe #-}
 
 whileM :: Monad m => m Bool -> m () -> m ()
 whileM cond action = do

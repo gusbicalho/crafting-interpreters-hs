@@ -48,6 +48,7 @@ interpret prog = do
   env <- baseEnv
   (_, rtError) <- interpretNext env prog
   pure rtError
+{-# INLINE interpret #-}
 
 interpretNext :: Has NativeFns.NativeFns sig m
               => RTState
@@ -58,6 +59,7 @@ interpretNext env prog = prog & interpretStmt
                               & Util.runErrorToEither @RTError
                               & fmap (Util.rightToMaybe . Util.swapEither)
                               & Util.runStateToPair env
+{-# INLINE interpretNext #-}
 
 showValue :: RTValue -> T.Text
 showValue (ValString s) = s

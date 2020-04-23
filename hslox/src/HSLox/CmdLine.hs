@@ -65,6 +65,7 @@ runApp app =
       & runReadLine
       & runTrace
       & runM @IO
+{-# INLINE runApp #-}
 
 runFromSourceFile :: _ => FilePath -> m ()
 runFromSourceFile path =
@@ -72,6 +73,7 @@ runFromSourceFile path =
   where
     getSource "-"  = sendM @IO $ T.IO.hGetContents stdin
     getSource path = sendM @IO $ T.IO.readFile path
+{-# INLINE runFromSourceFile #-}
 
 readSource :: Algebra sig m
            => T.Text
@@ -95,6 +97,7 @@ runSource source = do
       for_ rtError $ \error -> do
         sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
+{-# INLINE runSource #-}
 
 runRepl :: _ => m ()
 runRepl = do
@@ -112,6 +115,7 @@ runRepl = do
         put rtState
         for_ rtError $ \error -> do
           sendM @IO $ putStrLn (show error)
+{-# INLINE runRepl #-}
 
 reportReadErrors :: Has Trace sig m => (Seq ScanError, Seq ParserError) -> m ()
 reportReadErrors (scanErrors, parserErrors) =

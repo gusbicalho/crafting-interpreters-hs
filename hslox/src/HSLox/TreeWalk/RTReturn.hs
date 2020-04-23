@@ -14,6 +14,7 @@ runReturn = runError @RTReturn returnOutsideFunctionCall pure
   where
     returnOutsideFunctionCall (RTReturn tk _) =
       RTError.throwRT tk $ "Unexpected 'return' outside function body"
+{-# INLINE runReturn #-}
 
 throwReturn :: Has (Throw RTReturn) sig m => Token -> RTValue -> m a
 throwReturn token value = throwError (RTReturn token value)
