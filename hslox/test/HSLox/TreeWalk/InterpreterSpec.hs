@@ -120,6 +120,13 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["24"] )
+    it "a program with a closure" $ do
+      ( "fun makeInc() { var x = 0; fun inc() { x = x + 1; return x; } return inc; } "
+        <> "var inc = makeInc(); print(inc()); print(inc());" )
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["1", "2"] )
+
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

@@ -51,7 +51,9 @@ data RTValue
   | ValNativeFn LoxNativeFn
   deriving (Show)
 
-newtype LoxFn = LoxFn { loxFnAST :: AST.Function }
+data LoxFn = LoxFn { loxFnAST :: AST.Function
+                   , loxClosedEnv :: Maybe RTFrame
+                   }
   deriving (Show)
 
 pattern NativeDef :: Int

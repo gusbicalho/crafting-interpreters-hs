@@ -63,7 +63,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn (LoxFn (AST.Function tk _ _))) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -111,7 +111,8 @@ instance Runtime sig m => StmtInterpreter AST.While m where
 
 instance Runtime sig m => StmtInterpreter AST.Function m where
   interpretStmt fn@(AST.Function tk _ _) = do
-    RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn)
+    frame <- gets RTState.rtStateLocalFrame
+    RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn frame)
 
 instance Runtime sig m => StmtInterpreter AST.Return m where
   interpretStmt (AST.Return tk expr) = do
@@ -242,10 +243,10 @@ class LoxCallable e m where
   loxCall :: Token -> e -> Seq RTValue -> m RTValue
 
 instance Runtime sig m => LoxCallable LoxFn m where
-  loxArity (LoxFn (AST.Function _ params _)) = pure (Seq.length params)
-  loxCall _ (LoxFn (AST.Function _ params body)) args = do
+  loxArity (LoxFn (AST.Function _ params _) _) = pure (Seq.length params)
+  loxCall _ (LoxFn (AST.Function _ params body) env) args = do
     RTReturn.catchReturn $
-      RTState.runInChildEnvOf Nothing $ do
+      RTState.runInChildEnvOf env $ do
         for_ (Seq.zip params args) $ \(param, arg) -> do
           RTState.defineM (tokenLexeme param) arg
         interpretStmt body
