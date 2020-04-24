@@ -153,20 +153,25 @@ spec = do
         (scan "fun square(x) { return x*x; } print(square(3));")
         ( Set.empty
         , "[ (var square (fun [x] { (return (* x x)) })) (print (square 3.0)) ]")
-    describe "using return as assignment target" $ do
-      testParserImplementations
-        (scan "return true = nil;")
-        ( Set.fromList
-            [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
-            ]
-        , "[ (return True) ]")
-    describe "invalid assignment target, missing ; at end" $ do
-      testParserImplementations
-        (scan "-24 = -33 nil")
-        ( Set.fromList
-            [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
-            , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."]
-        , "[ ]")
+  describe "programs with anonymous fn expressions" $ do
+    testParserImplementations
+      (scan "fun twice(f) { return fun (a) { f(a); f(a); }; } twice(print)(3);")
+      ( Set.empty
+      , "[ (var twice (fun [f] { (return (fun [a] { (f a) (f a) })) })) ((twice print) 3.0) ]")
+  describe "using return as assignment target" $ do
+    testParserImplementations
+      (scan "return true = nil;")
+      ( Set.fromList
+          [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+          ]
+      , "[ (return True) ]")
+  describe "invalid assignment target, missing ; at end" $ do
+    testParserImplementations
+      (scan "-24 = -33 nil")
+      ( Set.fromList
+          [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+          , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."]
+      , "[ ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

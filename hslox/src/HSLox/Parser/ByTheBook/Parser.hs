@@ -78,13 +78,15 @@ varDeclaration = do
 
 funDeclaration :: Has Empty sig m => StmtParser sig m
 funDeclaration = do
-  marker <- match [Token.FUN]
-  (name, function) <- function "function" marker
-  pure $ functionDeclaration name function
+    marker <- match [Token.FUN]
+    (name, function) <- function "function" marker parseFunName
+    pure $ functionDeclaration name function
+  where
+    parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
 
-function :: T.Text -> Token -> LoxParser (Token, Function) sig m
-function kind marker = do
-    name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
+function :: T.Text -> Token -> LoxParser name sig m -> LoxParser (name, Function) sig m
+function kind marker parseName = do
+    name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
@@ -326,12 +328,14 @@ primary = do
                                         , Token.STRING
                                         , Token.LEFT_PAREN
                                         , Token.IDENTIFIER
+                                        , Token.FUN
                                         ])
     case mbTk of
       Just (Token { tokenType = Token.FALSE })         -> pure (BoolE False)
       Just (Token { tokenType = Token.TRUE })          -> pure (BoolE True)
       Just (Token { tokenType = Token.NIL })           -> pure NilE
       Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
+      Just tk@(Token { tokenType = Token.FUN})         -> anonymousFunction tk
       Just (Token { tokenType = Token.STRING, tokenLiteral }) ->
         case tokenLiteral of
           Just (Token.LitString s) -> pure (StringE s)
@@ -347,6 +351,11 @@ primary = do
           throwParserError "Expect ')' after expression."
         pure $ GroupingE expr
       _ -> throwParserError "Expect expression."
+
+anonymousFunction :: Token -> LoxParser Expr sig m
+anonymousFunction marker = do
+  (_, function) <- function "function" marker (pure ())
+  pure $ FunctionExpr function
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m

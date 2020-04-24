@@ -143,6 +143,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["false", "true"] )
+    it "a program with anonymous fn expressions" $ do
+      "fun twice(f) { return fun (a) { f(a); f(a); }; } twice(fun (a) { print(a); })(3);"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["3", "3"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

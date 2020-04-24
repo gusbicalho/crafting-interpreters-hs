@@ -91,14 +91,16 @@ varDeclaration = do
 
 funDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
 funDeclaration = do
-  marker <- singleMatching [Token.FUN]
-  (name, function) <- function "function" marker
-  pure $ functionDeclaration name function
+    marker <- singleMatching [Token.FUN]
+    (name, function) <- function "function" marker parseFunName
+    pure $ functionDeclaration name function
+  where
+    parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
 
 function :: MonadParsec ParserError TokenStream m
-         => T.Text -> Token -> m (Token, Function)
-function kind marker = do
-    name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
+         => T.Text -> Token -> m name -> m (name, Function)
+function kind marker parseName = do
+    name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
@@ -327,6 +329,7 @@ primary =
        , singleMatching [ Token.TRUE ]        $> BoolE True
        , singleMatching [ Token.NIL ]         $> NilE
        , singleMatching [ Token.IDENTIFIER ] <&> VariableE
+       , singleMatching [ Token.FUN ]        >>= anonymousFunction
        , do tk <- singleMatching [ Token.STRING ]
             case tokenLiteral tk of
               Just (Token.LitString s) -> pure (StringE s)
@@ -342,6 +345,11 @@ primary =
        , do tk <- lookAhead maybeAny
             fancyFailure (makeError tk "Expect expression.")
        ]
+
+anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m Expr
+anonymousFunction marker = do
+  (_, function) <- function "function" marker (pure ())
+  pure $ FunctionExpr function
 
 leftAssociativeBinaryOp :: Foldable t
                         => MonadParsec ParserError TokenStream m
