@@ -127,6 +127,12 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["1", "2"] )
+    it "a program with a closure that capture a variable declared after the fn" $ do
+      ( "fun makeInc() { fun inc() { x = x + 1; return x; } var x = 0; return inc; } "
+        <> "var inc = makeInc(); print(inc()); print(inc());" )
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["1", "2"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
