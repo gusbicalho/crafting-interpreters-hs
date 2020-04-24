@@ -1,0 +1,22 @@
+fun twice(f) {
+  return fun(x) {
+    f(x);
+    f(x);
+  };
+}
+
+fun atMostOnce(f) {
+  var done = false;
+  return fun(x) {
+    if (!done) {
+      var result = f(x);
+      done = true;
+      return result;
+    }
+    return nil;
+  };
+}
+
+twice(twice(print))("4 times!");
+
+twice(twice(twice(atMostOnce(print))))("8 times? Nope, only 1!");
