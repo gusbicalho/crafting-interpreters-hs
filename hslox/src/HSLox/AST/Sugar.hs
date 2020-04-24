@@ -2,6 +2,7 @@ module HSLox.AST.Sugar where
 
 import qualified Data.Sequence as Seq
 import HSLox.AST
+import HSLox.Token (Token)
 
 buildFor :: Maybe Stmt -> Maybe Expr -> Maybe Expr -> Stmt -> Stmt
 buildFor init condition increment body =
@@ -17,3 +18,6 @@ buildFor init condition increment body =
       case increment of
         Nothing -> body
         Just increment -> blockFromList $ [body, ExprStmt increment]
+
+functionDeclaration :: Token -> Function -> Stmt
+functionDeclaration varName function = VarDeclarationStmt $ VarDeclaration varName (FunctionExpr function)

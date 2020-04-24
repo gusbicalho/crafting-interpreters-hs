@@ -90,17 +90,21 @@ varDeclaration = do
     pure . VarDeclarationStmt $ VarDeclaration identifier init
 
 funDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
-funDeclaration = FunctionVarDeclarationStmt <$> (singleMatching [Token.FUN] *> function "function")
+funDeclaration = do
+  marker <- singleMatching [Token.FUN]
+  (name, function) <- function "function" marker
+  pure $ functionDeclaration name function
 
-function :: MonadParsec ParserError TokenStream m => T.Text -> m Function
-function kind = do
+function :: MonadParsec ParserError TokenStream m
+         => T.Text -> Token -> m (Token, Function)
+function kind marker = do
     name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure $ Function name args body
+    pure $ (name, Function marker args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]

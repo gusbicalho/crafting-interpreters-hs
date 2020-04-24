@@ -13,7 +13,6 @@ data Stmt = ExprStmt Expr
           | BlockStmt Block
           | IfStmt If
           | WhileStmt While
-          | FunctionVarDeclarationStmt Function
           | ReturnStmt Return
   deriving (Eq, Show, Ord)
 
@@ -32,12 +31,6 @@ data If = If { ifCondition :: Expr
 data While = While { whileCondition :: Expr
                    , whileBody :: Stmt
                    }
-  deriving (Eq, Show, Ord)
-
-data Function = Function { functionName :: Token
-                         , functionArgs :: Seq Token
-                         , functionBody :: Block
-                         }
   deriving (Eq, Show, Ord)
 
 data Return = Return { returnToken :: Token
@@ -90,6 +83,7 @@ data Expr = UnaryExpr Unary
           | VariableExpr Variable
           | AssignmentExpr Assignment
           | CallExpr Call
+          | FunctionExpr Function
   deriving (Eq, Show, Ord)
 
 data Ternary = Ternary { ternaryLeft :: Expr
@@ -118,6 +112,12 @@ data Unary = Unary { unaryOperator :: Token
   deriving (Eq, Show, Ord)
 
 data Grouping = Grouping { groupingExpr :: Expr }
+  deriving (Eq, Show, Ord)
+
+data Function = Function { functionToken :: Token
+                         , functionArgs :: Seq Token
+                         , functionBody :: Block
+                         }
   deriving (Eq, Show, Ord)
 
 data Literal

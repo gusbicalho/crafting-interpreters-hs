@@ -18,7 +18,6 @@ instance ASTPrinter Stmt where
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
   printAST (WhileStmt whileStmt) = printAST whileStmt
-  printAST (FunctionVarDeclarationStmt functionDecl) = printFunction "fun" functionDecl
   printAST (ReturnStmt returnStmt) = printAST returnStmt
 
 instance ASTPrinter VarDeclaration where
@@ -41,13 +40,11 @@ instance ASTPrinter While where
                             <> ")"
 
 instance ASTPrinter Function where
-  printAST fn = printFunction "*" fn
+  printAST fn = printFunction fn
 
-printFunction :: T.Text -> Function -> T.Text
-printFunction kind (Function tk args body)
+printFunction :: Function -> T.Text
+printFunction (Function tk args body)
   = "("
- <> kind
- <> " "
  <> tokenLexeme tk
  <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
  <> printAST body
@@ -66,6 +63,7 @@ instance ASTPrinter Expr where
   printAST (VariableExpr e) = printAST e
   printAST (AssignmentExpr e) = printAST e
   printAST (CallExpr e) = printAST e
+  printAST (FunctionExpr e) = printAST e
 
 instance ASTPrinter Call where
   printAST (Call callee _ args) = parenthesize (printAST callee) (toList args)

@@ -95,7 +95,6 @@ instance Runtime cell sig m => StmtInterpreter cell AST.Stmt m where
   interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt @cell ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
-  interpretStmt (AST.FunctionVarDeclarationStmt function) = interpretStmt @cell function
   interpretStmt (AST.ReturnStmt return) = interpretStmt @cell return
 
 instance Runtime cell sig m => StmtInterpreter cell AST.VarDeclaration m where
@@ -120,11 +119,6 @@ instance Runtime cell sig m => StmtInterpreter cell AST.While m where
     Util.whileM (isTruthy <$> interpretExpr @cell cond) $
       interpretStmt @cell body
 
-instance Runtime cell sig m => StmtInterpreter cell AST.Function m where
-  interpretStmt fn@(AST.Function tk _ _) = do
-    frame <- gets (RTState.rtStateLocalFrame @cell)
-    RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn frame)
-
 instance Runtime cell sig m => StmtInterpreter cell AST.Return m where
   interpretStmt (AST.Return tk expr) = do
     val <- interpretExpr @cell expr
@@ -145,6 +139,7 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Expr m where
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
+  interpretExpr (AST.FunctionExpr t) = interpretExpr t
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Ternary m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
@@ -212,6 +207,11 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Unary m where
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Grouping m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
+
+instance Runtime cell sig m => ExprInterpreter cell AST.Function m where
+  interpretExpr fn = do
+    frame <- gets (RTState.rtStateLocalFrame @cell)
+    pure . ValFn $ LoxFn fn frame
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s

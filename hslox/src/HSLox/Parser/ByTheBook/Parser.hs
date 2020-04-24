@@ -77,17 +77,20 @@ varDeclaration = do
     pure . VarDeclarationStmt $ VarDeclaration identifier init
 
 funDeclaration :: Has Empty sig m => StmtParser sig m
-funDeclaration = FunctionVarDeclarationStmt <$> (match [Token.FUN] *> function "function")
+funDeclaration = do
+  marker <- match [Token.FUN]
+  (name, function) <- function "function" marker
+  pure $ functionDeclaration name function
 
-function :: T.Text -> LoxParser Function sig m
-function kind = do
+function :: T.Text -> Token -> LoxParser (Token, Function) sig m
+function kind marker = do
     name <- consume [Token.IDENTIFIER] $ "Expect " <> kind <> " name."
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure $ Function name args body
+    pure $ (name, Function marker args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]

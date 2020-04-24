@@ -147,12 +147,12 @@ spec = do
       testParserImplementations
         (scan "fun printTwo(x, y) { print(x); print(y); } printTwo(3,4);")
         ( Set.empty
-        , "[ (fun printTwo [x y] { (print x) (print y) }) (printTwo 3.0 4.0) ]")
+        , "[ (var printTwo (fun [x y] { (print x) (print y) })) (printTwo 3.0 4.0) ]")
     describe "with return values" $ do
       testParserImplementations
         (scan "fun square(x) { return x*x; } print(square(3));")
         ( Set.empty
-        , "[ (fun square [x] { (return (* x x)) }) (print (square 3.0)) ]")
+        , "[ (var square (fun [x] { (return (* x x)) })) (print (square 3.0)) ]")
     describe "using return as assignment target" $ do
       testParserImplementations
         (scan "return true = nil;")
