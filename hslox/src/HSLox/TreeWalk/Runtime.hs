@@ -27,7 +27,7 @@ type BindingName = T.Text
 
 newtype RTCell cell = RTCell { unRTCell :: cell (RTValue cell) }
 
-newtype RTEnv cell = RTEnv { rtEnvBindings :: Map BindingName (RTCell cell) }
+newtype RTEnv cell = RTEnv { rtEnvBindings :: cell (Map BindingName (RTCell cell)) }
 
 data RTFrame cell = RTFrame { rtFrameEnv :: RTEnv cell
                             , rtFrameEnclosing :: Maybe (RTFrame cell)

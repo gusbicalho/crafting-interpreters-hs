@@ -7,28 +7,33 @@ module HSLox.TreeWalk.RTState
 
 import Control.Effect.Error
 import Control.Effect.State
-import Control.Applicative
 import Data.Function
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import HSLox.Cells.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.TreeWalk.RTError as RTError
 import HSLox.TreeWalk.Runtime
+import qualified HSLox.Util as Util
 
-newEnv :: RTEnv cell
-newEnv = RTEnv Map.empty
+newEnv :: forall cell sig m
+        . Has (Cells cell) sig m
+       => m (RTEnv cell)
+newEnv = RTEnv <$> newCell @cell Map.empty
 
-newState :: RTState cell
-newState = RTState newEnv Nothing
+newState :: forall cell sig m
+          . Has (Cells cell) sig m
+         => m (RTState cell)
+newState = RTState <$> newEnv @cell <*> pure Nothing
 
 addAsChildFrame :: RTEnv cell -> RTState cell -> RTState cell
 addAsChildFrame env state =
   let newFrame = RTFrame env (rtStateLocalFrame state)
   in state { rtStateLocalFrame = Just newFrame }
 
-atNewChildEnv :: RTState cell -> RTState cell
-atNewChildEnv state = addAsChildFrame newEnv state
+atNewChildEnv :: forall cell sig m
+               . Has (Cells cell) sig m
+              => RTState cell -> m (RTState cell)
+atNewChildEnv state = addAsChildFrame <$> newEnv @cell <*> pure state
 
 overFrameEnv :: (RTEnv cell -> RTEnv cell) -> RTFrame cell -> RTFrame cell
 overFrameEnv f frame =
@@ -48,22 +53,24 @@ currentEnv state = case rtStateLocalFrame state of
 globalEnv :: RTState cell -> RTEnv cell
 globalEnv = rtStateGlobalEnv
 
-overBindings :: (Map BindingName (RTCell cell) -> Map BindingName (RTCell cell)) -> RTEnv cell -> RTEnv cell
-overBindings f env = env { rtEnvBindings = f (rtEnvBindings env) }
-
 bindNameToFreshCell :: Has (Cells cell) sig m
                     => Has (State (RTState cell)) sig m
                     => BindingName
                     -> m (RTCell cell)
 bindNameToFreshCell name = do
   cell <- RTCell <$> newCell ValNil
-  modify $ overCurrentEnv . overBindings $ Map.insert name cell
+  bindings <- rtEnvBindings . currentEnv <$> get
+  updateCell (Map.insert name cell) bindings
   pure cell
 
-bindingInCurrentEnv :: BindingName
+bindingInCurrentEnv :: Has (Cells cell) sig m
+                    => BindingName
                     -> RTState cell
-                    -> Maybe (RTCell cell)
-bindingInCurrentEnv name = Map.lookup name . rtEnvBindings . currentEnv
+                    -> m (Maybe (RTCell cell))
+bindingInCurrentEnv name = fmap (Map.lookup name)
+                         . readCell
+                         . rtEnvBindings
+                         . currentEnv
 
 assignRTCell :: Has (Cells cell) sig m
              => RTCell cell -> RTValue cell -> m ()
@@ -78,17 +85,36 @@ defineM :: Has (Cells cell) sig m
         => BindingName -> RTValue cell -> m ()
 defineM name val = do
   state <- get
-  cell <- case bindingInCurrentEnv name state of
+  cell <- bindingInCurrentEnv name state
+  cell <- case cell of
             Nothing   -> bindNameToFreshCell name
             Just cell -> pure cell
   assignRTCell cell val
 
-getBoundCell :: BindingName -> RTState cell -> Maybe (RTCell cell)
+getBoundCell :: Has (Cells cell) sig m
+             => BindingName
+             -> RTState cell
+             -> m (Maybe (RTCell cell))
 getBoundCell name state
-    = (go =<< rtStateLocalFrame state) <|> lookup (rtStateGlobalEnv state)
+    = (go `onJust` rtStateLocalFrame state) `orMaybe` lookup (rtStateGlobalEnv state)
   where
-    go (RTFrame env parent) = lookup env <|> (go =<< parent)
-    lookup env = Map.lookup name (rtEnvBindings env)
+    orMaybe :: Monad m => m (Maybe a) -> m (Maybe a) -> m (Maybe a)
+    orMaybe ma mb = do
+      a <- ma
+      case a of
+        Just a -> pure $ Just a
+        Nothing -> mb
+    onJust :: Applicative f => (t -> f (Maybe a)) -> Maybe t -> f (Maybe a)
+    _ `onJust` Nothing = pure Nothing
+    f `onJust` (Just a) = f a
+    go :: Has (Cells cell) sig m => RTFrame cell -> m (Maybe (RTCell cell))
+    go (RTFrame env parent) = do
+      cell <- lookup env
+      case cell of
+        Just cell -> pure $ Just cell
+        Nothing -> go `onJust` parent
+    lookup :: Has (Cells cell) sig m => RTEnv cell -> m (Maybe (RTCell cell))
+    lookup env = Map.lookup name <$> readCell (rtEnvBindings env)
 
 getBoundValueM :: forall cell sig m
                 . Has (Cells cell) sig m
@@ -96,9 +122,10 @@ getBoundValueM :: forall cell sig m
                => Has (Throw RTError) sig m
                => Token -> m (RTValue cell)
 getBoundValueM tk = do
-  env <- get @(RTState cell)
+  state <- get @(RTState cell)
   let name = tokenLexeme tk
-  case getBoundCell name env of
+  cell <- getBoundCell name state
+  case cell of
     Just cell -> readRTCell cell
     Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
 
@@ -114,10 +141,12 @@ assignM :: forall cell sig m
         => Token -> RTValue cell -> m ()
 assignM tk val = do
   state <- get
-  case getBoundCell (tokenLexeme tk) state of
+  let name = tokenLexeme tk
+  cell <- getBoundCell name state
+  case cell of
     Just cell -> assignRTCell cell val
     Nothing -> RTError.throwRT tk $ "Undefined variable '"
-                                 <> tokenLexeme tk
+                                 <> name
                                  <> "'."
 
 finallyOnErrorOrReturn :: forall cell sig m a
@@ -142,21 +171,27 @@ runInChildEnv :: forall cell sig m
               => Has (State (RTState cell)) sig m
               => m () -> m ()
 runInChildEnv action = do
-    modify @(RTState cell) atNewChildEnv
+    Util.modifyM @(RTState cell) atNewChildEnv
     action
       `finally` restoreParent
   where
     finally = finallyOnErrorOrReturn @cell
-    restoreParent = modify @(RTState cell) $ maybe newState snd . atParentEnv
+    restoreParent = Util.modifyM @(RTState cell) $ \s -> do
+      case atParentEnv s of
+        Just (_, s) -> pure s
+        Nothing -> newState
 
 runInChildEnvOf :: forall cell sig m a
-                 . Has (Error RTError) sig m
+                 . Has (Cells cell) sig m
+                => Has (Error RTError) sig m
                 => Has (Error (RTReturn cell)) sig m
                 => Has (State (RTState cell)) sig m
                 => Maybe (RTFrame cell) -> m a -> m a
 runInChildEnvOf frame action = do
     currentFrame <- gets @(RTState cell) rtStateLocalFrame
-    modify $ \state -> state { rtStateLocalFrame = Just $ RTFrame newEnv frame }
+    Util.modifyM $ \state -> do
+      env <- newEnv
+      pure $ state { rtStateLocalFrame = Just $ RTFrame env frame }
     action
       `finally` restore currentFrame
   where

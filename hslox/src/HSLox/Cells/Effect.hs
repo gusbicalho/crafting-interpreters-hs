@@ -1,6 +1,6 @@
 module HSLox.Cells.Effect
   ( Cells (..)
-  , newCell, readCell, writeCell
+  , newCell, readCell, writeCell, updateCell
   -- * Re-exports
   , Algebra, Has, run
   ) where
@@ -21,3 +21,8 @@ readCell cell = send (ReadCell cell)
 
 writeCell :: Has (Cells cellType) sig m => val -> cellType val -> m ()
 writeCell val cell = send (WriteCell val cell)
+
+updateCell :: Has (Cells cellType) sig m => (val -> val) -> cellType val -> m ()
+updateCell f cell = do
+  val <- readCell cell
+  writeCell (f val) cell

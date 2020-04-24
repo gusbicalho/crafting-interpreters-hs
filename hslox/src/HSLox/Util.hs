@@ -117,3 +117,9 @@ foldMapIntersperse toMonoid separator elems =
   case toList elems of
     [] -> mempty
     (a:as) -> toMonoid a <> (foldMap ((separator <>) . toMonoid) as)
+
+modifyM :: Has (State s) sig m => (s -> m s) -> m ()
+modifyM f = do
+  s <- get
+  s <- f s
+  put s

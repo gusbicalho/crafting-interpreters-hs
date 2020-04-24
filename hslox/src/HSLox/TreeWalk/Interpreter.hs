@@ -35,14 +35,16 @@ import qualified HSLox.Util as Util
 baseEnv :: forall cell sig m
          . Has (Cells.Cells cell) sig m
         => m (RTState cell)
-baseEnv = execState RTState.newState $ do
-  RTState.defineM @cell "clock" $ NativeDef 0 (\_ _ ->
-    ValNum . fromIntegral <$> NativeFns.clock)
-  RTState.defineM @cell "print" $ NativeDef 1 (\_ args -> case args of
-    arg :<| _ -> do
-      NativeFns.printText (showValue arg)
-      pure ValNil
-    _ -> pure ValNil)
+baseEnv = do
+  empty <- RTState.newState
+  execState empty $ do
+    RTState.defineM @cell "clock" $ NativeDef 0 (\_ _ ->
+      ValNum . fromIntegral <$> NativeFns.clock)
+    RTState.defineM @cell "print" $ NativeDef 1 (\_ args -> case args of
+      arg :<| _ -> do
+        NativeFns.printText (showValue arg)
+        pure ValNil
+      _ -> pure ValNil)
 
 interpret :: forall cell sig m
            . Has (Cells.Cells cell) sig m
