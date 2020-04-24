@@ -158,6 +158,13 @@ spec = do
             [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
             ]
         , "[ (return True) ]")
+    describe "invalid assignment target, missing ; at end" $ do
+      testParserImplementations
+        (scan "-24 = -33 nil")
+        ( Seq.fromList
+            [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+            , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."]
+        , "[ ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent
