@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 module HSLox.TreeWalk.Runtime
   ( Trace, trace
   , module HSLox.TreeWalk.Runtime
@@ -13,52 +15,54 @@ import qualified HSLox.AST as AST
 import HSLox.NativeFns.Effect
 import HSLox.Token (Token (..))
 
-type Runtime sig m = ( Has NativeFns sig m
-                     , Has (Error RTError) sig m
-                     , Has (Error RTReturn) sig m
-                     , Has (State RTState) sig m
-                     )
+type Runtime cell sig m = ( Has NativeFns sig m
+                          , Has (Cells cell) sig m
+                          , Has (Error RTError) sig m
+                          , Has (Error (RTReturn cell)) sig m
+                          , Has (State (RTState cell)) sig m
+                          )
 
 type BindingName = T.Text
 
-newtype RTEnv = RTEnv { rtEnvBindings :: Map BindingName RTValue }
-  deriving (Show)
+newtype RTCell cell = RTCell { unRTCell :: cell (RTValue cell) }
 
-data RTFrame = RTFrame { rtFrameEnv :: RTEnv
-                       , rtFrameEnclosing :: Maybe RTFrame
-                       }
+newtype RTEnv cell = RTEnv { rtEnvBindings :: Map BindingName (RTCell cell) }
 
-instance Show RTFrame where
+data RTFrame cell = RTFrame { rtFrameEnv :: RTEnv cell
+                            , rtFrameEnclosing :: Maybe (RTFrame cell)
+                            }
+
+instance Show (RTFrame cell) where
   show _ = "<stack frame>"
 
-data RTState = RTState { rtStateGlobalEnv :: RTEnv
-                       , rtStateLocalFrame :: Maybe RTFrame
-                       }
+data RTState cell = RTState { rtStateGlobalEnv :: (RTEnv cell)
+                            , rtStateLocalFrame :: Maybe (RTFrame cell)
+                            }
 
-data RTReturn = RTReturn Token RTValue
+data RTReturn cell = RTReturn Token (RTValue cell)
 
 data RTError = RTError { rtErrorMessage :: T.Text
                        , rtErrorToken :: Token
                        }
   deriving (Eq, Show)
 
-data RTValue
+data RTValue cell
   = ValString T.Text
   | ValNum Double
   | ValBool Bool
   | ValNil
-  | ValFn LoxFn
+  | ValFn (LoxFn cell)
   | ValNativeFn LoxNativeFn
   deriving (Show)
 
-data LoxFn = LoxFn { loxFnAST :: AST.Function
-                   , loxClosedEnv :: Maybe RTFrame
-                   }
+data LoxFn  cell = LoxFn { loxFnAST :: AST.Function
+                         , loxClosedEnv :: Maybe (RTFrame cell)
+                         }
   deriving (Show)
 
 pattern NativeDef :: Int
-                  -> (forall sig m. NativeFnImplFn sig m)
-                  -> RTValue
+                  -> (forall cell sig m. NativeFnImplFn cell sig m)
+                  -> (RTValue cell)
 pattern NativeDef arity impl = ValNativeFn (LoxNativeFn arity (NativeFnImpl impl))
 
 data LoxNativeFn = LoxNativeFn { loxNativeFnArity :: Int
@@ -66,10 +70,10 @@ data LoxNativeFn = LoxNativeFn { loxNativeFnArity :: Int
                                }
   deriving (Show)
 
-type NativeFnImplFn sig m = Has NativeFns sig m => Token -> Seq RTValue -> m RTValue
+type NativeFnImplFn cell sig m = Has NativeFns sig m => Token -> Seq (RTValue cell) -> m (RTValue cell)
 
 newtype NativeFnImpl
-  = NativeFnImpl { runNativeFnImpl :: forall sig m. NativeFnImplFn sig m }
+  = NativeFnImpl { runNativeFnImpl :: forall cell sig m. NativeFnImplFn cell sig m }
 
 instance Show NativeFnImpl where
   show _ = "<NativeFnImpl>"

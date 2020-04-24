@@ -1,6 +1,6 @@
 module HSLox.TreeWalk.InterpreterSpec where
 
-import Control.Algebra (run)
+import Control.Carrier.Lift
 import Data.Function
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -17,7 +17,7 @@ import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import HSLox.TreeWalk.RTError (RTError (..))
 import qualified HSLox.Util as Util
 import Test.Hspec
-import HSLox.Test.NativeFnsMock (runNativeFnsMock)
+import qualified HSLox.Test.NativeFnsMock as NativeFnsMock
 
 spec :: Spec
 spec = do
@@ -127,16 +127,20 @@ spec = do
       ( Nothing
       , Seq.fromList ["1", "2"] )
 
-
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
-  (source & runParser
-          & Interpreter.interpret
-          & runNativeFnsMock
-          & Util.runWriterToPair @(Seq T.Text)
-          & run
-          & swap)
+  (NativeFnsMock.runST evaluate)
   `shouldBe` (error, output)
+  where
+    evaluate :: forall s. NativeFnsMock.ST s (Maybe RTError, Seq T.Text)
+    evaluate =
+      source & runParser
+             & Interpreter.interpret @(NativeFnsMock.Cell s)
+             & NativeFnsMock.runNativeFnsMock
+             & NativeFnsMock.runCellsOnST @s
+             & Util.runWriterToPair @(Seq T.Text)
+             & runM @(NativeFnsMock.ST s)
+             & fmap swap
 
 runParser :: T.Text -> AST.Program
 runParser = run

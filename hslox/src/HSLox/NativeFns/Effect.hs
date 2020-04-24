@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 module HSLox.NativeFns.Effect
   ( Algebra, Has
   , module HSLox.NativeFns.Effect

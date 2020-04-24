@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -16,6 +17,7 @@ import Control.Monad (when)
 import Data.Foldable
 import Data.Function
 import Data.Functor
+import Data.Kind (Type)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
@@ -29,36 +31,42 @@ import qualified HSLox.TreeWalk.RTReturn as RTReturn
 import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
 
-baseEnv :: Algebra sig m => m RTState
+baseEnv :: forall cell sig m
+         . Has (NativeFns.Cells cell) sig m
+        => m (RTState cell)
 baseEnv = execState RTState.newState $ do
-  RTState.defineM "clock" $ NativeDef 0 (\_ _ ->
+  RTState.defineM @cell "clock" $ NativeDef 0 (\_ _ ->
     ValNum . fromIntegral <$> NativeFns.clock)
-  RTState.defineM "print" $ NativeDef 1 (\_ args -> case args of
+  RTState.defineM @cell "print" $ NativeDef 1 (\_ args -> case args of
     arg :<| _ -> do
       NativeFns.printText (showValue arg)
       pure ValNil
     _ -> pure ValNil)
 
-interpret :: Has NativeFns.NativeFns sig m
+interpret :: forall cell sig m
+           . Has (NativeFns.Cells cell) sig m
+          => Has NativeFns.NativeFns sig m
           => AST.Program -> m (Maybe RTError)
 interpret prog = do
-  env <- baseEnv
+  env <- baseEnv @cell
   (_, rtError) <- interpretNext env prog
   pure rtError
 {-# INLINE interpret #-}
 
-interpretNext :: Has NativeFns.NativeFns sig m
-              => RTState
+interpretNext :: forall cell sig m
+               . Has (NativeFns.Cells cell) sig m
+              => Has NativeFns.NativeFns sig m
+              => RTState cell
               -> AST.Program
-              -> m (RTState, Maybe RTError)
-interpretNext env prog = prog & interpretStmt
-                              & RTReturn.runReturn
+              -> m (RTState cell, Maybe RTError)
+interpretNext env prog = prog & interpretStmt @cell
+                              & RTReturn.runReturn @cell
                               & Util.runErrorToEither @RTError
                               & fmap (Util.rightToMaybe . Util.swapEither)
                               & Util.runStateToPair env
 {-# INLINE interpretNext #-}
 
-showValue :: RTValue -> T.Text
+showValue :: RTValue cell -> T.Text
 showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
@@ -72,57 +80,61 @@ showValue (ValNum d) = dropZeroDecimal doubleString
       | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
       | otherwise                  = numStr
 
-class StmtInterpreter e m where
+class StmtInterpreter (cell :: Type -> Type)
+                      (e :: Type)
+                      (m :: Type -> Type) where
   interpretStmt :: e -> m ()
 
-instance Runtime sig m => StmtInterpreter AST.Program m where
-  interpretStmt (AST.Program stmts) = for_ stmts interpretStmt
+instance Runtime cell sig m => StmtInterpreter cell AST.Program m where
+  interpretStmt (AST.Program stmts) = for_ stmts (interpretStmt @cell)
 
-instance Runtime sig m => StmtInterpreter AST.Stmt m where
-  interpretStmt (AST.ExprStmt expr) = interpretExpr expr $> ()
-  interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt decl
-  interpretStmt (AST.BlockStmt block) = interpretStmt block
-  interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
-  interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
-  interpretStmt (AST.FunctionVarDeclarationStmt function) = interpretStmt function
-  interpretStmt (AST.ReturnStmt return) = interpretStmt return
+instance Runtime cell sig m => StmtInterpreter cell AST.Stmt m where
+  interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
+  interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
+  interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
+  interpretStmt (AST.IfStmt ifStmt) = interpretStmt @cell ifStmt
+  interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
+  interpretStmt (AST.FunctionVarDeclarationStmt function) = interpretStmt @cell function
+  interpretStmt (AST.ReturnStmt return) = interpretStmt @cell return
 
-instance Runtime sig m => StmtInterpreter AST.VarDeclaration m where
+instance Runtime cell sig m => StmtInterpreter cell AST.VarDeclaration m where
   interpretStmt (AST.VarDeclaration tk expr) = do
-    val <- interpretExpr expr
+    val <- interpretExpr @cell expr
     RTState.defineM (tokenLexeme tk) val
 
-instance Runtime sig m => StmtInterpreter AST.Block m where
+instance Runtime cell sig m => StmtInterpreter cell AST.Block m where
   interpretStmt (AST.Block stmts) =
-    RTState.runInChildEnv $ do
-      for_ stmts interpretStmt
+    RTState.runInChildEnv @cell $ do
+      for_ stmts (interpretStmt @cell)
 
-instance Runtime sig m => StmtInterpreter AST.If m where
+instance Runtime cell sig m => StmtInterpreter cell AST.If m where
   interpretStmt (AST.If cond thenStmt elseStmt) = do
-    cond <- interpretExpr cond
+    cond <- interpretExpr @cell cond
     if isTruthy cond
-    then interpretStmt thenStmt
-    else maybe (pure ()) interpretStmt elseStmt
+    then interpretStmt @cell thenStmt
+    else maybe (pure ()) (interpretStmt @cell) elseStmt
 
-instance Runtime sig m => StmtInterpreter AST.While m where
+instance Runtime cell sig m => StmtInterpreter cell AST.While m where
   interpretStmt (AST.While cond body) =
-    Util.whileM (isTruthy <$> interpretExpr cond) $
-      interpretStmt body
+    Util.whileM (isTruthy <$> interpretExpr @cell cond) $
+      interpretStmt @cell body
 
-instance Runtime sig m => StmtInterpreter AST.Function m where
+instance Runtime cell sig m => StmtInterpreter cell AST.Function m where
   interpretStmt fn@(AST.Function tk _ _) = do
-    frame <- gets RTState.rtStateLocalFrame
+    frame <- gets (RTState.rtStateLocalFrame @cell)
     RTState.defineM (tokenLexeme tk) (ValFn $ LoxFn fn frame)
 
-instance Runtime sig m => StmtInterpreter AST.Return m where
+instance Runtime cell sig m => StmtInterpreter cell AST.Return m where
   interpretStmt (AST.Return tk expr) = do
-    val <- interpretExpr expr
+    val <- interpretExpr @cell expr
     RTReturn.throwReturn tk val
 
-class ExprInterpreter e m where
-  interpretExpr :: e -> m RTValue
+class ExprInterpreter (cell :: Type -> Type)
+                      (e :: Type)
+                      (m :: Type -> Type) where
+  interpretExpr :: e -> m (RTValue cell)
 
-instance Runtime sig m => ExprInterpreter AST.Expr m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Expr m where
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.LogicalExpr t) = interpretExpr t
   interpretExpr (AST.BinaryExpr t) = interpretExpr t
@@ -133,9 +145,9 @@ instance Runtime sig m => ExprInterpreter AST.Expr m where
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
 
-instance Runtime sig m => ExprInterpreter AST.Ternary m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Ternary m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
-      leftVal <- interpretExpr left
+      leftVal <- interpretExpr @cell left
       case (tokenType op1, tokenType op2) of
         (Token.QUESTION_MARK, Token.COLON) ->
           if isTruthy leftVal
@@ -147,7 +159,7 @@ instance Runtime sig m => ExprInterpreter AST.Ternary m where
                                 <> tokenLexeme op2
                                 <> " not supported in ternary position"
 
-instance Runtime sig m => ExprInterpreter AST.Logical m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Logical m where
   interpretExpr (AST.Logical left op right) = do
     leftVal <- interpretExpr left
     case tokenType op of
@@ -161,7 +173,7 @@ instance Runtime sig m => ExprInterpreter AST.Logical m where
                              <> tokenLexeme op
                              <> " not supported in logical position"
 
-instance Runtime sig m => ExprInterpreter AST.Binary m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Binary m where
   interpretExpr (AST.Binary left op right) = do
       leftVal <- interpretExpr left
       rightVal <- interpretExpr right
@@ -187,9 +199,9 @@ instance Runtime sig m => ExprInterpreter AST.Binary m where
       sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
       sumVals opTk _ _ = RTError.throwRT opTk "Operands must be two numbers or two strings."
 
-instance Runtime sig m => ExprInterpreter AST.Unary m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Unary m where
   interpretExpr (AST.Unary op expr) = do
-    val <- interpretExpr expr
+    val <- interpretExpr @cell expr
     case tokenType op of
       Token.BANG -> pure . ValBool . not . isTruthy $ val
       Token.MINUS -> ValNum . negate <$> numericOperand op val
@@ -197,38 +209,39 @@ instance Runtime sig m => ExprInterpreter AST.Unary m where
                              <> tokenLexeme op
                              <> " not supported in unary position"
 
-instance Runtime sig m => ExprInterpreter AST.Grouping m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Grouping m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance Runtime sig m => ExprInterpreter AST.Literal m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s
   interpretExpr (AST.LitNum d)    = pure $ ValNum d
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
   interpretExpr AST.LitNil        = pure $ ValNil
 
-instance Runtime sig m => ExprInterpreter AST.Variable m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Variable m where
   interpretExpr (AST.Variable tk) = RTState.getBoundValueM tk
 
-instance Runtime sig m => ExprInterpreter AST.Assignment m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Assignment m where
   interpretExpr (AST.Assignment tk expr) = do
     val <- interpretExpr expr
     RTState.assignM tk val
     pure val
 
-instance Runtime sig m => ExprInterpreter AST.Call m where
+instance Runtime cell sig m => ExprInterpreter cell AST.Call m where
   interpretExpr (AST.Call calleeExpr paren argExprs) = do
-      callee <- interpretExpr calleeExpr
+      callee <- interpretExpr @cell calleeExpr
       args <- traverse interpretExpr argExprs
       case callee of
         ValFn fn -> call paren fn args
         ValNativeFn nativeFn -> call paren nativeFn args
         _ -> RTError.throwRT paren "Can only call functions and classes."
 
-call :: LoxCallable e m
+call :: forall cell e sig m
+      . LoxCallable cell e m
      => Has (Throw RTError) sig m
-     => Token -> e -> Seq RTValue -> m RTValue
+     => Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 call paren callee args = do
-  arity <- loxArity callee
+  arity <- loxArity @cell callee
   let argCount = Seq.length args
   when (arity /= argCount) $
     RTError.throwRT paren $ "Expected "
@@ -238,30 +251,30 @@ call paren callee args = do
                          <> "."
   loxCall paren callee args
 
-class LoxCallable e m where
+class LoxCallable cell e m where
   loxArity :: e -> m Int
-  loxCall :: Token -> e -> Seq RTValue -> m RTValue
+  loxCall :: Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 
-instance Runtime sig m => LoxCallable LoxFn m where
+instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
   loxArity (LoxFn (AST.Function _ params _) _) = pure (Seq.length params)
   loxCall _ (LoxFn (AST.Function _ params body) env) args = do
     RTReturn.catchReturn $
       RTState.runInChildEnvOf env $ do
         for_ (Seq.zip params args) $ \(param, arg) -> do
           RTState.defineM (tokenLexeme param) arg
-        interpretStmt body
+        interpretStmt @cell body
         pure ValNil
 
-instance Runtime sig m => LoxCallable LoxNativeFn m where
+instance Runtime cell sig m => LoxCallable cell LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity
   loxCall tk (LoxNativeFn _ impl) args = runNativeFnImpl impl tk args
 
-isTruthy :: RTValue -> Bool
+isTruthy :: RTValue cell -> Bool
 isTruthy (ValBool b) = b
 isTruthy ValNil = False
 isTruthy _ = True
 
-isEqual :: RTValue -> RTValue -> Bool
+isEqual :: RTValue cell -> RTValue cell -> Bool
 isEqual (ValString s1) (ValString s2) = s1 == s2
 isEqual (ValNum d1)    (ValNum d2)    = d1 == d2
 isEqual (ValBool b1)   (ValBool b2)   = b1 == b2
@@ -270,15 +283,15 @@ isEqual _              _              = False
 
 numericOperand :: Has (Throw RTError) sig m
                 => Token
-                -> RTValue
+                -> RTValue cell
                 -> m Double
 numericOperand _ (ValNum n) = pure n
 numericOperand opTk _ = RTError.throwRT opTk "Operand must be a number."
 
 numericOperands :: Has (Throw RTError) sig m
                 => Token
-                -> RTValue
-                -> RTValue
+                -> RTValue cell
+                -> RTValue cell
                 -> m (Double, Double)
 numericOperands _ (ValNum n1) (ValNum n2) = pure (n1, n2)
 numericOperands opTk _ _ = RTError.throwRT opTk "Operands must be numbers."

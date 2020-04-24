@@ -30,11 +30,13 @@ getSystemMonotonicClockMillis =
     <&> SysClock.toNanoSecs
     <&> (`div` 1000000)
 
+type Cell = IORef.IORef
+
 newtype CellsOnIOC m a = CellsOnIOC { runCellsOnIO :: m a }
   deriving newtype (Functor, Applicative, Monad)
 
 instance Has (Lift IO) sig m
-         => Algebra (Cells IORef.IORef :+: sig) (CellsOnIOC m) where
+         => Algebra (Cells Cell :+: sig) (CellsOnIOC m) where
   alg hdl sig ctx = CellsOnIOC $ case sig of
     L (NewCell initialVal) -> do
       ref <- sendM @IO $ IORef.newIORef initialVal
