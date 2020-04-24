@@ -133,6 +133,16 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["1", "1"] )
+    it "mutually recursive fns" $ do
+      ( "{" <>
+        "  var even; " <>
+        "  fun odd(n) { if (n == 0) return false; return even(n-1); } " <>
+        "  fun even(n) { if (n == 0) return true; return odd(n-1); } " <>
+        "  print(odd(4)); print(even(4)); " <>
+        "}" )
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["false", "true"] )
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
