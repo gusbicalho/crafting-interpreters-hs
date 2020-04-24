@@ -22,6 +22,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import qualified HSLox.Cells.Effect as Cells
 import qualified HSLox.NativeFns.Effect as NativeFns
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
@@ -32,7 +33,7 @@ import HSLox.TreeWalk.Runtime
 import qualified HSLox.Util as Util
 
 baseEnv :: forall cell sig m
-         . Has (NativeFns.Cells cell) sig m
+         . Has (Cells.Cells cell) sig m
         => m (RTState cell)
 baseEnv = execState RTState.newState $ do
   RTState.defineM @cell "clock" $ NativeDef 0 (\_ _ ->
@@ -44,7 +45,7 @@ baseEnv = execState RTState.newState $ do
     _ -> pure ValNil)
 
 interpret :: forall cell sig m
-           . Has (NativeFns.Cells cell) sig m
+           . Has (Cells.Cells cell) sig m
           => Has NativeFns.NativeFns sig m
           => AST.Program -> m (Maybe RTError)
 interpret prog = do
@@ -54,7 +55,7 @@ interpret prog = do
 {-# INLINE interpret #-}
 
 interpretNext :: forall cell sig m
-               . Has (NativeFns.Cells cell) sig m
+               . Has (Cells.Cells cell) sig m
               => Has NativeFns.NativeFns sig m
               => RTState cell
               -> AST.Program

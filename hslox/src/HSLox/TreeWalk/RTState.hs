@@ -11,7 +11,7 @@ import Control.Applicative
 import Data.Function
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import HSLox.NativeFns.Effect (Cells (..), newCell, writeCell, readCell)
+import HSLox.Cells.Effect
 import HSLox.Token (Token (..))
 import qualified HSLox.TreeWalk.RTError as RTError
 import HSLox.TreeWalk.Runtime

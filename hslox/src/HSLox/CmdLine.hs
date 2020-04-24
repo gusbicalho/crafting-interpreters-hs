@@ -12,6 +12,7 @@ import Control.Effect.Empty
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified HSLox.AST as AST
+import qualified HSLox.Cells.Carrier.CellsOnIO as CellsOnIO
 import HSLox.CmdLine.ReadLine
 import HSLox.ErrorReport (ErrorReport, toErrorReport)
 import qualified HSLox.NativeFns.Carrier.NativeFnsOnIO as NativeFnsOnIO
@@ -62,7 +63,7 @@ runText = runApp . runSource
 runApp :: _ a -> IO a
 runApp app =
   app & NativeFnsOnIO.runNativeFnsOnIO
-      & NativeFnsOnIO.runCellsOnIO
+      & CellsOnIO.runCellsOnIO
       & runReadLine
       & runTrace
       & runM @IO
@@ -94,7 +95,7 @@ runSource source = do
       reportReadErrors readErrors
       sendM @IO $ exitWith (ExitFailure 65)
     Right exprs -> do
-      rtError <- Interpreter.interpret @NativeFnsOnIO.Cell exprs
+      rtError <- Interpreter.interpret @CellsOnIO.Cell exprs
       for_ rtError $ \error -> do
         sendM @IO $ hPutStrLn stderr (show error)
         sendM @IO $ exitWith (ExitFailure (70))
@@ -102,7 +103,7 @@ runSource source = do
 
 runRepl :: _ => m ()
 runRepl = do
-  newEnv <- Interpreter.baseEnv @NativeFnsOnIO.Cell
+  newEnv <- Interpreter.baseEnv @CellsOnIO.Cell
   evalState newEnv . Util.untilEmpty $ do
     line <- readLine
     guard (line /= ":e")
@@ -112,7 +113,7 @@ runRepl = do
         reportReadErrors readErrors
       Right exprs -> do
         rtState <- get
-        (rtState, rtError) <- Interpreter.interpretNext @NativeFnsOnIO.Cell rtState exprs
+        (rtState, rtError) <- Interpreter.interpretNext @CellsOnIO.Cell rtState exprs
         put rtState
         for_ rtError $ \error -> do
           sendM @IO $ putStrLn (show error)

@@ -7,6 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import Data.Tuple (swap)
 import qualified HSLox.AST as AST
+import qualified HSLox.Cells.Carrier.CellsOnST as CellsOnST
 import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.Scanner.Megaparsec as Scanner
@@ -129,17 +130,17 @@ spec = do
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
-  (NativeFnsMock.runST evaluate)
+  (CellsOnST.runST evaluate)
   `shouldBe` (error, output)
   where
-    evaluate :: forall s. NativeFnsMock.ST s (Maybe RTError, Seq T.Text)
+    evaluate :: forall s. CellsOnST.ST s (Maybe RTError, Seq T.Text)
     evaluate =
       source & runParser
-             & Interpreter.interpret @(NativeFnsMock.Cell s)
+             & Interpreter.interpret @(CellsOnST.Cell s)
              & NativeFnsMock.runNativeFnsMock
-             & NativeFnsMock.runCellsOnST @s
+             & CellsOnST.runCellsOnST @s
              & Util.runWriterToPair @(Seq T.Text)
-             & runM @(NativeFnsMock.ST s)
+             & runM @(CellsOnST.ST s)
              & fmap swap
 
 runParser :: T.Text -> AST.Program

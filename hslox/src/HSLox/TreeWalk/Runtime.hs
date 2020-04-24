@@ -12,6 +12,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import HSLox.Cells.Effect
 import HSLox.NativeFns.Effect
 import HSLox.Token (Token (..))
 
