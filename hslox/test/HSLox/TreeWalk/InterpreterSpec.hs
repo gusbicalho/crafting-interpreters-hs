@@ -4,6 +4,7 @@ import Control.Carrier.Lift
 import Data.Function
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Text as T
 import Data.Tuple (swap)
 import qualified HSLox.AST as AST
@@ -152,9 +153,9 @@ source `shouldEvaluateTo` (error, output) =
 runParser :: T.Text -> AST.Program
 runParser = run
           . fmap snd
-          . Util.runWriterToPair @(Seq ParserError)
+          . Util.runWriterToPair @(Set ParserError)
           . Parser.parse
           . run
           . fmap snd
-          . Util.runWriterToPair @(Seq ScanError)
+          . Util.runWriterToPair @(Set ScanError)
           . Scanner.scanTokens

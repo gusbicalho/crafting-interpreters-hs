@@ -5,8 +5,10 @@ module HSLox.ScannerSpec where
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
 import Data.Sequence (Seq)
-import qualified Data.Text as T
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Text as T
 import HSLox.Scanner.ScanError
 import qualified HSLox.Scanner.ByTheBook.Scanner as ByTheBook
 import qualified HSLox.Scanner.Megaparsec as Megaparsec
@@ -27,9 +29,9 @@ spec = do
 testSource :: T.Text
 testSource = "//first comment\n{123.456.789\nand.123.treco&?:// zuera\n \"lol\" )!=!<=<>=>/bla \"erro"
 
-expectedResults :: (Seq ScanError, Seq Token)
+expectedResults :: (Set ScanError, Seq Token)
 expectedResults =
-  ( Seq.fromList
+  ( Set.fromList
       [ ScanError 3 "" "Unexpected character: &"
       , ScanError 4 "" "Unterminated string."
       ]
@@ -59,8 +61,8 @@ expectedResults =
       ]
   )
 
-runScan :: (a -> _ (Seq Token)) -> a -> IO (Seq ScanError, (Seq Token))
+runScan :: (a -> _ (Seq Token)) -> a -> IO (Set ScanError, (Seq Token))
 runScan scanTokens = runM @IO
                    . runTrace
-                   . Util.runWriterToPair @(Seq ScanError)
+                   . Util.runWriterToPair @(Set ScanError)
                    . scanTokens

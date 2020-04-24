@@ -3,7 +3,7 @@
 module HSLox.Scanner.ScanError where
 
 import Control.Effect.Writer
-import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import HSLox.ErrorReport
 
@@ -23,4 +23,4 @@ instance ToErrorReport ScanError where
                   }
 
 reportScanError :: _ => ScanError -> m ()
-reportScanError error = tell (Seq.singleton error)
+reportScanError error = tell (Set.singleton error)

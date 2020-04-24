@@ -10,6 +10,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Text.Megaparsec hiding (State, Token)
@@ -21,7 +22,7 @@ import HSLox.Scanner.ScanError (ScanError (..))
 import qualified HSLox.Scanner.ScanError as ScanError
 
 scanTokens ::
-  forall sig m. Has (Writer (Seq ScanError)) sig m
+  forall sig m. Has (Writer (Set ScanError)) sig m
              => T.Text
              -> m (Seq Token)
 scanTokens source = do

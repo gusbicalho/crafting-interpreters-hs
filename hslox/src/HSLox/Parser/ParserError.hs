@@ -3,7 +3,7 @@
 module HSLox.Parser.ParserError where
 
 import Control.Effect.Writer
-import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import HSLox.ErrorReport
 import HSLox.Token (Token (..))
@@ -32,4 +32,4 @@ instance ToErrorReport ParserError where
                       }
 
 reportError :: _ => ParserError -> m ()
-reportError error = tell (Seq.singleton error)
+reportError error = tell (Set.singleton error)

@@ -10,6 +10,7 @@ import Data.Foldable
 import Data.Functor
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Text as T
 import HSLox.AST
 import HSLox.AST.Sugar
@@ -19,7 +20,7 @@ import HSLox.Token (Token (..), TokenType)
 import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
-parse :: Has (Writer (Seq ParserError)) sig m
+parse :: Has (Writer (Set ParserError)) sig m
       => (Seq Token)
       -> m Program
 parse tokens
@@ -37,7 +38,7 @@ parse tokens
       Right stmt -> do
         tell $ Seq.singleton stmt
 
-type LoxParser t sig m = ( Has (Writer (Seq ParserError)) sig m
+type LoxParser t sig m = ( Has (Writer (Set ParserError)) sig m
                          , Has (ErrorEff.Error ParserError) sig m
                          , Has (State ParserState) sig m )
                          => m t

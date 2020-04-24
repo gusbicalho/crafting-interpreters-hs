@@ -20,7 +20,7 @@ import qualified HSLox.Token as Token
 import HSLox.Parser.Megaparsec.TokenStream (TokenStream (..))
 import Text.Megaparsec hiding (State, Token)
 
-parse :: Has (Writer (Seq ParserError)) sig m
+parse :: Has (Writer (Set.Set ParserError)) sig m
       => (Seq Token)
       -> m Program
 parse tokens = do

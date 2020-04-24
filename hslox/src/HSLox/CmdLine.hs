@@ -9,8 +9,9 @@ import Control.Carrier.State.Church
 import Control.Carrier.Lift
 import Control.Carrier.Trace.Printing
 import Control.Effect.Empty
-import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified HSLox.AST as AST
 import qualified HSLox.Cells.Carrier.CellsOnIO as CellsOnIO
 import HSLox.CmdLine.ReadLine
@@ -79,11 +80,11 @@ runFromSourceFile path =
 
 readSource :: Algebra sig m
            => T.Text
-           -> m (Either (Seq ScanError, Seq ParserError) AST.Program)
+           -> m (Either (Set ScanError, Set ParserError) AST.Program)
 readSource source = do
-  (scanErrors, tokens) <- Util.runWriterToPair @(Seq ScanError) $ Scanner.scanTokens source
-  (parserErrors, program) <- Util.runWriterToPair @(Seq ParserError) $ Parser.parse tokens
-  if (scanErrors /= Seq.empty || parserErrors /= Seq.empty)
+  (scanErrors, tokens) <- Util.runWriterToPair @(Set ScanError) $ Scanner.scanTokens source
+  (parserErrors, program) <- Util.runWriterToPair @(Set ParserError) $ Parser.parse tokens
+  if (scanErrors /= Set.empty || parserErrors /= Set.empty)
   then pure $ Left (scanErrors, parserErrors)
   else pure $ Right program
 
@@ -119,10 +120,10 @@ runRepl = do
           sendM @IO $ putStrLn (show error)
 {-# INLINE runRepl #-}
 
-reportReadErrors :: Has Trace sig m => (Seq ScanError, Seq ParserError) -> m ()
-reportReadErrors (scanErrors, parserErrors) =
-  reportErrors $ (toErrorReport <$> scanErrors)
-              <> (toErrorReport <$> parserErrors)
+reportReadErrors :: Has Trace sig m => (Set ScanError, Set ParserError) -> m ()
+reportReadErrors (scanErrors, parserErrors) = do
+  reportErrors $ (toErrorReport <$> foldMap Seq.singleton scanErrors)
+              <> (toErrorReport <$> foldMap Seq.singleton parserErrors)
 
 reportErrors :: _ => f ErrorReport -> m ()
 reportErrors errors = for_ errors (trace . show)

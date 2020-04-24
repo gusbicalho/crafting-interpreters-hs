@@ -11,6 +11,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Text as T
 import HSLox.Scanner.ByTheBook.ScanState
   ( ScanState
@@ -32,7 +33,7 @@ import qualified HSLox.Scanner.ScanError as ScanError
 import qualified HSLox.Util as Util
 
 scanTokens ::
-  forall sig m. Has (Writer (Seq ScanError)) sig m
+  forall sig m. Has (Writer (Set ScanError)) sig m
              => T.Text
              -> m (Seq Token)
 scanTokens source
@@ -60,7 +61,7 @@ makeToken tkType tkLiteral = do
              }
 
 reportError :: Has (State ScanState) sig m
-            => Has (Writer (Seq ScanError)) sig m
+            => Has (Writer (Set ScanError)) sig m
             => T.Text -> m ()
 reportError msg = do
   line <- getLine
@@ -71,7 +72,7 @@ buildEOFToken = do
   Token "" Token.EOF Nothing <$> getLine
 
 scanNextToken :: Has Empty sig m
-              => Has (Writer (Seq ScanError)) sig m
+              => Has (Writer (Set ScanError)) sig m
               => Has (State ScanState) sig m
               => m (Maybe Token)
 scanNextToken = Util.runEmptyToMaybe $ do
@@ -118,7 +119,7 @@ lineComment = Util.untilEmpty $ do
   advance
 
 stringLit :: Has Empty sig m
-          => Has (Writer (Seq ScanError)) sig m
+          => Has (Writer (Set ScanError)) sig m
           => Has (State ScanState) sig m
           => m T.Text
 stringLit = do
