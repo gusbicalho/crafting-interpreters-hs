@@ -111,7 +111,7 @@ data Unary = Unary { unaryOperator :: Token
                    }
   deriving (Eq, Show, Ord)
 
-data Grouping = Grouping { groupingExpr :: Expr }
+newtype Grouping = Grouping { groupingExpr :: Expr }
   deriving (Eq, Show, Ord)
 
 data Function = Function { functionToken :: Token

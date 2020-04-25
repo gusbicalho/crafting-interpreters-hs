@@ -40,15 +40,12 @@ instance ASTPrinter While where
                             <> ")"
 
 instance ASTPrinter Function where
-  printAST fn = printFunction fn
-
-printFunction :: Function -> T.Text
-printFunction (Function tk args body)
-  = "("
- <> tokenLexeme tk
- <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
- <> printAST body
- <> ")"
+  printAST (Function tk args body)
+    = "("
+   <> tokenLexeme tk
+   <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
+   <> printAST body
+   <> ")"
 
 instance ASTPrinter Return where
   printAST (Return tk expr) = parenthesize (tokenLexeme tk) [expr]
@@ -94,7 +91,7 @@ instance ASTPrinter Logical where
 
 instance ASTPrinter Ternary where
   printAST (Ternary left op1 middle op2 right)
-    = parenthesize ((tokenLexeme op1) <> (tokenLexeme op2))
+    = parenthesize (tokenLexeme op1 <> tokenLexeme op2)
                    [left, middle, right]
 
 parenthesize :: T.Text -> [Expr] -> T.Text

@@ -53,10 +53,10 @@ instance Stream.Stream TokenStream where
 
   tokensLength p tks = length (Stream.showTokens p tks)
 
-  reachOffset offset posSt@(PosState { pstateInput
-                                     , pstateOffset
-                                     , pstateSourcePos
-                                     })
+  reachOffset offset posSt@PosState { pstateInput
+                                    , pstateOffset
+                                    , pstateSourcePos
+                                    }
     = ( lineText
       , posSt { pstateInput = TokenStream back
               , pstateOffset = offset
@@ -71,5 +71,5 @@ instance Stream.Stream TokenStream where
                       _ :|> tk -> mkPos $ tokenLine tk
                       _ -> case back of
                         tk :<| _ -> mkPos $ tokenLine tk
-                        _ -> sourceLine $ pstateSourcePos
+                        _ -> sourceLine pstateSourcePos
       lineText = "<empty line>"

@@ -24,18 +24,18 @@ initialScanState source
 
 resetSegment :: Has (State ScanState) sig m
              => m ()
-resetSegment = modify $ \s@(ScanState { scanStateCurrent }) ->
+resetSegment = modify $ \s@ScanState { scanStateCurrent } ->
   s { scanStateStart = scanStateCurrent
     , scanStateSegment = T.empty
     }
 
 incLine :: Has (State ScanState) sig m
         => m ()
-incLine = modify $ \s@(ScanState { scanStateLine }) -> s { scanStateLine = succ scanStateLine }
+incLine = modify $ \s@ScanState { scanStateLine } -> s { scanStateLine = succ scanStateLine }
 
 incCurrent :: Has (State ScanState) sig m
         => m ()
-incCurrent = modify $ \s@(ScanState { scanStateCurrent }) -> s { scanStateCurrent = succ scanStateCurrent }
+incCurrent = modify $ \s@ScanState { scanStateCurrent } -> s { scanStateCurrent = succ scanStateCurrent }
 
 isAtEnd :: Has (State ScanState) sig m
         => m Bool
@@ -86,7 +86,7 @@ peek2 = do
   case T.uncons (scanStateSource state) of
     Nothing -> empty
     Just (c, source') ->
-      case T.uncons (source') of
+      case T.uncons source' of
         Nothing -> empty
         Just (c2, _) -> pure (c, c2)
 

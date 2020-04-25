@@ -24,10 +24,10 @@ instance ToErrorReport ParserError where
                       , errorReportMessage = parserErrorMessage
                       }
         Just token ->
-          ErrorReport { errorReportLine = (tokenLine token)
-                      , errorReportWhere = case (tokenType token) of
+          ErrorReport { errorReportLine = tokenLine token
+                      , errorReportWhere = case tokenType token of
                           Token.EOF -> " at end"
-                          _ -> " at '" <> (tokenLexeme token) <> "'"
+                          _ -> " at '" <> tokenLexeme token <> "'"
                       , errorReportMessage = parserErrorMessage
                       }
 

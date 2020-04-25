@@ -36,7 +36,7 @@ data RTFrame cell = RTFrame { rtFrameEnv :: RTEnv cell
 instance Show (RTFrame cell) where
   show _ = "<stack frame>"
 
-data RTState cell = RTState { rtStateGlobalEnv :: (RTEnv cell)
+data RTState cell = RTState { rtStateGlobalEnv :: RTEnv cell
                             , rtStateLocalFrame :: Maybe (RTFrame cell)
                             }
 
@@ -63,7 +63,7 @@ data LoxFn  cell = LoxFn { loxFnAST :: AST.Function
 
 pattern NativeDef :: Int
                   -> (forall cell sig m. NativeFnImplFn cell sig m)
-                  -> (RTValue cell)
+                  -> RTValue cell
 pattern NativeDef arity impl = ValNativeFn (LoxNativeFn arity (NativeFnImpl impl))
 
 data LoxNativeFn = LoxNativeFn { loxNativeFnArity :: Int

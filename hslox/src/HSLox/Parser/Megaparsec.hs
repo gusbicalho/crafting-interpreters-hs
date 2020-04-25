@@ -21,7 +21,7 @@ import HSLox.Parser.Megaparsec.TokenStream (TokenStream (..))
 import Text.Megaparsec hiding (State, Token)
 
 parse :: Has (Writer (Set.Set ParserError)) sig m
-      => (Seq Token)
+      => Seq Token
       -> m Program
 parse tokens = do
     stmts' <- runParserT parseStmts "" (TokenStream tokens)
@@ -40,7 +40,7 @@ parse tokens = do
       let delayedErrors = stateParseErrors state
       updateParserState $ \state -> state { stateParseErrors = [] }
       for_ delayedErrors (lift . report)
-    report (FancyError _ errs) = do
+    report (FancyError _ errs) =
       for_ errs $ \case
         ErrorCustom e -> ParserError.reportError e
         err -> ParserError.reportError $ ParserError Nothing (T.pack $ show err)
@@ -76,8 +76,10 @@ makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
 
 declaration :: MonadParsec ParserError TokenStream m => m Stmt
-declaration = do
-  varDeclaration <|> funDeclaration <|> statement
+declaration = asum [ varDeclaration
+                   , funDeclaration
+                   , statement
+                   ]
 
 varDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
 varDeclaration = do
@@ -95,7 +97,7 @@ funDeclaration = do
     (name, function) <- function "function" marker parseFunName
     pure $ functionDeclaration name function
   where
-    parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
+    parseFunName = consume [Token.IDENTIFIER] "Expect function name."
 
 function :: MonadParsec ParserError TokenStream m
          => T.Text -> Token -> m name -> m (name, Function)
@@ -106,7 +108,7 @@ function kind marker parseName = do
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure $ (name, Function marker args body)
+    pure (name, Function marker args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
@@ -157,20 +159,24 @@ forStmt :: MonadParsec ParserError TokenStream m => m Stmt
 forStmt = do
     singleMatching [ Token.FOR ]
     consume [ Token.LEFT_PAREN ] "Expect '(' after 'for'."
-    init      <- asum [ (singleMatching [ Token.SEMICOLON ] $> Nothing)
-                      , (Just <$> varDeclaration)
-                      , (Just <$> expressionStmt)
-                      ]
-    condition <- asum [ (singleMatching [ Token.SEMICOLON ] $> Nothing)
-                      , (Just <$> expression
-                          <* consume [ Token.SEMICOLON ] "Expect ';' after for condition.")
-                      ]
-    increment <- asum [ (singleMatching [ Token.RIGHT_PAREN ] $> Nothing)
-                      , (Just <$> expression
-                          <* consume [ Token.RIGHT_PAREN ] "Expect ')' after for increment.")
-                      ]
-    body <- statement
-    pure $ buildFor init condition increment body
+    buildFor <$> init
+             <*> condition
+             <*> increment
+             <*> statement
+  where
+    init      = asum [ singleMatching [ Token.SEMICOLON ] $> Nothing
+                     , Just <$> varDeclaration
+                     , Just <$> expressionStmt
+                     ]
+    condition = asum [ singleMatching [ Token.SEMICOLON ] $> Nothing
+                     , Just <$> expression
+                        <* consume [ Token.SEMICOLON ] "Expect ';' after for condition."
+                     ]
+    increment = asum [ singleMatching [ Token.RIGHT_PAREN ] $> Nothing
+                     , Just <$> expression
+                         <* consume [ Token.RIGHT_PAREN ] "Expect ')' after for increment."
+                     ]
+
 
 blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
 blockStmt = BlockStmt <$> (singleMatching [ Token.LEFT_BRACE ] *> finishBlock)
@@ -232,12 +238,12 @@ conditional = do
     left <- orExpr
     conditionalBody left <|> pure left
   where
-    conditionalBody left = do
-      op1 <- singleMatching [ Token.QUESTION_MARK ]
-      middle <- expression
-      op2 <- consume [ Token.COLON ] "Expect ':' after '?' expression."
-      right <- conditional
-      pure $ TernaryE left op1 middle op2 right
+    conditionalBody left =
+      TernaryE left
+               <$> singleMatching [ Token.QUESTION_MARK ]
+               <*> expression
+               <*> consume [ Token.COLON ] "Expect ':' after '?' expression."
+               <*> conditional
 
 orExpr :: MonadParsec ParserError TokenStream m => m Expr
 orExpr =
@@ -303,7 +309,7 @@ unary = (UnaryE <$> singleMatching [Token.MINUS, Token.BANG]
 call :: MonadParsec ParserError TokenStream m => m Expr
 call = primary >>= sequenceOfCalls
   where
-    sequenceOfCalls callee = do
+    sequenceOfCalls callee =
       (do _ <- singleMatching [ Token.LEFT_PAREN ]
           args <- arguments
           paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
@@ -366,7 +372,7 @@ leftAssociativeBinaryOp makeExpr termParser opTypes = do
 singleMatching :: Foldable t
                => MonadParsec ParserError TokenStream m
                => t TokenType -> m Token
-singleMatching tkTypes = try $ satisfy (\tk -> any ((tokenType tk) ==) tkTypes)
+singleMatching tkTypes = try $ satisfy (\tk -> elem (tokenType tk) tkTypes)
 
 check :: (Foldable t, MonadParsec ParserError TokenStream m) => t TokenType -> m Bool
 check tkTypes = lookAhead $ (True <$ singleMatching tkTypes)
@@ -378,7 +384,7 @@ maybeAny = (Just <$> anySingle) <|> pure Nothing
 consume :: Foldable t
         => MonadParsec ParserError TokenStream m
         => t TokenType -> T.Text -> m Token
-consume tkTypes errorMsg = do
+consume tkTypes errorMsg =
   singleMatching tkTypes <|> do
     mbTk <- lookAhead maybeAny
     fancyFailure (makeError mbTk errorMsg)
@@ -398,5 +404,5 @@ binaryOperatorAtBeginningOfExpression termParser opTypes = do
   op <- singleMatching opTypes
   observing termParser
   fancyFailure $ makeError (Just op) $ "Binary operator "
-                                    <> (tokenLexeme op)
+                                    <> tokenLexeme op
                                     <> " found at the beginning of expression."
