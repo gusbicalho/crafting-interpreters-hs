@@ -22,6 +22,7 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.Cells.Effect as Cells
 import qualified HSLox.NativeFns.Effect as NativeFns
 import HSLox.Token (Token (..))
@@ -44,21 +45,23 @@ baseEnv = execState RTState.newState $ do
         pure ValNil
       _ -> pure ValNil)
 
-interpret :: forall cell sig m
+interpret :: forall cell sig m f
            . Has (Cells.Cells cell) sig m
           => Has NativeFns.NativeFns sig m
-          => AST.Program -> m (Maybe RTError)
+          => AST.Meta.AsIdentity f
+          => AST.Program f -> m (Maybe RTError)
 interpret prog = do
   env <- baseEnv @cell
   (_, rtError) <- interpretNext env prog
   pure rtError
 {-# INLINE interpret #-}
 
-interpretNext :: forall cell sig m
+interpretNext :: forall cell sig m f
                . Has (Cells.Cells cell) sig m
               => Has NativeFns.NativeFns sig m
+              => AST.Meta.AsIdentity f
               => RTState cell
-              -> AST.Program
+              -> AST.Program f
               -> m (RTState cell, Maybe RTError)
 interpretNext env prog = prog & interpretStmt @cell
                               & RTReturn.runReturn @cell
@@ -72,7 +75,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValFn (LoxFn (AST.Meta.astContent -> AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -86,10 +89,24 @@ class StmtInterpreter (cell :: Type -> Type)
                       (m :: Type -> Type) where
   interpretStmt :: e -> m ()
 
-instance Runtime cell sig m => StmtInterpreter cell AST.Program m where
+instance (StmtInterpreter cell e m, AST.Meta.AsIdentity f) => StmtInterpreter cell (f e) m where
+  interpretStmt = interpretStmt @cell
+                . AST.Meta.runIdentity
+                . AST.Meta.asIdentity
+
+instance ( Applicative m
+         , StmtInterpreter cell (AST.Stmt f) m
+         ) => StmtInterpreter cell (AST.Program f) m where
   interpretStmt (AST.Program stmts) = for_ stmts (interpretStmt @cell)
 
-instance Runtime cell sig m => StmtInterpreter cell AST.Stmt m where
+instance ( Applicative m
+         , ExprInterpreter cell (f (AST.Expr f)) m
+         , StmtInterpreter cell (f (AST.VarDeclaration f)) m
+         , StmtInterpreter cell (f (AST.Block f)) m
+         , StmtInterpreter cell (f (AST.If f)) m
+         , StmtInterpreter cell (f (AST.While f)) m
+         , StmtInterpreter cell (f (AST.Return f)) m
+         ) => StmtInterpreter cell (AST.Stmt f) m where
   interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
   interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
   interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
@@ -97,29 +114,41 @@ instance Runtime cell sig m => StmtInterpreter cell AST.Stmt m where
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
   interpretStmt (AST.ReturnStmt return) = interpretStmt @cell return
 
-instance Runtime cell sig m => StmtInterpreter cell AST.VarDeclaration m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => StmtInterpreter cell (AST.VarDeclaration f) m where
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr @cell expr
     RTState.defineM (tokenLexeme tk) val
 
-instance Runtime cell sig m => StmtInterpreter cell AST.Block m where
+instance ( Runtime cell sig m
+         , StmtInterpreter cell (AST.Stmt f) m
+         ) => StmtInterpreter cell (AST.Block f) m where
   interpretStmt (AST.Block stmts) =
     RTState.runInChildEnv @cell $ do
       for_ stmts (interpretStmt @cell)
 
-instance Runtime cell sig m => StmtInterpreter cell AST.If m where
+instance ( Monad m
+         , StmtInterpreter cell (AST.Stmt f) m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => StmtInterpreter cell (AST.If f) m where
   interpretStmt (AST.If cond thenStmt elseStmt) = do
     cond <- interpretExpr @cell cond
     if isTruthy cond
     then interpretStmt @cell thenStmt
     else maybe (pure ()) (interpretStmt @cell) elseStmt
 
-instance Runtime cell sig m => StmtInterpreter cell AST.While m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         , StmtInterpreter cell (AST.Stmt f) m
+         ) => StmtInterpreter cell (AST.While f) m where
   interpretStmt (AST.While cond body) =
     Util.whileM (isTruthy <$> interpretExpr @cell cond) $
       interpretStmt @cell body
 
-instance Runtime cell sig m => StmtInterpreter cell AST.Return m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => StmtInterpreter cell (AST.Return f) m where
   interpretStmt (AST.Return tk expr) = do
     val <- interpretExpr @cell expr
     RTReturn.throwReturn tk val
@@ -129,7 +158,14 @@ class ExprInterpreter (cell :: Type -> Type)
                       (m :: Type -> Type) where
   interpretExpr :: e -> m (RTValue cell)
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Expr m where
+instance (ExprInterpreter cell e m, AST.Meta.AsIdentity f) => ExprInterpreter cell (f e) m where
+  interpretExpr = interpretExpr @cell
+                . AST.Meta.runIdentity
+                . AST.Meta.asIdentity
+
+instance ( Runtime cell sig m
+         , AST.Meta.AsIdentity f
+         ) => ExprInterpreter cell (AST.Expr f) m where
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.LogicalExpr t) = interpretExpr t
   interpretExpr (AST.BinaryExpr t) = interpretExpr t
@@ -141,7 +177,9 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Expr m where
   interpretExpr (AST.CallExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Ternary m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Ternary f) m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
       leftVal <- interpretExpr @cell left
       case (tokenType op1, tokenType op2) of
@@ -155,7 +193,9 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Ternary m where
                                 <> tokenLexeme op2
                                 <> " not supported in ternary position"
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Logical m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Logical f) m where
   interpretExpr (AST.Logical left op right) = do
     leftVal <- interpretExpr left
     case tokenType op of
@@ -169,7 +209,9 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Logical m where
                              <> tokenLexeme op
                              <> " not supported in logical position"
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Binary m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Binary f) m where
   interpretExpr (AST.Binary left op right) = do
       leftVal <- interpretExpr left
       rightVal <- interpretExpr right
@@ -195,7 +237,9 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Binary m where
       sumVals _ (ValString s1) (ValString s2) = pure $ ValString (s1 <> s2)
       sumVals opTk _ _ = RTError.throwRT opTk "Operands must be two numbers or two strings."
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Unary m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Unary f) m where
   interpretExpr (AST.Unary op expr) = do
     val <- interpretExpr @cell expr
     case tokenType op of
@@ -205,13 +249,17 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Unary m where
                              <> tokenLexeme op
                              <> " not supported in unary position"
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Grouping m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Grouping f) m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Function m where
+instance ( Runtime cell sig m
+         , AST.Meta.AsIdentity f
+         ) => ExprInterpreter cell (AST.Function f) m where
   interpretExpr fn = do
     frame <- gets (RTState.localFrame @cell)
-    pure . ValFn $ LoxFn fn frame
+    pure . ValFn $ LoxFn (AST.Meta.mkSomeAST fn) frame
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s
@@ -222,13 +270,17 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
 instance Runtime cell sig m => ExprInterpreter cell AST.Variable m where
   interpretExpr (AST.Variable tk) = RTState.getBoundValueM tk
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Assignment m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Assignment f) m where
   interpretExpr (AST.Assignment tk expr) = do
     val <- interpretExpr expr
     RTState.assignM tk val
     pure val
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Call m where
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Call f) m where
   interpretExpr (AST.Call calleeExpr paren argExprs) = do
       callee <- interpretExpr @cell calleeExpr
       args <- traverse interpretExpr argExprs
@@ -257,8 +309,8 @@ class LoxCallable cell e m where
   loxCall :: Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 
 instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
-  loxArity (LoxFn (AST.Function _ params _) _) = pure (Seq.length params)
-  loxCall _ (LoxFn (AST.Function _ params body) env) args = do
+  loxArity (LoxFn (AST.Meta.astContent -> AST.Function _ params _) _) = pure (Seq.length params)
+  loxCall _ (LoxFn (AST.Meta.astContent -> AST.Function _ params body) env) args = do
     RTReturn.catchReturn $
       RTState.runInChildEnvOf env $ do
         for_ (Seq.zip params args) $ \(param, arg) -> do

@@ -12,6 +12,7 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import qualified HSLox.AST.Meta as AST.Meta
 import HSLox.Cells.Effect
 import HSLox.NativeFns.Effect
 import HSLox.Token (Token (..))
@@ -54,12 +55,10 @@ data RTValue cell
   | ValNil
   | ValFn (LoxFn cell)
   | ValNativeFn LoxNativeFn
-  deriving (Show)
 
-data LoxFn cell = LoxFn { loxFnAST :: AST.Function
+data LoxFn cell = LoxFn { loxFnAST :: AST.Meta.SomeAST AST.Function
                         , loxClosedEnv :: Maybe (RTFrame cell)
                         }
-  deriving (Show)
 
 pattern NativeDef :: Int
                   -> (forall cell sig m. NativeFnImplFn cell sig m)

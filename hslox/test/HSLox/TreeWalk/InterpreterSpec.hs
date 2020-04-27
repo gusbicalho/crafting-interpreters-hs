@@ -164,7 +164,7 @@ source `shouldEvaluateTo` (error, output) =
              & runM @(CellsOnST.ST s)
              & fmap swap
 
-runParser :: T.Text -> AST.Program
+runParser :: T.Text -> AST.Program AST.Identity
 runParser = run
           . fmap snd
           . Util.runWriterToPair @(Set ParserError)

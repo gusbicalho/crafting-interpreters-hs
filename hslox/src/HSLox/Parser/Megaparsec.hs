@@ -22,7 +22,7 @@ import Text.Megaparsec hiding (State, Token)
 
 parse :: Has (Writer (Set.Set ParserError)) sig m
       => Seq Token
-      -> m Program
+      -> m ProgramI
 parse tokens = do
     stmts' <- runParserT parseStmts "" (TokenStream tokens)
     case stmts' of
@@ -49,7 +49,7 @@ parse tokens = do
 
 manyStmtsUntilEOF :: MonadParsec ParserError TokenStream m
                   => (ParseError TokenStream ParserError -> m ())
-                  -> m (Seq Stmt)
+                  -> m (Seq StmtI)
 manyStmtsUntilEOF handleError =
     Seq.fromList . catMaybes <$>
       manyTill
@@ -75,13 +75,13 @@ manyStmtsUntilEOF handleError =
 makeError :: Maybe Token -> T.Text -> Set.Set (ErrorFancy ParserError)
 makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
 
-declaration :: MonadParsec ParserError TokenStream m => m Stmt
+declaration :: MonadParsec ParserError TokenStream m => m StmtI
 declaration = asum [ varDeclaration
                    , funDeclaration
                    , statement
                    ]
 
-varDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
+varDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 varDeclaration = do
     singleMatching [Token.VAR]
     identifier <- consume [Token.IDENTIFIER] "Expect variable name."
@@ -89,9 +89,9 @@ varDeclaration = do
                  , pure NilE
                  ]
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
-    pure . VarDeclarationStmt $ VarDeclaration identifier init
+    pure . VarDeclarationStmtI $ VarDeclaration identifier init
 
-funDeclaration :: MonadParsec ParserError TokenStream m => m Stmt
+funDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 funDeclaration = do
     marker <- singleMatching [Token.FUN]
     (name, function) <- function "function" marker parseFunName
@@ -100,7 +100,7 @@ funDeclaration = do
     parseFunName = consume [Token.IDENTIFIER] "Expect function name."
 
 function :: MonadParsec ParserError TokenStream m
-         => T.Text -> Token -> m name -> m (name, Function)
+         => T.Text -> Token -> m name -> m (name, Function Identity)
 function kind marker parseName = do
     name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
@@ -125,7 +125,7 @@ function kind marker parseName = do
         *> argsList newArgs)
         <|> pure newArgs
 
-statement :: MonadParsec ParserError TokenStream m => m Stmt
+statement :: MonadParsec ParserError TokenStream m => m StmtI
 statement = asum [ blockStmt
                  , ifStmt
                  , whileStmt
@@ -134,7 +134,7 @@ statement = asum [ blockStmt
                  , expressionStmt
                  ]
 
-ifStmt :: MonadParsec ParserError TokenStream m => m Stmt
+ifStmt :: MonadParsec ParserError TokenStream m => m StmtI
 ifStmt = do
   singleMatching [ Token.IF ]
   consume [ Token.LEFT_PAREN ] "Expect '(' after 'if'."
@@ -144,18 +144,18 @@ ifStmt = do
   elseStmt <- do _ <- singleMatching [ Token.ELSE ]
                  Just <$> statement
               <|> pure Nothing
-  pure . IfStmt $ If condition thenStmt elseStmt
+  pure . IfStmtI $ If condition thenStmt elseStmt
 
-whileStmt :: MonadParsec ParserError TokenStream m => m Stmt
+whileStmt :: MonadParsec ParserError TokenStream m => m StmtI
 whileStmt = do
   singleMatching [ Token.WHILE ]
   consume [ Token.LEFT_PAREN ] "Expect '(' after 'while'."
   condition <- expression
   consume [ Token.RIGHT_PAREN ] "Expect ')' after while condition."
   body <- statement
-  pure . WhileStmt $ While condition body
+  pure . WhileStmtI $ While condition body
 
-forStmt :: MonadParsec ParserError TokenStream m => m Stmt
+forStmt :: MonadParsec ParserError TokenStream m => m StmtI
 forStmt = do
     singleMatching [ Token.FOR ]
     consume [ Token.LEFT_PAREN ] "Expect '(' after 'for'."
@@ -178,10 +178,10 @@ forStmt = do
                      ]
 
 
-blockStmt :: MonadParsec ParserError TokenStream m => m Stmt
-blockStmt = BlockStmt <$> (singleMatching [ Token.LEFT_BRACE ] *> finishBlock)
+blockStmt :: MonadParsec ParserError TokenStream m => m StmtI
+blockStmt = BlockStmtI <$> (singleMatching [ Token.LEFT_BRACE ] *> finishBlock)
 
-finishBlock :: MonadParsec ParserError TokenStream m => m Block
+finishBlock :: MonadParsec ParserError TokenStream m => m (Block Identity)
 finishBlock = do
     stmts <- blockBody Seq.empty
     consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
@@ -193,25 +193,25 @@ finishBlock = do
       <|> do stmt <- declaration
              blockBody (stmts Seq.:|> stmt)
 
-returnStmt :: MonadParsec ParserError TokenStream m => m Stmt
+returnStmt :: MonadParsec ParserError TokenStream m => m StmtI
 returnStmt = do
   returnTk <- singleMatching [ Token.RETURN ]
   expr <- (NilE <$ singleMatching [Token.SEMICOLON])
           <|> (do expr <- expression
                   consume [Token.SEMICOLON] "Expect ';' after expression."
                   pure expr)
-  pure . ReturnStmt $ Return returnTk expr
+  pure . ReturnStmtI $ Return returnTk expr
 
-expressionStmt :: MonadParsec ParserError TokenStream m => m Stmt
+expressionStmt :: MonadParsec ParserError TokenStream m => m StmtI
 expressionStmt = do
   expr <- expression
   consume [ Token.SEMICOLON ] "Expect ';' after expression."
-  pure $ ExprStmt expr
+  pure $ ExprStmtI expr
 
-expression :: MonadParsec ParserError TokenStream m => m Expr
+expression :: MonadParsec ParserError TokenStream m => m ExprI
 expression = comma
 
-comma :: MonadParsec ParserError TokenStream m => m Expr
+comma :: MonadParsec ParserError TokenStream m => m ExprI
 comma =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression assignment opTypes ]
@@ -219,7 +219,7 @@ comma =
   where
     opTypes = [ Token.COMMA ]
 
-assignment :: MonadParsec ParserError TokenStream m => m Expr
+assignment :: MonadParsec ParserError TokenStream m => m ExprI
 assignment = do
     left <- conditional
     assignTo left <|> pure left
@@ -233,7 +233,7 @@ assignment = do
           registerFancyFailure (makeError (Just equals) "Invalid assignment target.")
           pure left
 
-conditional :: MonadParsec ParserError TokenStream m => m Expr
+conditional :: MonadParsec ParserError TokenStream m => m ExprI
 conditional = do
     left <- orExpr
     conditionalBody left <|> pure left
@@ -245,7 +245,7 @@ conditional = do
                <*> consume [ Token.COLON ] "Expect ':' after '?' expression."
                <*> conditional
 
-orExpr :: MonadParsec ParserError TokenStream m => m Expr
+orExpr :: MonadParsec ParserError TokenStream m => m ExprI
 orExpr =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression andExpr opTypes ]
@@ -253,7 +253,7 @@ orExpr =
   where
     opTypes = [ Token.OR ]
 
-andExpr :: MonadParsec ParserError TokenStream m => m Expr
+andExpr :: MonadParsec ParserError TokenStream m => m ExprI
 andExpr =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression equality opTypes ]
@@ -261,7 +261,7 @@ andExpr =
   where
     opTypes = [ Token.AND ]
 
-equality :: MonadParsec ParserError TokenStream m => m Expr
+equality :: MonadParsec ParserError TokenStream m => m ExprI
 equality =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression comparison opTypes ]
@@ -271,7 +271,7 @@ equality =
               , Token.BANG_EQUAL
               ]
 
-comparison :: MonadParsec ParserError TokenStream m => m Expr
+comparison :: MonadParsec ParserError TokenStream m => m ExprI
 comparison =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression addition opTypes ]
@@ -283,7 +283,7 @@ comparison =
               , Token.LESS_EQUAL
               ]
 
-addition :: MonadParsec ParserError TokenStream m => m Expr
+addition :: MonadParsec ParserError TokenStream m => m ExprI
 addition =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression multiplication [ Token.PLUS ] ]
@@ -291,7 +291,7 @@ addition =
                                                          , Token.PLUS
                                                          ]
 
-multiplication :: MonadParsec ParserError TokenStream m => m Expr
+multiplication :: MonadParsec ParserError TokenStream m => m ExprI
 multiplication =
     checkForKnownErrorProductions
       [ binaryOperatorAtBeginningOfExpression unary opTypes ]
@@ -301,12 +301,12 @@ multiplication =
               , Token.SLASH
               ]
 
-unary :: MonadParsec ParserError TokenStream m => m Expr
+unary :: MonadParsec ParserError TokenStream m => m ExprI
 unary = (UnaryE <$> singleMatching [Token.MINUS, Token.BANG]
                 <*> unary)
     <|> call
 
-call :: MonadParsec ParserError TokenStream m => m Expr
+call :: MonadParsec ParserError TokenStream m => m ExprI
 call = primary >>= sequenceOfCalls
   where
     sequenceOfCalls callee =
@@ -329,7 +329,7 @@ call = primary >>= sequenceOfCalls
           argumentsList args)
         <|> pure args
 
-primary :: MonadParsec ParserError TokenStream m => m Expr
+primary :: MonadParsec ParserError TokenStream m => m ExprI
 primary =
   asum [ singleMatching [ Token.FALSE ]       $> BoolE False
        , singleMatching [ Token.TRUE ]        $> BoolE True
@@ -352,17 +352,17 @@ primary =
             fancyFailure (makeError tk "Expect expression.")
        ]
 
-anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m Expr
+anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
 anonymousFunction marker = do
   (_, function) <- function "function" marker (pure ())
-  pure $ FunctionExpr function
+  pure $ FunctionExprI function
 
 leftAssociativeBinaryOp :: Foldable t
                         => MonadParsec ParserError TokenStream m
-                        => (Expr -> Token -> Expr -> Expr)
-                        -> m Expr
+                        => (ExprI -> Token -> ExprI -> ExprI)
+                        -> m ExprI
                         -> t TokenType
-                        -> m Expr
+                        -> m ExprI
 leftAssociativeBinaryOp makeExpr termParser opTypes = do
   left <- termParser
   following <- many ((,) <$> singleMatching opTypes

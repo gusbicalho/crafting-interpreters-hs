@@ -80,7 +80,7 @@ runFromSourceFile path =
 
 readSource :: Algebra sig m
            => T.Text
-           -> m (Either (Set ScanError, Set ParserError) AST.Program)
+           -> m (Either (Set ScanError, Set ParserError) (AST.Program AST.Identity))
 readSource source = do
   (scanErrors, tokens) <- Util.runWriterToPair @(Set ScanError) $ Scanner.scanTokens source
   (parserErrors, program) <- Util.runWriterToPair @(Set ParserError) $ Parser.parse tokens

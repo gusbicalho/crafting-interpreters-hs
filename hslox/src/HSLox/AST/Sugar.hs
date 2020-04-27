@@ -5,20 +5,24 @@ import qualified Data.Sequence as Seq
 import HSLox.AST
 import HSLox.Token (Token)
 
-buildFor :: Maybe Stmt -> Maybe Expr -> Maybe Expr -> Stmt -> Stmt
+buildFor :: Maybe StmtI
+         -> Maybe ExprI
+         -> Maybe ExprI
+         -> StmtI
+         -> StmtI
 buildFor init condition increment body =
     case init of
       Nothing -> whileLoop
       Just init -> blockFromList [init, whileLoop]
   where
-    blockFromList = BlockStmt . Block . Seq.fromList
-    whileLoop = WhileStmt $ While (desugaredCondition condition)
-                                  (loopBody increment body)
+    blockFromList = BlockStmtI . Block . Seq.fromList
+    whileLoop = WhileStmtI $ While (desugaredCondition condition)
+                                   (loopBody increment body)
     desugaredCondition = fromMaybe (BoolE True)
     loopBody increment body =
       case increment of
         Nothing -> body
-        Just increment -> blockFromList [body, ExprStmt increment]
+        Just increment -> blockFromList [body, ExprStmtI increment]
 
-functionDeclaration :: Token -> Function -> Stmt
-functionDeclaration varName function = VarDeclarationStmt $ VarDeclaration varName (FunctionExpr function)
+functionDeclaration :: Token -> Function Identity -> StmtI
+functionDeclaration varName function = VarDeclarationStmtI $ VarDeclaration varName (FunctionExprI function)
