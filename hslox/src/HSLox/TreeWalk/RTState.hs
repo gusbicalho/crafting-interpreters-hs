@@ -1,8 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.RTState
-  ( RTState (..)
-  , module HSLox.TreeWalk.RTState
+  ( RTState, newState
+  , RTFrame, localFrame
+  , runInChildEnv, runInChildEnvOf
+  , defineM, assignM, getBoundValueM
   ) where
 
 import Control.Applicative
@@ -21,6 +23,9 @@ newEnv = RTEnv Map.empty
 
 newState :: RTState cell
 newState = RTState newEnv Nothing
+
+localFrame :: RTState cell -> Maybe (RTFrame cell)
+localFrame = rtStateLocalFrame
 
 addAsChildFrame :: RTEnv cell -> RTState cell -> RTState cell
 addAsChildFrame env state =
@@ -48,9 +53,6 @@ currentEnv :: RTState cell -> RTEnv cell
 currentEnv state = case rtStateLocalFrame state of
   Just frame -> rtFrameEnv frame
   Nothing -> rtStateGlobalEnv state
-
-globalEnv :: RTState cell -> RTEnv cell
-globalEnv = rtStateGlobalEnv
 
 bindNameToFreshCell :: Has (Cells cell) sig m
                     => Has (State (RTState cell)) sig m
@@ -175,11 +177,3 @@ runInChildEnvOf frame action = do
   where
     finally = finallyOnErrorOrReturn @cell
     restore frame = modify $ \state -> state { rtStateLocalFrame = frame }
-
-envStack :: Has (State (RTState cell)) sig m => m [RTEnv cell]
-envStack = do
-    state <- get
-    pure $ rtStateGlobalEnv state : go [] (rtStateLocalFrame state)
-  where
-    go acc Nothing = acc
-    go acc (Just frame) = go (rtFrameEnv frame : acc) (rtFrameEnclosing frame)

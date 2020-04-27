@@ -56,9 +56,9 @@ data RTValue cell
   | ValNativeFn LoxNativeFn
   deriving (Show)
 
-data LoxFn  cell = LoxFn { loxFnAST :: AST.Function
-                         , loxClosedEnv :: Maybe (RTFrame cell)
-                         }
+data LoxFn cell = LoxFn { loxFnAST :: AST.Function
+                        , loxClosedEnv :: Maybe (RTFrame cell)
+                        }
   deriving (Show)
 
 pattern NativeDef :: Int

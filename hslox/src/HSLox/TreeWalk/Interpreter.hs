@@ -210,7 +210,7 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Grouping m where
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Function m where
   interpretExpr fn = do
-    frame <- gets (RTState.rtStateLocalFrame @cell)
+    frame <- gets (RTState.localFrame @cell)
     pure . ValFn $ LoxFn fn frame
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
