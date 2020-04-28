@@ -117,7 +117,6 @@ runRepl = do
       Left readErrors -> do
         reportReadErrors readErrors
       Right exprs -> do
-        sendM @IO $ print exprs
         rtState <- get
         (rtState, rtError) <- Interpreter.interpretNext @CellsOnIO.Cell rtState exprs
         put rtState

@@ -1,5 +1,6 @@
 module HSLox.AST.AsAST where
 
+import Data.Kind
 import HSLox.AST
 
 class AsAST a f | a -> f where
@@ -33,6 +34,10 @@ class AsAST a f | a -> f where
   toCall _ = Nothing
   toFunction :: a -> Maybe (Function f)
   toFunction _ = Nothing
+  toVariable :: a -> Maybe Variable
+  toVariable _ = Nothing
+  toLiteral :: a -> Maybe Literal
+  toLiteral _ = Nothing
 
 instance AsAST (Stmt f) f where
   toStmt = Just
@@ -64,3 +69,10 @@ instance AsAST (Call f) f where
   toCall = Just
 instance AsAST (Function f) f where
   toFunction = Just
+
+newtype LeafNode a (f :: Type -> Type) = LeafNode { unLeafNode :: a }
+
+instance AsAST (LeafNode Variable f) f where
+  toVariable = Just . unLeafNode
+instance AsAST (LeafNode Literal f) f where
+  toLiteral = Just . unLeafNode
