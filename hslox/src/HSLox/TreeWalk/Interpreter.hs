@@ -90,6 +90,7 @@ class StmtInterpreter (cell :: Type -> Type)
   interpretStmt :: e -> m ()
 
 instance (StmtInterpreter cell e m, AST.Meta.AsIdentity f) => StmtInterpreter cell (f e) m where
+  {-# INLINE interpretStmt #-}
   interpretStmt = interpretStmt @cell
                 . AST.Meta.runIdentity
                 . AST.Meta.asIdentity
@@ -107,6 +108,7 @@ instance ( Applicative m
          , StmtInterpreter cell (f (AST.While f)) m
          , StmtInterpreter cell (f (AST.Return f)) m
          ) => StmtInterpreter cell (AST.Stmt f) m where
+  {-# INLINE interpretStmt #-}
   interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
   interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
   interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
@@ -159,6 +161,7 @@ class ExprInterpreter (cell :: Type -> Type)
   interpretExpr :: e -> m (RTValue cell)
 
 instance (ExprInterpreter cell e m, AST.Meta.AsIdentity f) => ExprInterpreter cell (f e) m where
+  {-# INLINE interpretExpr #-}
   interpretExpr = interpretExpr @cell
                 . AST.Meta.runIdentity
                 . AST.Meta.asIdentity
@@ -166,6 +169,7 @@ instance (ExprInterpreter cell e m, AST.Meta.AsIdentity f) => ExprInterpreter ce
 instance ( Runtime cell sig m
          , AST.Meta.AsIdentity f
          ) => ExprInterpreter cell (AST.Expr f) m where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.LogicalExpr t) = interpretExpr t
   interpretExpr (AST.BinaryExpr t) = interpretExpr t
