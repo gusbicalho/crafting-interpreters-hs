@@ -5,9 +5,6 @@
 module HSLox.TreeWalk.Interpreter
   ( interpret
   , interpretNext
-  , RTValue (..)
-  , RTError (..)
-  , RTState (..)
   , baseEnv
   ) where
 
@@ -193,15 +190,22 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
-  interpretExpr (AST.VariableExpr t) = do
-    let (AST.Variable tk) = AST.Meta.content t
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta t
+  interpretExpr (AST.VariableExpr t) = interpretExpr t
+  interpretExpr (AST.AssignmentExpr t) = interpretExpr t
+
+instance {-# OVERLAPPING #-} Runtime cell sig m
+         => ExprInterpreter cell (RuntimeAST AST.Variable) m where
+  interpretExpr variable = do
+    let (AST.Variable tk) = AST.Meta.content variable
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta variable
     RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
 
-  interpretExpr (AST.AssignmentExpr t) = do
-    let (AST.Assignment tk expr) = AST.Meta.content t
+instance {-# OVERLAPPING #-} Runtime cell sig m
+         => ExprInterpreter cell (RuntimeAST (AST.Assignment RuntimeAST)) m where
+  interpretExpr assignment = do
+    let (AST.Assignment tk expr) = AST.Meta.content assignment
     val <- interpretExpr expr
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta t
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta assignment
     let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
     RTState.assignAtM tk distance val
     pure val
