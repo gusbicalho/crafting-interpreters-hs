@@ -22,6 +22,7 @@ import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
 import qualified HSLox.Scanner.Megaparsec as Scanner
 import HSLox.Scanner.ScanError (ScanError)
+import HSLox.StaticAnalysis.Analyzer (analyze, AnalysisError)
 import qualified HSLox.Util as Util
 import Data.Foldable
 import Data.Function
@@ -80,12 +81,15 @@ runFromSourceFile path =
 
 readSource :: Algebra sig m
            => T.Text
-           -> m (Either (Set ScanError, Set ParserError) AST.Program)
+           -> m (Either (Set ScanError, Set ParserError, Set AnalysisError) (AST.Program _))
 readSource source = do
   (scanErrors, tokens) <- Util.runWriterToPair @(Set ScanError) $ Scanner.scanTokens source
   (parserErrors, program) <- Util.runWriterToPair @(Set ParserError) $ Parser.parse tokens
-  if (scanErrors /= Set.empty || parserErrors /= Set.empty)
-  then pure $ Left (scanErrors, parserErrors)
+  (resolverErrors, program) <- Util.runWriterToPair @(Set AnalysisError) $ analyze program
+  if (scanErrors /= Set.empty
+      || parserErrors /= Set.empty
+      || resolverErrors /= Set.empty)
+  then pure $ Left (scanErrors, parserErrors, resolverErrors)
   else pure $ Right program
 
 runSource :: _ => T.Text -> m ()
@@ -120,10 +124,11 @@ runRepl = do
           sendM @IO $ putStrLn (show error)
 {-# INLINE runRepl #-}
 
-reportReadErrors :: Has Trace sig m => (Set ScanError, Set ParserError) -> m ()
-reportReadErrors (scanErrors, parserErrors) = do
+reportReadErrors :: Has Trace sig m => (Set ScanError, Set ParserError, Set AnalysisError) -> m ()
+reportReadErrors (scanErrors, parserErrors, resolverErrors) = do
   reportErrors $ (toErrorReport <$> foldMap Seq.singleton scanErrors)
               <> (toErrorReport <$> foldMap Seq.singleton parserErrors)
+              <> (toErrorReport <$> foldMap Seq.singleton resolverErrors)
 
 reportErrors :: _ => f ErrorReport -> m ()
 reportErrors errors = for_ errors (trace . show)

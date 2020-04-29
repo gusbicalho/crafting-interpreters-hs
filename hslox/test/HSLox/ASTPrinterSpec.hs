@@ -18,7 +18,7 @@ spec = do
 printedBookExpr :: T.Text
 printedBookExpr = "(* (- 123.0) (group 45.67))"
 
-bookExpr :: Expr
+bookExpr :: ExprI
 bookExpr =
   BinaryE
     (UnaryE
@@ -31,7 +31,7 @@ bookExpr =
 printedBiggerExpr :: T.Text
 printedBiggerExpr = "(+ (group (- 3.0 (- 1.0))) \"asd\")"
 
-biggerExpr :: Expr
+biggerExpr :: ExprI
 biggerExpr =
   BinaryE
     (GroupingE

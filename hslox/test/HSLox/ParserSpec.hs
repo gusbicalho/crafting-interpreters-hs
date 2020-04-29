@@ -147,17 +147,17 @@ spec = do
       testParserImplementations
         (scan "fun printTwo(x, y) { print(x); print(y); } printTwo(3,4);")
         ( Set.empty
-        , "[ (var printTwo (fun [x y] { (print x) (print y) })) (printTwo 3.0 4.0) ]")
+        , "[ (fun printTwo [x y] { (print x) (print y) }) (printTwo 3.0 4.0) ]")
     describe "with return values" $ do
       testParserImplementations
         (scan "fun square(x) { return x*x; } print(square(3));")
         ( Set.empty
-        , "[ (var square (fun [x] { (return (* x x)) })) (print (square 3.0)) ]")
+        , "[ (fun square [x] { (return (* x x)) }) (print (square 3.0)) ]")
   describe "programs with anonymous fn expressions" $ do
     testParserImplementations
       (scan "fun twice(f) { return fun (a) { f(a); f(a); }; } twice(print)(3);")
       ( Set.empty
-      , "[ (var twice (fun [f] { (return (fun [a] { (f a) (f a) })) })) ((twice print) 3.0) ]")
+      , "[ (fun twice [f] { (return (fun [a] { (f a) (f a) })) }) ((twice print) 3.0) ]")
   describe "using return as assignment target" $ do
     testParserImplementations
       (scan "return true = nil;")
@@ -223,7 +223,6 @@ parserImplementationsAreEquivalent
         Token.IF            -> pure ("if", Nothing)
         Token.NIL           -> pure ("nil", Nothing)
         Token.OR            -> pure ("or", Nothing)
-        -- Token.PRINT         -> pure ("print", Nothing)
         Token.RETURN        -> pure ("return", Nothing)
         Token.SUPER         -> pure ("super", Nothing)
         Token.THIS          -> pure ("this", Nothing)

@@ -1,8 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.RTState
-  ( RTState (..)
-  , module HSLox.TreeWalk.RTState
+  ( RTState, newState
+  , RTFrame, localFrame
+  , runInChildEnv, runInChildEnvOf
+  , defineM, assignM, assignAtM, getBoundValueM, getBoundValueAtM
   ) where
 
 import Control.Applicative
@@ -21,6 +23,9 @@ newEnv = RTEnv Map.empty
 
 newState :: RTState cell
 newState = RTState newEnv Nothing
+
+localFrame :: RTState cell -> Maybe (RTFrame cell)
+localFrame = rtStateLocalFrame
 
 addAsChildFrame :: RTEnv cell -> RTState cell -> RTState cell
 addAsChildFrame env state =
@@ -48,9 +53,6 @@ currentEnv :: RTState cell -> RTEnv cell
 currentEnv state = case rtStateLocalFrame state of
   Just frame -> rtFrameEnv frame
   Nothing -> rtStateGlobalEnv state
-
-globalEnv :: RTState cell -> RTEnv cell
-globalEnv = rtStateGlobalEnv
 
 bindNameToFreshCell :: Has (Cells cell) sig m
                     => Has (State (RTState cell)) sig m
@@ -111,6 +113,62 @@ getBoundValueM tk = do
   case getBoundCell name state of
     Just cell -> readRTCell cell
     Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
+
+getGlobalCell :: BindingName
+              -> RTState cell
+              -> Maybe (RTCell cell)
+getGlobalCell name state =
+  Map.lookup name . rtEnvBindings . rtStateGlobalEnv $ state
+
+getLocalCell :: BindingName
+             -> Int
+             -> Maybe (RTFrame cell)
+             -> Maybe (RTCell cell)
+getLocalCell _ _ Nothing = Nothing
+getLocalCell name 0 (Just frame) =
+  Map.lookup name . rtEnvBindings . rtFrameEnv $ frame
+getLocalCell name distance (Just frame) =
+  getLocalCell name (distance - 1) (rtFrameEnclosing frame)
+
+getBoundValueAtM :: forall cell sig m
+                  . Has (Cells cell) sig m
+                 => Has (State (RTState cell)) sig m
+                 => Has (Throw RTError) sig m
+                 => Token -> Maybe Int -> m (RTValue cell)
+getBoundValueAtM tk Nothing = do
+  let name = tokenLexeme tk
+  cell <- gets @(RTState cell) $ getGlobalCell name
+  case cell of
+    Just cell -> readRTCell cell
+    Nothing -> RTError.throwRT tk $ "Undefined variable '" <> name <> "'."
+getBoundValueAtM tk (Just distance) = do
+  let name = tokenLexeme tk
+  cell <- gets @(RTState cell) $ getLocalCell name distance . rtStateLocalFrame
+  case cell of
+    Just cell -> readRTCell cell
+    Nothing -> RTError.throwRT tk $ "Undefined local '" <> name <> "'."
+
+assignAtM :: forall cell sig m
+           . Has (Cells cell) sig m
+          => Has (State (RTState cell)) sig m
+          => Has (Throw RTError) sig m
+          => Token -> Maybe Int -> RTValue cell -> m ()
+assignAtM tk Nothing val = do
+  let name = tokenLexeme tk
+  cell <- gets @(RTState cell) $ getGlobalCell name
+  case cell of
+    Just cell -> assignRTCell cell val
+    Nothing -> RTError.throwRT tk $ "Undefined variable '"
+                                 <> name
+                                 <> "'."
+assignAtM tk (Just distance) val = do
+  let name = tokenLexeme tk
+  cell <- gets @(RTState cell) $ getLocalCell name distance . rtStateLocalFrame
+  case cell of
+    Just cell -> assignRTCell cell val
+    Nothing -> RTError.throwRT tk $ "Undefined local '"
+                                 <> name
+                                 <> "'."
 
 atParentEnv :: RTState cell -> Maybe (RTEnv cell, RTState cell)
 atParentEnv state = case rtStateLocalFrame state of
@@ -175,11 +233,3 @@ runInChildEnvOf frame action = do
   where
     finally = finallyOnErrorOrReturn @cell
     restore frame = modify $ \state -> state { rtStateLocalFrame = frame }
-
-envStack :: Has (State (RTState cell)) sig m => m [RTEnv cell]
-envStack = do
-    state <- get
-    pure $ rtStateGlobalEnv state : go [] (rtStateLocalFrame state)
-  where
-    go acc Nothing = acc
-    go acc (Just frame) = go (rtFrameEnv frame : acc) (rtFrameEnclosing frame)

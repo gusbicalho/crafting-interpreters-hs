@@ -1,5 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
+{-# LANGUAGE StrictData #-}
 module HSLox.TreeWalk.Runtime
   ( Trace, trace
   , module HSLox.TreeWalk.Runtime
@@ -12,8 +13,11 @@ import Data.Map.Strict (Map)
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
+import qualified HSLox.AST.Meta as AST.Meta
+import qualified HSLox.AST.WalkAST as WalkAST
 import HSLox.Cells.Effect
 import HSLox.NativeFns.Effect
+import qualified HSLox.StaticAnalysis.Analyzer as Analyzer
 import HSLox.Token (Token (..))
 
 type Runtime cell sig m = ( Has NativeFns sig m
@@ -54,12 +58,33 @@ data RTValue cell
   | ValNil
   | ValFn (LoxFn cell)
   | ValNativeFn LoxNativeFn
-  deriving (Show)
 
-data LoxFn  cell = LoxFn { loxFnAST :: AST.Function
-                         , loxClosedEnv :: Maybe (RTFrame cell)
-                         }
-  deriving (Show)
+newtype RuntimeAST a = RuntimeAST (AST.Meta.WithMeta Analyzer.ResolverMeta
+                                    AST.Meta.Identity
+                                    a)
+  deriving (Show, Functor, Foldable, Traversable)
+instance AST.Meta.AsIdentity RuntimeAST where
+  asIdentity (RuntimeAST fa) = AST.Meta.asIdentity fa
+instance AST.Meta.HasMeta Analyzer.ResolverMeta RuntimeAST where
+  meta (RuntimeAST fa) = AST.Meta.meta fa
+
+asRuntimeAST :: Monad m
+             => Traversable f
+             => AST.Meta.AsIdentity f
+             => AST.Meta.HasMeta Analyzer.ResolverMeta f
+             => WalkAST.WalkAST astNode
+             => astNode f -> m (astNode RuntimeAST)
+asRuntimeAST ast = WalkAST.walkAST preWalk pure ast
+  where
+    preWalk fa = do
+      pure $ RuntimeAST
+           . AST.Meta.withMeta (AST.Meta.meta @Analyzer.ResolverMeta fa)
+           . AST.Meta.asIdentity
+           $ fa
+
+data LoxFn cell = LoxFn { loxFnAST :: AST.Function RuntimeAST
+                        , loxClosedEnv :: Maybe (RTFrame cell)
+                        }
 
 pattern NativeDef :: Int
                   -> (forall cell sig m. NativeFnImplFn cell sig m)

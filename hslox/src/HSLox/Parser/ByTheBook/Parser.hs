@@ -22,11 +22,11 @@ import qualified HSLox.Util as Util
 
 parse :: Has (Writer (Set ParserError)) sig m
       => (Seq Token)
-      -> m Program
+      -> m (Program Identity)
 parse tokens
   = evalState (initialParserState tokens)
   . fmap Program
-  . execWriter @(Seq Stmt)
+  . execWriter @(Seq StmtI)
   . Util.untilEmpty
   $ do
     guard . not =<< isAtEnd
@@ -43,9 +43,9 @@ type LoxParser t sig m = ( Has (Writer (Set ParserError)) sig m
                          , Has (State ParserState) sig m )
                          => m t
 
-type ExprParser sig m = LoxParser Expr sig m
+type ExprParser sig m = LoxParser ExprI sig m
 
-type StmtParser sig m = LoxParser Stmt sig m
+type StmtParser sig m = LoxParser StmtI sig m
 
 synchronize :: Has (State ParserState) sig m => m ()
 synchronize = Util.untilEmpty $ do
@@ -74,17 +74,17 @@ varDeclaration = do
     init <- (match [Token.EQUAL] *> expression)
             `Util.recoverFromEmptyWith` pure NilE
     consume [Token.SEMICOLON] "Expect ';' after variable declaration."
-    pure . VarDeclarationStmt $ VarDeclaration identifier init
+    pure . VarDeclarationStmtI $ VarDeclaration identifier init
 
 funDeclaration :: Has Empty sig m => StmtParser sig m
 funDeclaration = do
     marker <- match [Token.FUN]
     (name, function) <- function "function" marker parseFunName
-    pure $ functionDeclaration name function
+    pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
     parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
 
-function :: T.Text -> Token -> LoxParser name sig m -> LoxParser (name, Function) sig m
+function :: T.Text -> Token -> LoxParser name sig m -> LoxParser (name, Function Identity) sig m
 function kind marker parseName = do
     name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
@@ -121,9 +121,9 @@ statement = do
     pure stmt
 
 blockStmt :: Has Empty sig m => StmtParser sig m
-blockStmt = BlockStmt <$> (match [ Token.LEFT_BRACE ] *> finishBlock)
+blockStmt = BlockStmtI <$> (match [ Token.LEFT_BRACE ] *> finishBlock)
 
-finishBlock :: LoxParser Block sig m
+finishBlock :: LoxParser (Block Identity) sig m
 finishBlock = do
     stmts <- blockBody Seq.empty
     consume [ Token.RIGHT_BRACE ] "Expect '}' after block."
@@ -147,7 +147,7 @@ ifStmt = do
   elseStmt <- Util.runEmptyToMaybe $ do
                 _ <- match [ Token.ELSE ]
                 statement
-  pure . IfStmt $ If condition thenStmt elseStmt
+  pure . IfStmtI $ If condition thenStmt elseStmt
 
 whileStmt :: Has Empty sig m => StmtParser sig m
 whileStmt = do
@@ -156,7 +156,7 @@ whileStmt = do
   condition <- expression
   consume [ Token.RIGHT_PAREN ] "Expect ')' after while condition."
   body <- statement
-  pure . WhileStmt $ While condition body
+  pure . WhileStmtI $ While condition body
 
 forStmt :: Has Empty sig m => StmtParser sig m
 forStmt = do
@@ -182,13 +182,13 @@ returnStmt = do
   expr <- (NilE <$ match [Token.SEMICOLON])
           `Util.recoverFromEmptyWith`
           (expression <* consume [Token.SEMICOLON] "Expect ';' after expression.")
-  pure . ReturnStmt $ Return returnTk expr
+  pure . ReturnStmtI $ Return returnTk expr
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do
   expr <- expression
   consume [Token.SEMICOLON] "Expect ';' after expression."
-  pure $ ExprStmt expr
+  pure $ ExprStmtI expr
 
 expression :: ExprParser sig m
 expression = comma
@@ -352,10 +352,10 @@ primary = do
         pure $ GroupingE expr
       _ -> throwParserError "Expect expression."
 
-anonymousFunction :: Token -> LoxParser Expr sig m
+anonymousFunction :: Token -> LoxParser ExprI sig m
 anonymousFunction marker = do
   (_, function) <- function "function" marker (pure ())
-  pure $ FunctionExpr function
+  pure $ FunctionExprI function
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m
@@ -372,7 +372,7 @@ throwParserError :: Has (ErrorEff.Throw ParserError) sig m
 throwParserError msg = ErrorEff.throwError =<< makeParserError msg
 
 leftAssociativeBinaryOp :: Foldable t
-                        => (Expr -> Token -> Expr -> Expr)
+                        => (ExprI -> Token -> ExprI -> ExprI)
                         -> (forall sig m. ExprParser sig m)
                         -> t TokenType
                         -> ExprParser sig m
