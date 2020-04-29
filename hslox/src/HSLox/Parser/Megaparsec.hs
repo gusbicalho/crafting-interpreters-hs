@@ -372,7 +372,7 @@ leftAssociativeBinaryOp makeExpr termParser opTypes = do
 singleMatching :: Foldable t
                => MonadParsec ParserError TokenStream m
                => t TokenType -> m Token
-singleMatching tkTypes = try $ satisfy (\tk -> elem (tokenType tk) tkTypes)
+singleMatching tkTypes = try $ satisfy (\tk -> tokenType tk `elem` tkTypes)
 
 check :: (Foldable t, MonadParsec ParserError TokenStream m) => t TokenType -> m Bool
 check tkTypes = lookAhead $ (True <$ singleMatching tkTypes)

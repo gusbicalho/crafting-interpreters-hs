@@ -80,7 +80,7 @@ instance FFunctor FunDeclaration where
   {-# INLINE ffmap #-}
   ffmap nt (FunDeclaration tk e) = FunDeclaration tk (ffmap nt e)
 
-newtype Block f = Block { blockBody :: (Seq (Stmt f)) }
+newtype Block f = Block { blockBody :: Seq (Stmt f) }
 deriving instance (Show (Stmt f)) => Show (Block f)
 instance FFunctor Block where
   {-# INLINE ffmap #-}
@@ -152,7 +152,7 @@ pattern AssignmentE tk expr = AssignmentExpr (Identity (Assignment tk expr))
 
 pattern CallExprI :: Call Identity -> Expr Identity
 pattern CallExprI e = CallExpr (Identity e)
-pattern CallE :: ExprI -> Token -> Seq (ExprI) -> ExprI
+pattern CallE :: ExprI -> Token -> Seq ExprI -> ExprI
 pattern CallE callee paren args = CallExpr (Identity (Call callee paren args))
 
 pattern LiteralExprI :: Literal -> Expr Identity

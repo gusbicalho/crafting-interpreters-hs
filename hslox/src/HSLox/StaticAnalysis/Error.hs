@@ -12,8 +12,8 @@ data AnalysisError = AnalysisError Token T.Text
 
 instance ToErrorReport AnalysisError where
   toErrorReport (AnalysisError token msg) =
-    ErrorReport { errorReportLine = (tokenLine token)
-                , errorReportWhere = (tokenLexeme token)
+    ErrorReport { errorReportLine = tokenLine token
+                , errorReportWhere = tokenLexeme token
                 , errorReportMessage = msg
                 }
 

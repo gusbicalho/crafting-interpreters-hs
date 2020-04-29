@@ -21,11 +21,10 @@ analyze :: AsIdentity f
         => Has (Writer (Set AnalysisError)) sig m
         => AST.Program f
         -> m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
-analyze prog
+analyze
   = State.evalState ResolveLocals.emptyState
   . State.evalState CheckBadReturns.emptyState
   . walkAST (ResolveLocals.preResolvingLocals >=>
              CheckBadReturns.preCheckForBadReturns)
             (CheckBadReturns.postCheckForBadReturns >=>
              ResolveLocals.postResolvingLocals)
-  $ prog
