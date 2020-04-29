@@ -9,16 +9,10 @@ module HSLox.AST.Meta
 
 import Data.Functor.Compose
 import Data.Functor.Identity
-import Data.Kind
-
--- HKD
-type f ~> g = forall a. f a -> g a
-class FFunctor (t :: (Type -> Type) -> Type) where
-  ffmap :: (Functor f, Functor g) => (f ~> g) -> t f -> t g
 
 -- AST Meta stuff
 class Functor f => AsIdentity f where
-  asIdentity :: f ~> Identity
+  asIdentity :: f a -> Identity a
 
 content :: AsIdentity f => f c -> c
 content = runIdentity . asIdentity
