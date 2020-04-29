@@ -25,6 +25,7 @@ import qualified HSLox.AST as AST
 import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.Cells.Effect as Cells
 import qualified HSLox.NativeFns.Effect as NativeFns
+import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.TreeWalk.RTState as RTState
@@ -48,7 +49,9 @@ baseEnv = execState RTState.newState $ do
 interpret :: forall cell sig m f
            . Has (Cells.Cells cell) sig m
           => Has NativeFns.NativeFns sig m
+          => Traversable f
           => AST.Meta.AsIdentity f
+          => AST.Meta.HasMeta ResolveLocals.ResolverMeta f
           => AST.Program f -> m (Maybe RTError)
 interpret prog = do
   env <- baseEnv @cell
@@ -59,11 +62,14 @@ interpret prog = do
 interpretNext :: forall cell sig m f
                . Has (Cells.Cells cell) sig m
               => Has NativeFns.NativeFns sig m
+              => Traversable f
               => AST.Meta.AsIdentity f
+              => AST.Meta.HasMeta ResolveLocals.ResolverMeta f
               => RTState cell
               -> AST.Program f
               -> m (RTState cell, Maybe RTError)
-interpretNext env prog = prog & interpretStmt @cell
+interpretNext env prog = prog & asRuntimeAST
+                              & (interpretStmt @cell =<<)
                               & RTReturn.runReturn @cell
                               & Util.runErrorToEither @RTError
                               & fmap (Util.rightToMaybe . Util.swapEither)
@@ -75,7 +81,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn (LoxFn (AST.Meta.astContent -> AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -103,6 +109,7 @@ instance ( Applicative m
 instance ( Applicative m
          , ExprInterpreter cell (f (AST.Expr f)) m
          , StmtInterpreter cell (f (AST.VarDeclaration f)) m
+         , StmtInterpreter cell (f (AST.FunDeclaration f)) m
          , StmtInterpreter cell (f (AST.Block f)) m
          , StmtInterpreter cell (f (AST.If f)) m
          , StmtInterpreter cell (f (AST.While f)) m
@@ -111,6 +118,7 @@ instance ( Applicative m
   {-# INLINE interpretStmt #-}
   interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
   interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
+  interpretStmt (AST.FunDeclarationStmt decl) = interpretStmt @cell decl
   interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt @cell ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
@@ -122,6 +130,15 @@ instance ( Runtime cell sig m
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr @cell expr
     RTState.defineM (tokenLexeme tk) val
+
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Function f) m
+         ) => StmtInterpreter cell (AST.FunDeclaration f) m where
+  interpretStmt (AST.FunDeclaration tk expr) = do
+    let name = tokenLexeme tk
+    RTState.defineM @cell name ValNil
+    val <- interpretExpr @cell expr
+    RTState.defineM @cell name val
 
 instance ( Runtime cell sig m
          , StmtInterpreter cell (AST.Stmt f) m
@@ -166,9 +183,7 @@ instance (ExprInterpreter cell e m, AST.Meta.AsIdentity f) => ExprInterpreter ce
                 . AST.Meta.runIdentity
                 . AST.Meta.asIdentity
 
-instance ( Runtime cell sig m
-         , AST.Meta.AsIdentity f
-         ) => ExprInterpreter cell (AST.Expr f) m where
+instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m where
   {-# INLINE interpretExpr #-}
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.LogicalExpr t) = interpretExpr t
@@ -176,10 +191,20 @@ instance ( Runtime cell sig m
   interpretExpr (AST.TernaryExpr t) = interpretExpr t
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
-  interpretExpr (AST.VariableExpr t) = interpretExpr t
-  interpretExpr (AST.AssignmentExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
+  interpretExpr (AST.VariableExpr t) = do
+    let (AST.Variable tk) = AST.Meta.content t
+    let resolverMeta = AST.Meta.meta @ResolveLocals.ResolverMeta t
+    RTState.getBoundValueAtM tk (ResolveLocals.resolverMetaLocalVariableScopeDistance resolverMeta)
+
+  interpretExpr (AST.AssignmentExpr t) = do
+    let (AST.Assignment tk expr) = AST.Meta.content t
+    val <- interpretExpr expr
+    let resolverMeta = AST.Meta.meta @ResolveLocals.ResolverMeta t
+    let distance = ResolveLocals.resolverMetaLocalVariableScopeDistance resolverMeta
+    RTState.assignAtM tk distance val
+    pure val
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
@@ -258,29 +283,16 @@ instance ( Runtime cell sig m
          ) => ExprInterpreter cell (AST.Grouping f) m where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance ( Runtime cell sig m
-         , AST.Meta.AsIdentity f
-         ) => ExprInterpreter cell (AST.Function f) m where
+instance Runtime cell sig m => ExprInterpreter cell (AST.Function RuntimeAST) m where
   interpretExpr fn = do
     frame <- gets (RTState.localFrame @cell)
-    pure . ValFn $ LoxFn (AST.Meta.mkSomeAST fn) frame
+    pure . ValFn $ LoxFn fn frame
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s
   interpretExpr (AST.LitNum d)    = pure $ ValNum d
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
   interpretExpr AST.LitNil        = pure $ ValNil
-
-instance Runtime cell sig m => ExprInterpreter cell AST.Variable m where
-  interpretExpr (AST.Variable tk) = RTState.getBoundValueM tk
-
-instance ( Runtime cell sig m
-         , ExprInterpreter cell (AST.Expr f) m
-         ) => ExprInterpreter cell (AST.Assignment f) m where
-  interpretExpr (AST.Assignment tk expr) = do
-    val <- interpretExpr expr
-    RTState.assignM tk val
-    pure val
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
@@ -313,8 +325,8 @@ class LoxCallable cell e m where
   loxCall :: Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 
 instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
-  loxArity (LoxFn (AST.Meta.astContent -> AST.Function _ params _) _) = pure (Seq.length params)
-  loxCall _ (LoxFn (AST.Meta.astContent -> AST.Function _ params body) env) args = do
+  loxArity (LoxFn (AST.Function _ params _) _) = pure (Seq.length params)
+  loxCall _ (LoxFn (AST.Function _ params body) env) args = do
     RTReturn.catchReturn $
       RTState.runInChildEnvOf env $ do
         for_ (Seq.zip params args) $ \(param, arg) -> do
@@ -352,3 +364,64 @@ numericOperands :: Has (Throw RTError) sig m
                 -> m (Double, Double)
 numericOperands _ (ValNum n1) (ValNum n2) = pure (n1, n2)
 numericOperands opTk _ _ = RTError.throwRT opTk "Operands must be numbers."
+
+{-
+x =
+ Program
+  fromList
+  [BlockStmt $
+    RuntimeAST
+      (WithMeta
+        (ResolverMeta Nothing)
+        Identity
+          (Block
+            fromList
+            [VarDeclarationStmt $
+              RuntimeAST
+                (WithMeta
+                  (ResolverMeta Nothing)
+                  Identity
+                    (VarDeclaration
+                      (Token "a" IDENTIFIER Nothing 1) $
+                      LiteralExpr
+                        (RuntimeAST
+                          (WithMeta
+                            (ResolverMeta Nothing)
+                            Identity
+                              (LitNum 1.0)))))
+            ,FunDeclarationStmt
+              (RuntimeAST
+                (WithMeta
+                  (ResolverMeta Nothing)
+                  Identity
+                    (FunDeclaration
+                      (Token "x" IDENTIFIER Nothing 1) $
+                      Function
+                        (Token "fun" FUN Nothing 1)
+                        (fromList []) $
+                        Block $
+                          fromList
+                          [ExprStmt
+                            (RuntimeAST
+                              (WithMeta
+                                (ResolverMeta Nothing)
+                                Identity
+                                  (CallExpr
+                                    (RuntimeAST
+                                      (WithMeta
+                                        (ResolverMeta Nothing)
+                                        Identity
+                                          (Call
+                                            VariableExpr
+                                              (RuntimeAST
+                                                (WithMeta
+                                                  (ResolverMeta Nothing)
+                                                  Identity
+                                                    (Variable $ Token "print" IDENTIFIER Nothing 1)))
+                                            (Token ")" RIGHT_PAREN Nothing 1)
+                                            fromList
+                                            [VariableExpr
+                                              (RuntimeAST
+                                                (WithMeta (ResolverMeta 0), withMetaContent = Identity (Variable {variableIdentifier = Token {tokenLexeme = "a", tokenType = IDENTIFIER, tokenLiteral = Nothing, tokenLine = 1}})}))]})})))}))]}}})})),ExprStmt (RuntimeAST (WithMeta {withMetaMeta = ResolverMeta {resolverMetaLocalVariableScopeDistance = Nothing}, withMetaContent = Identity (CallExpr (RuntimeAST (WithMeta {withMetaMeta = ResolverMeta {resolverMetaLocalVariableScopeDistance = Nothing}, withMetaContent = Identity (Call {callCallee = VariableExpr (RuntimeAST (WithMeta {withMetaMeta = ResolverMeta {resolverMetaLocalVariableScopeDistance = Just 0}, withMetaContent = Identity (Variable {variableIdentifier = Token {tokenLexeme = "x", tokenType = IDENTIFIER, tokenLiteral = Nothing, tokenLine = 1}})})), callParen = Token {tokenLexeme = ")", tokenType = RIGHT_PAREN, tokenLiteral = Nothing, tokenLine = 1}, callArguments = fromList []})})))}))]})}))
+  ]
+-}

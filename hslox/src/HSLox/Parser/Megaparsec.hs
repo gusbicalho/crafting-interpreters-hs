@@ -95,7 +95,7 @@ funDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 funDeclaration = do
     marker <- singleMatching [Token.FUN]
     (name, function) <- function "function" marker parseFunName
-    pure $ functionDeclaration name function
+    pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
     parseFunName = consume [Token.IDENTIFIER] "Expect function name."
 

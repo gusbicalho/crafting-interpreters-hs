@@ -80,7 +80,7 @@ funDeclaration :: Has Empty sig m => StmtParser sig m
 funDeclaration = do
     marker <- match [Token.FUN]
     (name, function) <- function "function" marker parseFunName
-    pure $ functionDeclaration name function
+    pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
     parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
 

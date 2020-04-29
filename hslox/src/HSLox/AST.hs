@@ -19,12 +19,14 @@ deriving instance (Show (Stmt f)) => Show (Program f)
 
 data Stmt f = ExprStmt (f (Expr f))
             | VarDeclarationStmt (f (VarDeclaration f))
+            | FunDeclarationStmt (f (FunDeclaration f))
             | BlockStmt (f (Block f))
             | IfStmt (f (If f))
             | WhileStmt (f (While f))
             | ReturnStmt (f (Return f))
 deriving instance ( Show (f (Expr f))
                   , Show (f (VarDeclaration f))
+                  , Show (f (FunDeclaration f))
                   , Show (f (Block f))
                   , Show (f (If f))
                   , Show (f (While f))
@@ -36,6 +38,9 @@ pattern ExprStmtI expr = ExprStmt (Identity expr)
 
 pattern VarDeclarationStmtI :: VarDeclaration Identity -> StmtI
 pattern VarDeclarationStmtI expr = VarDeclarationStmt (Identity expr)
+
+pattern FunDeclarationStmtI :: FunDeclaration Identity -> StmtI
+pattern FunDeclarationStmtI expr = FunDeclarationStmt (Identity expr)
 
 pattern BlockStmtI :: Block Identity -> StmtI
 pattern BlockStmtI expr = BlockStmt (Identity expr)
@@ -53,6 +58,7 @@ instance FFunctor Stmt where
   {-# INLINE ffmap #-}
   ffmap nt (ExprStmt e) = ExprStmt $ nt (fmap (ffmap nt) e)
   ffmap nt (VarDeclarationStmt e) = VarDeclarationStmt $ nt (fmap (ffmap nt) e)
+  ffmap nt (FunDeclarationStmt e) = FunDeclarationStmt $ nt (fmap (ffmap nt) e)
   ffmap nt (BlockStmt e) = BlockStmt $ nt (fmap (ffmap nt) e)
   ffmap nt (IfStmt e) = IfStmt $ nt (fmap (ffmap nt) e)
   ffmap nt (WhileStmt e) = WhileStmt $ nt (fmap (ffmap nt) e)
@@ -65,6 +71,14 @@ deriving instance (Show (Expr f)) => Show (VarDeclaration f)
 instance FFunctor VarDeclaration where
   {-# INLINE ffmap #-}
   ffmap nt (VarDeclaration tk e) = VarDeclaration tk (ffmap nt e)
+
+data FunDeclaration f = FunDeclaration { funDeclarationIdentifier :: Token
+                                       , funDeclarationInitializer :: Function f
+                                       }
+deriving instance (Show (Function f)) => Show (FunDeclaration f)
+instance FFunctor FunDeclaration where
+  {-# INLINE ffmap #-}
+  ffmap nt (FunDeclaration tk e) = FunDeclaration tk (ffmap nt e)
 
 newtype Block f = Block { blockBody :: (Seq (Stmt f)) }
 deriving instance (Show (Stmt f)) => Show (Block f)

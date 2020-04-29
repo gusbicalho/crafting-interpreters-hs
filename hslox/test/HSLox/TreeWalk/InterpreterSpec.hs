@@ -1,3 +1,5 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module HSLox.TreeWalk.InterpreterSpec where
 
 import Control.Carrier.Lift
@@ -13,6 +15,7 @@ import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.Scanner.Megaparsec as Scanner
 import HSLox.Scanner.ScanError (ScanError)
+import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
@@ -28,7 +31,7 @@ spec = do
       "" `shouldEvaluateTo`
         (Nothing, Seq.empty)
     it "a program with variables and local scope" $ do
-      "var a = 1; { var a = a + 2; print(a); }"
+      "var a = 1; { var temp = a + 2; var a = temp; print(a); }"
         `shouldEvaluateTo`
         (Nothing, Seq.fromList [ "3" ])
     it "a program with variables, local scope, and a runtime error" $
@@ -164,8 +167,11 @@ source `shouldEvaluateTo` (error, output) =
              & runM @(CellsOnST.ST s)
              & fmap swap
 
-runParser :: T.Text -> AST.Program AST.Identity
+runParser :: T.Text -> AST.Program _
 runParser = run
+          . fmap snd
+          . Util.runWriterToPair @(Set ResolveLocals.ResolverError)
+          . (ResolveLocals.resolveLocals =<<)
           . fmap snd
           . Util.runWriterToPair @(Set ParserError)
           . Parser.parse

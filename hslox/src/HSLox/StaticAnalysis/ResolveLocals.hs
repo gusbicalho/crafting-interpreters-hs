@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module HSLox.StaticAnalysis.ResolveLocals where
 
 import Control.Carrier.State.Church (State)
@@ -52,6 +53,20 @@ resolveLocals (Program stmts)
           beginScope
         (toVarDeclaration -> Just (VarDeclaration tk _)) -> do
           declareM (tokenLexeme tk)
+        (toFunDeclaration -> Just (FunDeclaration tk (Function _ args _))) -> do
+          declareM (tokenLexeme tk)
+          defineM (tokenLexeme tk)
+          beginScope -- args scope
+          Foldable.for_ args $ \(tokenLexeme -> argName) -> do
+            declareM argName
+            defineM argName
+          beginScope -- body scope
+        (toFunction -> Just (Function _ args _)) -> do
+          beginScope -- args scope
+          Foldable.for_ args $ \(tokenLexeme -> argName) -> do
+            declareM argName
+            defineM argName
+          beginScope -- body scope
         _ -> pure ()
       pure fa
     postWalk fa = do
@@ -63,7 +78,19 @@ resolveLocals (Program stmts)
         (toVarDeclaration -> Just (VarDeclaration tk _)) -> do
           defineM (tokenLexeme tk)
           pure emptyResolverMeta
+        (toFunDeclaration -> Just _) -> do
+          endScope -- body scope
+          endScope -- args scope
+          pure emptyResolverMeta
+        (toFunction -> Just _) -> do
+          endScope -- body scope
+          endScope -- args scope
+          pure emptyResolverMeta
         (toVariable -> Just (Variable tk)) -> do
+          checkLocalIsNotBeingDeclared tk
+          distance <- resolveLocalScopeDistance (tokenLexeme tk)
+          pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
+        (toAssignment -> Just (Assignment tk _)) -> do
           checkLocalIsNotBeingDeclared tk
           distance <- resolveLocalScopeDistance (tokenLexeme tk)
           pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
@@ -71,6 +98,7 @@ resolveLocals (Program stmts)
       pure $ withMeta meta fa
 
 newtype Scope = Scope (Map T.Text Bool)
+  deriving (Show)
 data BindingStatus = Missing | Declared | Defined
   deriving (Eq, Ord, Show)
 
@@ -129,6 +157,7 @@ bindingStatus name (Scope bindings) =
 
 -- Stack
 newtype Stack a = Stack [a]
+  deriving (Show)
   deriving newtype (Foldable)
 
 emptyStack :: Stack a

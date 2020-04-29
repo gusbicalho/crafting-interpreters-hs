@@ -1,5 +1,6 @@
-{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE UndecidableInstances #-}
 module HSLox.AST.Meta
   ( module HSLox.AST.Meta
@@ -16,21 +17,6 @@ class FFunctor (t :: (Type -> Type) -> Type) where
   ffmap :: (Functor f, Functor g) => (f ~> g) -> t f -> t g
 
 -- AST Meta stuff
-newtype SomeAST astNode =
-  SomeAST { runSomeAST :: forall a
-                        . (forall f. ( AsIdentity f
-                                     , FFunctor astNode
-                                     ) => astNode f -> a)
-                        -> a }
-
-mkSomeAST :: (AsIdentity f, FFunctor astNode) => astNode f -> SomeAST astNode
-mkSomeAST fnAst = SomeAST $ \k -> k fnAst
-{-# INLINE mkSomeAST #-}
-
-astContent :: SomeAST astNode -> astNode Identity
-astContent ast = runSomeAST ast (ffmap asIdentity)
-{-# INLINE astContent #-}
-
 class Functor f => AsIdentity f where
   asIdentity :: f ~> Identity
 
@@ -38,10 +24,11 @@ content :: AsIdentity f => f c -> c
 content = runIdentity . asIdentity
 {-# INLINE content #-}
 
-type WithMeta meta f = Compose ((,) meta) f
+data WithMeta meta f a = WithMeta { withMetaMeta :: meta, withMetaContent :: f a }
+  deriving (Show, Functor, Foldable, Traversable)
 
 withMeta :: meta -> f a -> WithMeta meta f a
-withMeta meta fa = Compose (meta, fa)
+withMeta = WithMeta
 
 class HasMeta meta f where
   meta :: forall a. f a -> meta
@@ -50,21 +37,14 @@ instance AsIdentity Identity where
   asIdentity = id
   {-# INLINE asIdentity #-}
 
-instance HasMeta () f where
-  meta _ = ()
-
-instance AsIdentity ((,) a) where
-  asIdentity = Identity . snd
+instance AsIdentity f => AsIdentity (WithMeta meta f) where
+  asIdentity = asIdentity . withMetaContent
   {-# INLINE asIdentity #-}
 
-instance (AsIdentity f, AsIdentity g) => AsIdentity (Compose g f) where
-  asIdentity gf = asIdentity . runIdentity . asIdentity . getCompose $ gf
-  {-# INLINE asIdentity #-}
-
-instance HasMeta a g => HasMeta a (Compose g f) where
-  meta = meta . getCompose
+instance {-# OVERLAPPABLE #-} HasMeta a f => HasMeta a (WithMeta meta f) where
+  meta = meta . withMetaContent
   {-# INLINE meta #-}
 
-instance (AsIdentity g, HasMeta a f) => HasMeta a (Compose g f) where
-  meta = meta . runIdentity . asIdentity . getCompose
+instance {-# OVERLAPPING #-} HasMeta meta (WithMeta meta f) where
+  meta = withMetaMeta
   {-# INLINE meta #-}
