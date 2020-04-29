@@ -17,6 +17,7 @@ import HSLox.AST.WalkAST
 import HSLox.AST.Meta
 import HSLox.ErrorReport
 import HSLox.Token (Token(..))
+import qualified HSLox.Util as Util
 
 data ResolverError = ResolverError Token T.Text
   deriving (Eq, Ord, Show)
@@ -27,7 +28,7 @@ tellResolverError tk msg = tell . Set.singleton $ ResolverError tk msg
 instance ToErrorReport ResolverError where
   toErrorReport (ResolverError token msg) =
     ErrorReport { errorReportLine = (tokenLine token)
-                , errorReportWhere = ""
+                , errorReportWhere = (tokenLexeme token)
                 , errorReportMessage = msg
                 }
 
@@ -47,44 +48,32 @@ resolveLocals (Program stmts)
   $ Program <$> (traverse (walkAST preWalk postWalk) stmts)
   where
     preWalk fa = do
-      let node = content fa
-      case node of
+      case content fa of
         (toBlock -> Just _) -> do
           beginScope
         (toVarDeclaration -> Just (VarDeclaration tk _)) -> do
-          declareM (tokenLexeme tk)
-        (toFunDeclaration -> Just (FunDeclaration tk (Function _ args _))) -> do
-          declareM (tokenLexeme tk)
-          defineM (tokenLexeme tk)
-          beginScope -- args scope
-          Foldable.for_ args $ \(tokenLexeme -> argName) -> do
-            declareM argName
-            defineM argName
-          beginScope -- body scope
-        (toFunction -> Just (Function _ args _)) -> do
-          beginScope -- args scope
-          Foldable.for_ args $ \(tokenLexeme -> argName) -> do
-            declareM argName
-            defineM argName
-          beginScope -- body scope
+          declareLocal tk
+        (toFunDeclaration -> Just (FunDeclaration tk fn)) -> do
+          declareLocal tk
+          defineLocal tk
+          beginFunctionScope fn
+        (toFunction -> Just fn) -> do
+          beginFunctionScope fn
         _ -> pure ()
       pure fa
     postWalk fa = do
-      let node = content fa
-      meta <- case node of
+      meta <- case content fa of
         (toBlock -> Just _) -> do
           endScope
           pure emptyResolverMeta
         (toVarDeclaration -> Just (VarDeclaration tk _)) -> do
-          defineM (tokenLexeme tk)
+          defineLocal tk
           pure emptyResolverMeta
-        (toFunDeclaration -> Just _) -> do
-          endScope -- body scope
-          endScope -- args scope
+        (toFunDeclaration -> Just (FunDeclaration _ fn)) -> do
+          endFunctionScope fn
           pure emptyResolverMeta
-        (toFunction -> Just _) -> do
-          endScope -- body scope
-          endScope -- args scope
+        (toFunction -> Just fn) -> do
+          endFunctionScope fn
           pure emptyResolverMeta
         (toVariable -> Just (Variable tk)) -> do
           checkLocalIsNotBeingDeclared tk
@@ -97,6 +86,21 @@ resolveLocals (Program stmts)
         _ -> pure emptyResolverMeta
       pure $ withMeta meta fa
 
+beginFunctionScope :: Has (State (Stack Scope)) sig m
+                   => Has (Writer (Set ResolverError)) sig m
+                   => Function f -> m ()
+beginFunctionScope (Function _ args _) = do
+  beginScope -- args scope
+  Foldable.for_ args $ \argName -> do
+    declareLocal argName
+    defineLocal argName
+  beginScope -- body scope
+
+endFunctionScope :: Has (State (Stack Scope)) sig m => Function f -> m ()
+endFunctionScope (Function _ _ _) = do
+  endScope -- body scope
+  endScope -- args scope
+
 newtype Scope = Scope (Map T.Text Bool)
   deriving (Show)
 data BindingStatus = Missing | Declared | Defined
@@ -105,27 +109,27 @@ data BindingStatus = Missing | Declared | Defined
 emptyScope :: Scope
 emptyScope = Scope Map.empty
 
-declare :: T.Text -> Scope -> Scope
-declare name s@(Scope bindings) =
-  case Map.lookup name bindings of
-    Nothing -> Scope (Map.insert name False bindings)
-    -- avoid overwriting if it's already defined
-    Just _ -> s
-
-define :: T.Text -> Scope -> Scope
-define name (Scope bindings) = Scope (Map.insert name True bindings)
-
 beginScope :: Has (State (Stack Scope)) sig m => m ()
 beginScope = State.modify $ push emptyScope
 
 endScope :: Has (State (Stack Scope)) sig m => m ()
 endScope = State.modify $ pop_ @Scope
 
-declareM :: Has (State (Stack Scope)) sig m => T.Text -> m ()
-declareM name = State.modify . overPeek $ declare name
+declareLocal :: Has (State (Stack Scope)) sig m
+             => Has (Writer (Set ResolverError)) sig m
+             => Token -> m ()
+declareLocal tk = Util.modifyM . overPeekA $ \s@(Scope bindings) -> do
+  let name = tokenLexeme tk
+  case Map.lookup name bindings of
+    Nothing -> pure $ Scope (Map.insert name False bindings)
+    -- avoid overwriting if it's already defined
+    Just _ -> do
+      tellResolverError tk "Variable with this name already declared in this scope."
+      pure s
 
-defineM :: Has (State (Stack Scope)) sig m => T.Text -> m ()
-defineM name = State.modify . overPeek $ define name
+defineLocal :: Has (State (Stack Scope)) sig m => Token -> m ()
+defineLocal tk = State.modify . overPeek $ \(Scope bindings) ->
+  Scope (Map.insert (tokenLexeme tk) True bindings)
 
 checkLocalIsNotBeingDeclared :: Has (State (Stack Scope)) sig m
                     => Has (Writer (Set ResolverError)) sig m
@@ -181,3 +185,9 @@ peek (Stack (x:_)) = Just x
 overPeek :: (a -> a) -> Stack a -> Stack a
 overPeek _ s@(Stack []) = s
 overPeek f (Stack (x : xs)) = Stack (f x : xs)
+
+overPeekA :: Applicative m => (a -> m a) -> Stack a -> m (Stack a)
+overPeekA _ s@(Stack []) = pure s
+overPeekA f (Stack (x : xs)) = do
+  fx <- f x
+  pure $ Stack (fx : xs)
