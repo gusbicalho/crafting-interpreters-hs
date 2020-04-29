@@ -15,7 +15,7 @@ import qualified HSLox.Parser.Megaparsec as Parser
 import HSLox.Parser.ParserError (ParserError)
 import qualified HSLox.Scanner.Megaparsec as Scanner
 import HSLox.Scanner.ScanError (ScanError)
-import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
+import qualified HSLox.StaticAnalysis.Analyzer as Analyzer
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.TreeWalk.Interpreter as Interpreter
@@ -170,8 +170,8 @@ source `shouldEvaluateTo` (error, output) =
 runParser :: T.Text -> AST.Program _
 runParser = run
           . fmap snd
-          . Util.runWriterToPair @(Set ResolveLocals.ResolverError)
-          . (ResolveLocals.resolveLocals =<<)
+          . Util.runWriterToPair @(Set Analyzer.AnalysisError)
+          . (Analyzer.analyze =<<)
           . fmap snd
           . Util.runWriterToPair @(Set ParserError)
           . Parser.parse

@@ -25,7 +25,7 @@ import qualified HSLox.AST as AST
 import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.Cells.Effect as Cells
 import qualified HSLox.NativeFns.Effect as NativeFns
-import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
+import qualified HSLox.StaticAnalysis.Analyzer as Analyzer
 import HSLox.Token (Token (..))
 import qualified HSLox.Token as Token
 import qualified HSLox.TreeWalk.RTState as RTState
@@ -51,7 +51,7 @@ interpret :: forall cell sig m f
           => Has NativeFns.NativeFns sig m
           => Traversable f
           => AST.Meta.AsIdentity f
-          => AST.Meta.HasMeta ResolveLocals.ResolverMeta f
+          => AST.Meta.HasMeta Analyzer.ResolverMeta f
           => AST.Program f -> m (Maybe RTError)
 interpret prog = do
   env <- baseEnv @cell
@@ -64,7 +64,7 @@ interpretNext :: forall cell sig m f
               => Has NativeFns.NativeFns sig m
               => Traversable f
               => AST.Meta.AsIdentity f
-              => AST.Meta.HasMeta ResolveLocals.ResolverMeta f
+              => AST.Meta.HasMeta Analyzer.ResolverMeta f
               => RTState cell
               -> AST.Program f
               -> m (RTState cell, Maybe RTError)
@@ -195,14 +195,14 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = do
     let (AST.Variable tk) = AST.Meta.content t
-    let resolverMeta = AST.Meta.meta @ResolveLocals.ResolverMeta t
-    RTState.getBoundValueAtM tk (ResolveLocals.resolverMetaLocalVariableScopeDistance resolverMeta)
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta t
+    RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
 
   interpretExpr (AST.AssignmentExpr t) = do
     let (AST.Assignment tk expr) = AST.Meta.content t
     val <- interpretExpr expr
-    let resolverMeta = AST.Meta.meta @ResolveLocals.ResolverMeta t
-    let distance = ResolveLocals.resolverMetaLocalVariableScopeDistance resolverMeta
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta t
+    let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
     RTState.assignAtM tk distance val
     pure val
 

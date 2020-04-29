@@ -17,7 +17,7 @@ import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.AST.WalkAST as WalkAST
 import HSLox.Cells.Effect
 import HSLox.NativeFns.Effect
-import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
+import qualified HSLox.StaticAnalysis.Analyzer as Analyzer
 import HSLox.Token (Token (..))
 
 type Runtime cell sig m = ( Has NativeFns sig m
@@ -59,26 +59,26 @@ data RTValue cell
   | ValFn (LoxFn cell)
   | ValNativeFn LoxNativeFn
 
-newtype RuntimeAST a = RuntimeAST (AST.Meta.WithMeta ResolveLocals.ResolverMeta
+newtype RuntimeAST a = RuntimeAST (AST.Meta.WithMeta Analyzer.ResolverMeta
                                     AST.Meta.Identity
                                     a)
   deriving (Show, Functor, Foldable, Traversable)
 instance AST.Meta.AsIdentity RuntimeAST where
   asIdentity (RuntimeAST fa) = AST.Meta.asIdentity fa
-instance AST.Meta.HasMeta ResolveLocals.ResolverMeta RuntimeAST where
+instance AST.Meta.HasMeta Analyzer.ResolverMeta RuntimeAST where
   meta (RuntimeAST fa) = AST.Meta.meta fa
 
 asRuntimeAST :: Monad m
              => Traversable f
              => AST.Meta.AsIdentity f
-             => AST.Meta.HasMeta ResolveLocals.ResolverMeta f
+             => AST.Meta.HasMeta Analyzer.ResolverMeta f
              => WalkAST.WalkAST astNode
              => astNode f -> m (astNode RuntimeAST)
 asRuntimeAST ast = WalkAST.walkAST preWalk pure ast
   where
     preWalk fa = do
       pure $ RuntimeAST
-           . AST.Meta.withMeta (AST.Meta.meta @ResolveLocals.ResolverMeta fa)
+           . AST.Meta.withMeta (AST.Meta.meta @Analyzer.ResolverMeta fa)
            . AST.Meta.asIdentity
            $ fa
 
