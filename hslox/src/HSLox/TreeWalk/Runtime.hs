@@ -77,9 +77,9 @@ asRuntimeAST :: Monad m
              => AST.Meta.HasMeta Analyzer.ResolverMeta f
              => WalkAST.WalkAST astNode
              => astNode f -> m (astNode RuntimeAST)
-asRuntimeAST ast = WalkAST.walkAST preWalk pure ast
+asRuntimeAST ast = WalkAST.walkAST pure postWalk ast
   where
-    preWalk fa = do
+    postWalk fa = do
       pure $ RuntimeAST
            . AST.Meta.withMeta (AST.Meta.meta @Analyzer.ResolverMeta fa)
            . AST.Meta.asIdentity
