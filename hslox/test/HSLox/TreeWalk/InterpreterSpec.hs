@@ -166,6 +166,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["The Lemon Song"])
+    it "a program with a class with a constructor" $ do
+      "class A { init(i) { this.i = i; } } print(A(7).i);"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["7"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

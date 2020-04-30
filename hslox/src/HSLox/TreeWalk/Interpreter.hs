@@ -424,10 +424,19 @@ instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
         pure ValNil
 
 instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
-  loxArity (LoxClass _ _) = pure 0
-  loxCall _ klass@(LoxClass _name _methods) _args = do
+  loxArity klass = case findMethod "init" klass of
+    Nothing -> pure 0
+    Just fn -> loxArity @cell fn
+  loxCall tk klass@(LoxClass _name _methods) args = do
     instanceState <- Cells.newCell @cell (Map.empty)
-    pure $ ValInstance (LoxInstance klass instanceState)
+    let inst = LoxInstance klass instanceState
+    case findMethod "init" klass of
+      Nothing -> pure ()
+      Just init -> do
+        boundInit <- bindThis inst init
+        call tk boundInit args
+        pure ()
+    pure $ ValInstance inst
 
 instance Runtime cell sig m => LoxCallable cell LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity
