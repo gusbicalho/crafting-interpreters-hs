@@ -2,6 +2,7 @@ module HSLox.AST.WalkAST
   ( WalkAST (..)
   ) where
 
+import Control.Monad
 import HSLox.AST
 import HSLox.AST.AsAST
 
@@ -50,7 +51,8 @@ instance WalkAST FunDeclaration where
 
 instance WalkAST ClassDeclaration where
   {-# INLINE walkAST #-}
-  walkAST preWalk postWalk (ClassDeclaration identifier methods) = ClassDeclaration identifier <$> traverse (walkAST preWalk postWalk) methods
+  walkAST preWalk postWalk (ClassDeclaration identifier methods) =
+    ClassDeclaration identifier <$> traverse (preWalk >=> traverse (walkAST preWalk postWalk) >=> postWalk) methods
 
 instance WalkAST Block where
   {-# INLINE walkAST #-}
@@ -83,6 +85,7 @@ instance WalkAST Expr where
   walkAST preWalk postWalk (AssignmentExpr t)  = AssignmentExpr  <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (CallExpr t)        = CallExpr        <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (GetExpr t)         = GetExpr         <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (ThisExpr t)        = ThisExpr        <$> walkLeaf preWalk postWalk t
   walkAST preWalk postWalk (SetPropertyExpr t) = SetPropertyExpr <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (FunctionExpr t)    = FunctionExpr    <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
 

@@ -24,40 +24,45 @@ import HSLox.Token (Token(..))
 import qualified HSLox.Util as Util
 
 preResolvingLocals :: AsIdentity f
-                       => AsAST a g
-                       => Has (State ResolveLocalsState) sig m
-                       => Has (Writer (Set AnalysisError)) sig m
-                       => f a -> m (f a)
+                   => AsAST a g
+                   => Has (State ResolveLocalsState) sig m
+                   => Has (Writer (Set AnalysisError)) sig m
+                   => f a -> m (f a)
 preResolvingLocals fa = do
   case content fa of
     (toBlock -> Just _) -> do
       beginScope
     (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
       declareLocal tk
-    (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
-      declareLocal tk
-      defineLocal tk
-      beginFunctionScope fn
     (toClassDeclaration -> Just (AST.ClassDeclaration tk _)) -> do
       declareLocal tk
-      defineLocal tk
+      defineLocal (tokenLexeme tk)
+      beginScope -- class
+      defineLocal "this"
+    (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
+      declareLocal tk
+      defineLocal (tokenLexeme tk)
+      beginFunctionScope fn
     (toFunction -> Just fn) -> do
       beginFunctionScope fn
     _ -> pure ()
   pure fa
 
 postResolvingLocals :: AsIdentity f
-                        => AsAST a g
-                        => Has (State ResolveLocalsState) sig m
-                        => Has (Writer (Set AnalysisError)) sig m
-                        => f a -> m (WithMeta ResolverMeta f a)
+                    => AsAST a g
+                    => Has (State ResolveLocalsState) sig m
+                    => Has (Writer (Set AnalysisError)) sig m
+                    => f a -> m (WithMeta ResolverMeta f a)
 postResolvingLocals fa = do
   meta <- case content fa of
     (toBlock -> Just _) -> do
       endScope
       pure emptyResolverMeta
     (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
-      defineLocal tk
+      defineLocal (tokenLexeme tk)
+      pure emptyResolverMeta
+    (toClassDeclaration -> Just _) -> do
+      endScope -- class
       pure emptyResolverMeta
     (toFunDeclaration -> Just (AST.FunDeclaration _ fn)) -> do
       endFunctionScope fn
@@ -71,6 +76,9 @@ postResolvingLocals fa = do
       pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
     (toAssignment -> Just (AST.Assignment tk _)) -> do
       checkLocalIsNotBeingDeclared tk
+      distance <- resolveLocalScopeDistance (tokenLexeme tk)
+      pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
+    (toThis -> Just (AST.This tk)) -> do
       distance <- resolveLocalScopeDistance (tokenLexeme tk)
       pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
     _ -> pure emptyResolverMeta
@@ -100,7 +108,7 @@ beginFunctionScope (AST.Function _ args _) = do
   beginScope -- args scope
   Foldable.for_ args $ \argName -> do
     declareLocal argName
-    defineLocal argName
+    defineLocal (tokenLexeme argName)
   beginScope -- body scope
 
 endFunctionScope :: Has (State ResolveLocalsState) sig m => AST.Function f -> m ()
@@ -134,9 +142,9 @@ declareLocal tk = Util.modifyM . overStackF . Stack.overPeekA $ \s@(Scope bindin
       tellAnalysisError tk "Variable with this name already declared in this scope."
       pure s
 
-defineLocal :: Has (State ResolveLocalsState) sig m => Token -> m ()
-defineLocal tk = State.modify . overStack . Stack.overPeek $ \(Scope bindings) ->
-  Scope (Map.insert (tokenLexeme tk) True bindings)
+defineLocal :: Has (State ResolveLocalsState) sig m => T.Text -> m ()
+defineLocal name = State.modify . overStack . Stack.overPeek $ \(Scope bindings) ->
+  Scope (Map.insert name True bindings)
 
 checkLocalIsNotBeingDeclared :: Has (State ResolveLocalsState) sig m
                     => Has (Writer (Set AnalysisError)) sig m

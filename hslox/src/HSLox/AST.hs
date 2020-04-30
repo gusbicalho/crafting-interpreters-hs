@@ -70,9 +70,9 @@ data FunDeclaration f = FunDeclaration { funDeclarationIdentifier :: Token
 deriving instance (Show (Function f)) => Show (FunDeclaration f)
 
 data ClassDeclaration f = ClassDeclaration { classDeclarationIdentifier :: Token
-                                           , classDeclarationMethods :: Seq (Function f)
+                                           , classDeclarationMethods :: Seq (f (Function f))
                                            }
-deriving instance (Show (Function f)) => Show (ClassDeclaration f)
+deriving instance (Show (f (Function f))) => Show (ClassDeclaration f)
 
 newtype Block f = Block { blockBody :: Seq (Stmt f) }
 deriving instance (Show (Stmt f)) => Show (Block f)
@@ -143,6 +143,9 @@ pattern SetPropertyExprI e = SetPropertyExpr (Identity e)
 pattern SetPropertyE :: ExprI -> Token -> ExprI -> ExprI
 pattern SetPropertyE object name value = SetPropertyExpr (Identity (SetProperty object name value))
 
+pattern ThisE :: Token -> ExprI
+pattern ThisE tk = ThisExpr (Identity (This tk))
+
 pattern LiteralExprI :: Literal -> Expr Identity
 pattern LiteralExprI e = LiteralExpr (Identity e)
 
@@ -174,6 +177,7 @@ data Expr f = UnaryExpr (f (Unary f))
             | CallExpr (f (Call f))
             | GetExpr (f (Get f))
             | SetPropertyExpr (f (SetProperty f))
+            | ThisExpr (f This)
             | FunctionExpr (f (Function f))
 
 deriving instance ( Show (f (Unary f))
@@ -187,6 +191,7 @@ deriving instance ( Show (f (Unary f))
                   , Show (f (Call f))
                   , Show (f (Get f))
                   , Show (f (SetProperty f))
+                  , Show (f This)
                   , Show (f (Function f))
                   ) => Show (Expr f)
 
@@ -255,3 +260,6 @@ data SetProperty f = SetProperty { setPropertyObject :: Expr f
                                  , setPropertyValue :: Expr f
                                  }
 deriving instance (Show (Expr f)) => Show (SetProperty f)
+
+newtype This = This { thisToken :: Token }
+  deriving (Eq, Show)

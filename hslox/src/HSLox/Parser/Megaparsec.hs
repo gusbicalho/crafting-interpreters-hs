@@ -115,7 +115,7 @@ classDeclaration = do
       then pure acc
       else do
         (_, method) <- function "method" parseMethodName
-        parseMethods (acc :|> method)
+        parseMethods (acc :|> Identity method)
     parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
 
 function :: MonadParsec ParserError TokenStream m
@@ -358,6 +358,7 @@ primary =
        , singleMatching [ Token.TRUE ]        $> BoolE True
        , singleMatching [ Token.NIL ]         $> NilE
        , singleMatching [ Token.IDENTIFIER ] <&> VariableE
+       , singleMatching [ Token.THIS ]       <&> ThisE
        , singleMatching [ Token.FUN ]        >>= anonymousFunction
        , do tk <- singleMatching [ Token.STRING ]
             case tokenLiteral tk of

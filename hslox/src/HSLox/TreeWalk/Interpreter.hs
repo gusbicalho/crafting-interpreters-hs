@@ -151,8 +151,10 @@ instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration Runtim
       RTState.defineM @cell name klass
     where
       methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
-      addMethod frame table methodExpr =
-        Map.insert (tokenLexeme $ AST.functionToken methodExpr) (LoxFn methodExpr frame) table
+      addMethod frame table (AST.Meta.content -> methodExpr) =
+        Map.insert (tokenLexeme $ AST.functionToken methodExpr)
+                   (LoxFn methodExpr frame)
+                   table
 
 instance ( Runtime cell sig m
          , StmtInterpreter cell (AST.Stmt f) m
@@ -208,9 +210,17 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.CallExpr t) = interpretExpr t
   interpretExpr (AST.GetExpr t) = interpretExpr t
   interpretExpr (AST.SetPropertyExpr t) = interpretExpr t
+  interpretExpr (AST.ThisExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
+
+instance {-# OVERLAPPING #-} Runtime cell sig m
+         => ExprInterpreter cell (RuntimeAST AST.This) m where
+  interpretExpr this = do
+    let (AST.This tk) = AST.Meta.content this
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta this
+    RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
 
 instance {-# OVERLAPPING #-} Runtime cell sig m
          => ExprInterpreter cell (RuntimeAST AST.Variable) m where
@@ -342,18 +352,24 @@ getProperty :: forall cell sig m
             => LoxInstance cell
             -> Token
             -> m (RTValue cell)
-getProperty (LoxInstance klass properties) propertyName = do
+getProperty inst@(LoxInstance klass properties) propertyName = do
   let name = tokenLexeme propertyName
   props <- Cells.readCell properties
   case Map.lookup name props of
     Just val -> pure val
     Nothing -> do
       case findMethod name klass of
-        Just method -> pure $ ValFn method
+        Just method -> ValFn <$> bindThis inst method
         Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
 
 findMethod :: T.Text -> LoxClass cell -> Maybe (LoxFn cell)
 findMethod name (LoxClass _ methodTable) = Map.lookup name methodTable
+
+bindThis :: Runtime cell sig m
+         => LoxInstance cell -> LoxFn cell -> m (LoxFn cell)
+bindThis inst (LoxFn function env) = RTState.runInChildEnvOf env $ do
+  RTState.defineM "this" (ValInstance inst)
+  LoxFn function <$> gets RTState.localFrame
 
 setProperty :: forall cell sig m
              . Runtime cell sig m

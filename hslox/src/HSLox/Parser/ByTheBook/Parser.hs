@@ -100,7 +100,7 @@ classDeclaration = do
       then pure acc
       else do
         (_, method) <- function "method" parseMethodName
-        parseMethods (acc :|> method)
+        parseMethods (acc :|> Identity method)
     parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
 
 function :: T.Text -> LoxParser Token sig m -> LoxParser (Token, Function Identity) sig m
@@ -354,6 +354,7 @@ primary = do
                                         , Token.STRING
                                         , Token.LEFT_PAREN
                                         , Token.IDENTIFIER
+                                        , Token.THIS
                                         , Token.FUN
                                         ])
     case mbTk of
@@ -361,6 +362,7 @@ primary = do
       Just (Token { tokenType = Token.TRUE })          -> pure (BoolE True)
       Just (Token { tokenType = Token.NIL })           -> pure NilE
       Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
+      Just tk@(Token { tokenType = Token.THIS })       -> pure (ThisE tk)
       Just tk@(Token { tokenType = Token.FUN})         -> anonymousFunction tk
       Just (Token { tokenType = Token.STRING, tokenLiteral }) ->
         case tokenLiteral of

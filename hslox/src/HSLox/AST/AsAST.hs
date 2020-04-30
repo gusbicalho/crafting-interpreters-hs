@@ -67,6 +67,9 @@ class AsAST a f | a -> f where
   {-# INLINE toLiteral #-}
   toLiteral :: a -> Maybe Literal
   toLiteral _ = Nothing
+  {-# INLINE toThis #-}
+  toThis :: a -> Maybe This
+  toThis _ = Nothing
 
 instance AsAST (Stmt f) f where
   {-# INLINE toStmt #-}
@@ -134,3 +137,6 @@ instance AsAST (LeafNode Variable f) f where
 instance AsAST (LeafNode Literal f) f where
   {-# INLINE toLiteral #-}
   toLiteral = Just . unLeafNode
+instance AsAST (LeafNode This f) f where
+  {-# INLINE toThis #-}
+  toThis = Just . unLeafNode

@@ -161,6 +161,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["3"])
+    it "a program with classes and methods that use `this`" $ do
+      "class A { play() { print(this.song); }} var a = A(); a.song = \"The Lemon Song\"; var play = a.play; play();"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["The Lemon Song"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

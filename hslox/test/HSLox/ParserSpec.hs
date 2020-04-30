@@ -182,6 +182,11 @@ spec = do
       (scan "class Klass { one() { print(1); } } var a = Klass(); a.one(); a.two = 2;")
       ( Set.empty
       , "[ (class Klass (one [] { (print 1.0) })) (var a (Klass)) ((.one a)) (.two= a 2.0) ]")
+  describe "programs with `this`" $ do
+    testParserImplementations
+      (scan "class A { play() { print(this.song); }} var a = A(); a.song = \"The Lemon Song\"; var play = a.play; play();")
+      ( Set.empty
+      , "[ (class A (play [] { (print (.song this)) })) (var a (A)) (.song= a \"The Lemon Song\") (var play (.play a)) (play) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent
