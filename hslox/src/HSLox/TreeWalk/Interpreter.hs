@@ -107,6 +107,7 @@ instance ( Applicative m
          , ExprInterpreter cell (f (AST.Expr f)) m
          , StmtInterpreter cell (f (AST.VarDeclaration f)) m
          , StmtInterpreter cell (f (AST.FunDeclaration f)) m
+         , StmtInterpreter cell (f (AST.ClassDeclaration f)) m
          , StmtInterpreter cell (f (AST.Block f)) m
          , StmtInterpreter cell (f (AST.If f)) m
          , StmtInterpreter cell (f (AST.While f)) m
@@ -116,6 +117,7 @@ instance ( Applicative m
   interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
   interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
   interpretStmt (AST.FunDeclarationStmt decl) = interpretStmt @cell decl
+  interpretStmt (AST.ClassDeclarationStmt decl) = interpretStmt @cell decl
   interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
   interpretStmt (AST.IfStmt ifStmt) = interpretStmt @cell ifStmt
   interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
@@ -136,6 +138,16 @@ instance ( Runtime cell sig m
     RTState.defineM @cell name ValNil
     val <- interpretExpr @cell expr
     RTState.defineM @cell name val
+
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Function f) m
+         ) => StmtInterpreter cell (AST.ClassDeclaration f) m where
+  interpretStmt (AST.ClassDeclaration tk methods) = do
+    let name = tokenLexeme tk
+    RTState.defineM @cell name ValNil
+    -- TODO build class
+    -- val <- interpretExpr @cell expr
+    -- RTState.defineM @cell name val
 
 instance ( Runtime cell sig m
          , StmtInterpreter cell (AST.Stmt f) m

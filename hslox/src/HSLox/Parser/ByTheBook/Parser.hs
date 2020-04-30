@@ -65,6 +65,7 @@ declaration :: StmtParser sig m
 declaration = do
   varDeclaration
   `Util.recoverFromEmptyWith` funDeclaration
+  `Util.recoverFromEmptyWith` classDeclaration
   `Util.recoverFromEmptyWith` statement
 
 varDeclaration :: Has Empty sig m => StmtParser sig m
@@ -78,21 +79,39 @@ varDeclaration = do
 
 funDeclaration :: Has Empty sig m => StmtParser sig m
 funDeclaration = do
-    marker <- match [Token.FUN]
-    (name, function) <- function "function" marker parseFunName
+    match [Token.FUN]
+    (name, function) <- function "function" parseFunName
     pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
     parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
 
-function :: T.Text -> Token -> LoxParser name sig m -> LoxParser (name, Function Identity) sig m
-function kind marker parseName = do
+classDeclaration :: Has Empty sig m => StmtParser sig m
+classDeclaration = do
+    match [Token.CLASS]
+    className <- consume [Token.IDENTIFIER] "Expect class name."
+    consume [Token.LEFT_BRACE] "Expect '{' before class body."
+    methods <- parseMethods Seq.empty
+    consume [Token.RIGHT_BRACE] "Expect '}' after class body."
+    pure $ ClassDeclarationStmtI $ ClassDeclaration className methods
+  where
+    parseMethods acc = do
+      endOfClass <- check [Token.RIGHT_BRACE, Token.EOF]
+      if endOfClass
+      then pure acc
+      else do
+        (_, method) <- function "method" parseMethodName
+        parseMethods (acc :|> method)
+    parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
+
+function :: T.Text -> LoxParser Token sig m -> LoxParser (Token, Function Identity) sig m
+function kind parseName = do
     name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure $ (name, Function marker args body)
+    pure $ (name, Function name args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
@@ -354,7 +373,7 @@ primary = do
 
 anonymousFunction :: Token -> LoxParser ExprI sig m
 anonymousFunction marker = do
-  (_, function) <- function "function" marker (pure ())
+  (_, function) <- function "function" (pure marker)
   pure $ FunctionExprI function
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m

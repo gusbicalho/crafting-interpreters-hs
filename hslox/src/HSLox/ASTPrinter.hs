@@ -22,6 +22,7 @@ instance ASTPrinter (Stmt f) => ASTPrinter (Program f) where
 instance ( ASTPrinter (f (Expr f))
          , ASTPrinter (f (VarDeclaration f))
          , ASTPrinter (f (FunDeclaration f))
+         , ASTPrinter (f (ClassDeclaration f))
          , ASTPrinter (f (Block f))
          , ASTPrinter (f (If f))
          , ASTPrinter (f (While f))
@@ -30,6 +31,7 @@ instance ( ASTPrinter (f (Expr f))
   printAST (ExprStmt e) = printAST e
   printAST (VarDeclarationStmt decl) = printAST decl
   printAST (FunDeclarationStmt decl) = printAST decl
+  printAST (ClassDeclarationStmt decl) = printAST decl
   printAST (BlockStmt block) = printAST block
   printAST (IfStmt ifStmt) = printAST ifStmt
   printAST (WhileStmt whileStmt) = printAST whileStmt
@@ -46,6 +48,14 @@ instance ( ASTPrinter (Block f)
       <> tokenLexeme tkName
       <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
       <> printAST body
+      <> ")"
+
+instance ( ASTPrinter (Function f)
+         ) => ASTPrinter (ClassDeclaration f) where
+  printAST (ClassDeclaration tkName methods)
+      = "(class "
+      <> tokenLexeme tkName
+      <> foldMap ((" " <>) . printAST) methods
       <> ")"
 
 instance ASTPrinter (Stmt f) => ASTPrinter (Block f) where

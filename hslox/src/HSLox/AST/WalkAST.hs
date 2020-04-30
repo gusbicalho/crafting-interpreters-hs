@@ -34,6 +34,7 @@ instance WalkAST Stmt where
   walkAST preWalk postWalk (ExprStmt t) = ExprStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (VarDeclarationStmt t) = VarDeclarationStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (FunDeclarationStmt t) = FunDeclarationStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (ClassDeclarationStmt t) = ClassDeclarationStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (BlockStmt t) = BlockStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (IfStmt t) = IfStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (WhileStmt t) = WhileStmt <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
@@ -46,6 +47,10 @@ instance WalkAST VarDeclaration where
 instance WalkAST FunDeclaration where
   {-# INLINE walkAST #-}
   walkAST preWalk postWalk (FunDeclaration identifier expr) = FunDeclaration identifier <$> walkAST preWalk postWalk expr
+
+instance WalkAST ClassDeclaration where
+  {-# INLINE walkAST #-}
+  walkAST preWalk postWalk (ClassDeclaration identifier methods) = ClassDeclaration identifier <$> traverse (walkAST preWalk postWalk) methods
 
 instance WalkAST Block where
   {-# INLINE walkAST #-}

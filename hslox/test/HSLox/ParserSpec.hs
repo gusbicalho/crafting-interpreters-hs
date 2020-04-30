@@ -172,6 +172,11 @@ spec = do
           [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
           , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."]
       , "[ ]")
+  describe "programs with classes" $ do
+    testParserImplementations
+      (scan "class Klass { one() { print(1); } two(a) { print(a); } }")
+      ( Set.empty
+      , "[ (class Klass (one [] { (print 1.0) }) (two [a] { (print a) })) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

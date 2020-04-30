@@ -16,6 +16,9 @@ class AsAST a f | a -> f where
   {-# INLINE toFunDeclaration #-}
   toFunDeclaration :: a -> Maybe (FunDeclaration f)
   toFunDeclaration _ = Nothing
+  {-# INLINE toClassDeclaration #-}
+  toClassDeclaration :: a -> Maybe (ClassDeclaration f)
+  toClassDeclaration _ = Nothing
   {-# INLINE toBlock #-}
   toBlock :: a -> Maybe (Block f)
   toBlock _ = Nothing
@@ -68,6 +71,9 @@ instance AsAST (VarDeclaration f) f where
 instance AsAST (FunDeclaration f) f where
   {-# INLINE toFunDeclaration #-}
   toFunDeclaration = Just
+instance AsAST (ClassDeclaration f) f where
+  {-# INLINE toClassDeclaration #-}
+  toClassDeclaration = Just
 instance AsAST (Block f) f where
   {-# INLINE toBlock #-}
   toBlock = Just

@@ -78,6 +78,7 @@ makeError mbTk msg = Set.singleton . ErrorCustom $ ParserError mbTk msg
 declaration :: MonadParsec ParserError TokenStream m => m StmtI
 declaration = asum [ varDeclaration
                    , funDeclaration
+                   , classDeclaration
                    , statement
                    ]
 
@@ -93,22 +94,40 @@ varDeclaration = do
 
 funDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 funDeclaration = do
-    marker <- singleMatching [Token.FUN]
-    (name, function) <- function "function" marker parseFunName
+    singleMatching [Token.FUN]
+    (name, function) <- function "function" parseFunName
     pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
     parseFunName = consume [Token.IDENTIFIER] "Expect function name."
 
+classDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
+classDeclaration = do
+    singleMatching [Token.CLASS]
+    className <- consume [Token.IDENTIFIER] "Expect class name."
+    consume [Token.LEFT_BRACE] "Expect '{' before class body."
+    methods <- parseMethods Seq.empty
+    consume [Token.RIGHT_BRACE] "Expect '}' after class body."
+    pure $ ClassDeclarationStmtI $ ClassDeclaration className methods
+  where
+    parseMethods acc = do
+      endOfClass <- check [Token.RIGHT_BRACE, Token.EOF]
+      if endOfClass
+      then pure acc
+      else do
+        (_, method) <- function "method" parseMethodName
+        parseMethods (acc :|> method)
+    parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
+
 function :: MonadParsec ParserError TokenStream m
-         => T.Text -> Token -> m name -> m (name, Function Identity)
-function kind marker parseName = do
+         => T.Text -> m Token -> m (Token, Function Identity)
+function kind parseName = do
     name <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure (name, Function marker args body)
+    pure (name, Function name args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
@@ -354,7 +373,7 @@ primary =
 
 anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
 anonymousFunction marker = do
-  (_, function) <- function "function" marker (pure ())
+  (_, function) <- function "function" (pure marker)
   pure $ FunctionExprI function
 
 leftAssociativeBinaryOp :: Foldable t

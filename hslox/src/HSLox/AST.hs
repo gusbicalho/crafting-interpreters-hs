@@ -20,6 +20,7 @@ deriving instance (Show (Stmt f)) => Show (Program f)
 data Stmt f = ExprStmt (f (Expr f))
             | VarDeclarationStmt (f (VarDeclaration f))
             | FunDeclarationStmt (f (FunDeclaration f))
+            | ClassDeclarationStmt (f (ClassDeclaration f))
             | BlockStmt (f (Block f))
             | IfStmt (f (If f))
             | WhileStmt (f (While f))
@@ -27,6 +28,7 @@ data Stmt f = ExprStmt (f (Expr f))
 deriving instance ( Show (f (Expr f))
                   , Show (f (VarDeclaration f))
                   , Show (f (FunDeclaration f))
+                  , Show (f (ClassDeclaration f))
                   , Show (f (Block f))
                   , Show (f (If f))
                   , Show (f (While f))
@@ -41,6 +43,9 @@ pattern VarDeclarationStmtI expr = VarDeclarationStmt (Identity expr)
 
 pattern FunDeclarationStmtI :: FunDeclaration Identity -> StmtI
 pattern FunDeclarationStmtI expr = FunDeclarationStmt (Identity expr)
+
+pattern ClassDeclarationStmtI :: ClassDeclaration Identity -> StmtI
+pattern ClassDeclarationStmtI expr = ClassDeclarationStmt (Identity expr)
 
 pattern BlockStmtI :: Block Identity -> StmtI
 pattern BlockStmtI expr = BlockStmt (Identity expr)
@@ -63,6 +68,11 @@ data FunDeclaration f = FunDeclaration { funDeclarationIdentifier :: Token
                                        , funDeclarationInitializer :: Function f
                                        }
 deriving instance (Show (Function f)) => Show (FunDeclaration f)
+
+data ClassDeclaration f = ClassDeclaration { classDeclarationIdentifier :: Token
+                                           , classDeclarationMethods :: Seq (Function f)
+                                           }
+deriving instance (Show (Function f)) => Show (ClassDeclaration f)
 
 newtype Block f = Block { blockBody :: Seq (Stmt f) }
 deriving instance (Show (Stmt f)) => Show (Block f)
