@@ -156,6 +156,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["3"])
+    it "a program with classes and object method access" $ do
+      "class A { play() { print(3); }} var a = A(); a.play();"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["3"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

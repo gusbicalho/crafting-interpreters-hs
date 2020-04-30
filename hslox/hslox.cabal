@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d8363d0f5c0593eadfd490ee1b25957e462cec44ffdeb0fa94067e8999c68438
+-- hash: f154861f2cca373ccfaa2926276a3e0ba9f5f5ddf7dbf562c857b53fa59fae31
 
 name:           hslox
 version:        0.1.0.0
@@ -52,6 +52,7 @@ library
       HSLox.StaticAnalysis.Analyzer
       HSLox.StaticAnalysis.CheckBadReturns
       HSLox.StaticAnalysis.Error
+      HSLox.StaticAnalysis.FunctionTypeStack
       HSLox.StaticAnalysis.ResolveLocals
       HSLox.StaticAnalysis.Stack
       HSLox.Token
@@ -136,6 +137,7 @@ executable hslox-test-dev
       HSLox.StaticAnalysis.Analyzer
       HSLox.StaticAnalysis.CheckBadReturns
       HSLox.StaticAnalysis.Error
+      HSLox.StaticAnalysis.FunctionTypeStack
       HSLox.StaticAnalysis.ResolveLocals
       HSLox.StaticAnalysis.Stack
       HSLox.Token

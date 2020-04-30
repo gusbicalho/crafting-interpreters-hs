@@ -80,8 +80,8 @@ showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
 showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
-showValue (ValClass (LoxClass className)) = "<class " <> className <> ">"
-showValue (ValInstance (LoxInstance (LoxClass className) _)) = "<instance " <> className <> ">"
+showValue (ValClass (LoxClass className _)) = "<class " <> className <> ">"
+showValue (ValInstance (LoxInstance (LoxClass className _) _)) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -142,17 +142,17 @@ instance ( Runtime cell sig m
     val <- interpretExpr @cell expr
     RTState.defineM @cell name val
 
-instance ( Runtime cell sig m
-         , ExprInterpreter cell (AST.Function f) m
-         ) => StmtInterpreter cell (AST.ClassDeclaration f) m where
-  interpretStmt (AST.ClassDeclaration tk _methods) = do
-    let name = tokenLexeme tk
-    RTState.defineM @cell name ValNil
-    let klass = ValClass $ LoxClass (tokenLexeme tk)
-    RTState.defineM @cell name klass
-    -- TODO build class
-    -- val <- interpretExpr @cell expr
-    -- RTState.defineM @cell name val
+instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration RuntimeAST) m where
+  interpretStmt (AST.ClassDeclaration tk methodExprs) = do
+      let name = tokenLexeme tk
+      RTState.defineM @cell name ValNil
+      frame <- gets (RTState.localFrame @cell)
+      let klass = ValClass $ LoxClass (tokenLexeme tk) (methodTable frame methodExprs)
+      RTState.defineM @cell name klass
+    where
+      methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
+      addMethod frame table methodExpr =
+        Map.insert (tokenLexeme $ AST.functionToken methodExpr) (LoxFn methodExpr frame) table
 
 instance ( Runtime cell sig m
          , StmtInterpreter cell (AST.Stmt f) m
@@ -342,12 +342,18 @@ getProperty :: forall cell sig m
             => LoxInstance cell
             -> Token
             -> m (RTValue cell)
-getProperty (LoxInstance _klass properties) propertyName = do
+getProperty (LoxInstance klass properties) propertyName = do
   let name = tokenLexeme propertyName
   props <- Cells.readCell properties
   case Map.lookup name props of
-    Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
     Just val -> pure val
+    Nothing -> do
+      case findMethod name klass of
+        Just method -> pure $ ValFn method
+        Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
+
+findMethod :: T.Text -> LoxClass cell -> Maybe (LoxFn cell)
+findMethod name (LoxClass _ methodTable) = Map.lookup name methodTable
 
 setProperty :: forall cell sig m
              . Runtime cell sig m
@@ -402,8 +408,8 @@ instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
         pure ValNil
 
 instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
-  loxArity (LoxClass _) = pure 0
-  loxCall _ klass@(LoxClass _name) _args = do
+  loxArity (LoxClass _ _) = pure 0
+  loxCall _ klass@(LoxClass _name _methods) _args = do
     instanceState <- Cells.newCell @cell (Map.empty)
     pure $ ValInstance (LoxInstance klass instanceState)
 
