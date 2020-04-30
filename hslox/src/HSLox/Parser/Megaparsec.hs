@@ -333,7 +333,10 @@ call = primary >>= sequenceOfCalls
           args <- arguments
           paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
           sequenceOfCalls (CallE callee paren args))
-        <|> pure callee
+      <|> (do _ <- singleMatching [ Token.DOT ]
+              property <- consume [Token.IDENTIFIER] "Expect property name after '.'."
+              sequenceOfCalls (GetE callee property))
+      <|> pure callee
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
       if endOfArgsList

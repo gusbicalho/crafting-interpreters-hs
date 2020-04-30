@@ -82,6 +82,7 @@ instance WalkAST Expr where
   walkAST preWalk postWalk (VariableExpr t)   = VariableExpr   <$> walkLeaf preWalk postWalk t
   walkAST preWalk postWalk (AssignmentExpr t) = AssignmentExpr <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (CallExpr t)       = CallExpr       <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (GetExpr t)        = GetExpr        <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
   walkAST preWalk postWalk (FunctionExpr t)   = FunctionExpr   <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
 
 instance WalkAST Unary where
@@ -120,8 +121,13 @@ instance WalkAST Assignment where
 instance WalkAST Call where
   {-# INLINE walkAST #-}
   walkAST preWalk postWalk (Call callee paren args) = Call <$> walkAST preWalk postWalk callee
-                                                       <*> pure paren
-                                                       <*> traverse (walkAST preWalk postWalk) args
+                                                           <*> pure paren
+                                                           <*> traverse (walkAST preWalk postWalk) args
+
+instance WalkAST Get where
+  {-# INLINE walkAST #-}
+  walkAST preWalk postWalk (Get callee prop) = Get <$> walkAST preWalk postWalk callee
+                                                   <*> pure prop
 
 instance WalkAST Function where
   {-# INLINE walkAST #-}

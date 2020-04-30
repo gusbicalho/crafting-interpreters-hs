@@ -205,6 +205,7 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
+  interpretExpr (AST.GetExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
@@ -316,15 +317,25 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.Get f) m where
+  interpretExpr (AST.Get objectExpr tk) = do
+    object <- interpretExpr @cell objectExpr
+    case object of
+      -- TODO access property
+      ValInstance _inst -> pure ValNil
+      _ -> RTError.throwRT tk "Not an object."
+
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
          ) => ExprInterpreter cell (AST.Call f) m where
   interpretExpr (AST.Call calleeExpr paren argExprs) = do
-      callee <- interpretExpr @cell calleeExpr
-      args <- traverse interpretExpr argExprs
-      case callee of
-        ValFn fn -> call paren fn args
-        ValClass klass -> call paren klass args
-        ValNativeFn nativeFn -> call paren nativeFn args
-        _ -> RTError.throwRT paren "Can only call functions and classes."
+    callee <- interpretExpr @cell calleeExpr
+    args <- traverse interpretExpr argExprs
+    case callee of
+      ValFn fn -> call paren fn args
+      ValClass klass -> call paren klass args
+      ValNativeFn nativeFn -> call paren nativeFn args
+      _ -> RTError.throwRT paren "Can only call functions and classes."
 
 call :: forall cell e sig m
       . LoxCallable cell e m

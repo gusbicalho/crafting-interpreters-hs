@@ -316,13 +316,19 @@ call :: ExprParser sig m
 call = primary >>= sequenceOfCalls
   where
     sequenceOfCalls callee = do
-      nextCallParen <- Util.runEmptyToBool $ match [ Token.LEFT_PAREN ]
-      if nextCallParen
-      then do
-        args <- arguments
-        paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
-        sequenceOfCalls (CallE callee paren args)
-      else pure callee
+      next <- Util.runEmptyToMaybe $ match [ Token.LEFT_PAREN
+                                           , Token.DOT
+                                           ]
+      case next of
+        Just tk
+          | Token.LEFT_PAREN == tokenType tk -> do
+            args <- arguments
+            paren <- consume [ Token.RIGHT_PAREN ] "Expect ')' after arguments."
+            sequenceOfCalls (CallE callee paren args)
+          | Token.DOT == tokenType tk -> do
+            property <- consume [Token.IDENTIFIER] "Expect property name after '.'."
+            sequenceOfCalls (GetE callee property)
+        _ -> pure callee
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
       if endOfArgsList

@@ -98,6 +98,7 @@ instance ( ASTPrinter (f (Unary f))
          , ASTPrinter (f Variable)
          , ASTPrinter (f (Assignment f))
          , ASTPrinter (f (Call f))
+         , ASTPrinter (f (Get f))
          , ASTPrinter (f (Function f))
          ) => ASTPrinter (Expr f) where
   printAST (UnaryExpr e) = printAST e
@@ -109,10 +110,14 @@ instance ( ASTPrinter (f (Unary f))
   printAST (VariableExpr e) = printAST e
   printAST (AssignmentExpr e) = printAST e
   printAST (CallExpr e) = printAST e
+  printAST (GetExpr e) = printAST e
   printAST (FunctionExpr e) = printAST e
 
 instance ASTPrinter (Expr f) => ASTPrinter (Call f) where
   printAST (Call callee _ args) = parenthesize (printAST callee) (toList args)
+
+instance ASTPrinter (Expr f) => ASTPrinter (Get f) where
+  printAST (Get object tk) = parenthesize ("." <> tokenLexeme tk) [object]
 
 instance ASTPrinter (Expr f) => ASTPrinter (Assignment f) where
   printAST (Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]
