@@ -248,6 +248,7 @@ assignment = do
       right <- assignment
       case left of
         VariableE tk -> pure $ AssignmentE tk right
+        GetE obj prop -> pure $ SetPropertyE obj prop right
         _ -> do
           registerFancyFailure (makeError (Just equals) "Invalid assignment target.")
           pure left

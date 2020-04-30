@@ -73,17 +73,18 @@ instance WalkAST Return where
 
 instance WalkAST Expr where
   {-# INLINE walkAST #-}
-  walkAST preWalk postWalk (UnaryExpr t)      = UnaryExpr      <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (LogicalExpr t)    = LogicalExpr    <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (BinaryExpr t)     = BinaryExpr     <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (TernaryExpr t)    = TernaryExpr    <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (GroupingExpr t)   = GroupingExpr   <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (LiteralExpr t)    = LiteralExpr    <$> walkLeaf preWalk postWalk t
-  walkAST preWalk postWalk (VariableExpr t)   = VariableExpr   <$> walkLeaf preWalk postWalk t
-  walkAST preWalk postWalk (AssignmentExpr t) = AssignmentExpr <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (CallExpr t)       = CallExpr       <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (GetExpr t)        = GetExpr        <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
-  walkAST preWalk postWalk (FunctionExpr t)   = FunctionExpr   <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (UnaryExpr t)       = UnaryExpr       <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (LogicalExpr t)     = LogicalExpr     <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (BinaryExpr t)      = BinaryExpr      <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (TernaryExpr t)     = TernaryExpr     <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (GroupingExpr t)    = GroupingExpr    <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (LiteralExpr t)     = LiteralExpr     <$> walkLeaf preWalk postWalk t
+  walkAST preWalk postWalk (VariableExpr t)    = VariableExpr    <$> walkLeaf preWalk postWalk t
+  walkAST preWalk postWalk (AssignmentExpr t)  = AssignmentExpr  <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (CallExpr t)        = CallExpr        <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (GetExpr t)         = GetExpr         <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (SetPropertyExpr t) = SetPropertyExpr <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
+  walkAST preWalk postWalk (FunctionExpr t)    = FunctionExpr    <$> (preWalk t >>= traverse (walkAST preWalk postWalk) >>= postWalk)
 
 instance WalkAST Unary where
   {-# INLINE walkAST #-}
@@ -128,6 +129,12 @@ instance WalkAST Get where
   {-# INLINE walkAST #-}
   walkAST preWalk postWalk (Get callee prop) = Get <$> walkAST preWalk postWalk callee
                                                    <*> pure prop
+
+instance WalkAST SetProperty where
+  {-# INLINE walkAST #-}
+  walkAST preWalk postWalk (SetProperty obj prop val) = SetProperty <$> walkAST preWalk postWalk obj
+                                                                    <*> pure prop
+                                                                    <*> walkAST preWalk postWalk val
 
 instance WalkAST Function where
   {-# INLINE walkAST #-}

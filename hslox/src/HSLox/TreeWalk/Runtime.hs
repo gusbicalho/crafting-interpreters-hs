@@ -93,7 +93,8 @@ data LoxClass (cell :: Type -> Type) =
   LoxClass { loxClassName :: T.Text }
 
 data LoxInstance cell =
-  LoxInstance { loxInstanceClass :: LoxClass cell }
+  LoxInstance { loxInstanceClass :: LoxClass cell
+              , loxInstanceState :: (cell (Map T.Text (RTValue cell)))}
 
 pattern NativeDef :: Int
                   -> (forall cell sig m. NativeFnImplFn cell sig m)

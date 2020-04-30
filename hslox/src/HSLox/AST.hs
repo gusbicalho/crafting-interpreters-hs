@@ -138,6 +138,11 @@ pattern GetExprI e = GetExpr (Identity e)
 pattern GetE :: ExprI -> Token -> ExprI
 pattern GetE object name = GetExpr (Identity (Get object name))
 
+pattern SetPropertyExprI :: SetProperty Identity -> Expr Identity
+pattern SetPropertyExprI e = SetPropertyExpr (Identity e)
+pattern SetPropertyE :: ExprI -> Token -> ExprI -> ExprI
+pattern SetPropertyE object name value = SetPropertyExpr (Identity (SetProperty object name value))
+
 pattern LiteralExprI :: Literal -> Expr Identity
 pattern LiteralExprI e = LiteralExpr (Identity e)
 
@@ -168,6 +173,7 @@ data Expr f = UnaryExpr (f (Unary f))
             | AssignmentExpr (f (Assignment f))
             | CallExpr (f (Call f))
             | GetExpr (f (Get f))
+            | SetPropertyExpr (f (SetProperty f))
             | FunctionExpr (f (Function f))
 
 deriving instance ( Show (f (Unary f))
@@ -180,6 +186,7 @@ deriving instance ( Show (f (Unary f))
                   , Show (f (Assignment f))
                   , Show (f (Call f))
                   , Show (f (Get f))
+                  , Show (f (SetProperty f))
                   , Show (f (Function f))
                   ) => Show (Expr f)
 
@@ -239,6 +246,12 @@ data Call f = Call { callCallee :: Expr f
 deriving instance (Show (Expr f)) => Show (Call f)
 
 data Get f = Get { getObject :: Expr f
-                 , getParen :: Token
+                 , getProperty :: Token
                  }
 deriving instance (Show (Expr f)) => Show (Get f)
+
+data SetProperty f = SetProperty { setPropertyObject :: Expr f
+                                 , setPropertyProperty :: Token
+                                 , setPropertyValue :: Expr f
+                                 }
+deriving instance (Show (Expr f)) => Show (SetProperty f)

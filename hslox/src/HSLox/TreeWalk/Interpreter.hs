@@ -15,6 +15,7 @@ import Data.Foldable
 import Data.Function
 import Data.Functor
 import Data.Kind (Type)
+import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
@@ -80,7 +81,7 @@ showValue (ValBool False) = "false"
 showValue ValNil = "nil"
 showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValClass (LoxClass className)) = "<class " <> className <> ">"
-showValue (ValInstance (LoxInstance (LoxClass className))) = "<instance " <> className <> ">"
+showValue (ValInstance (LoxInstance (LoxClass className) _)) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -206,6 +207,7 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
   interpretExpr (AST.GetExpr t) = interpretExpr t
+  interpretExpr (AST.SetPropertyExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
@@ -319,11 +321,44 @@ instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
          ) => ExprInterpreter cell (AST.Get f) m where
   interpretExpr (AST.Get objectExpr tk) = do
-    object <- interpretExpr @cell objectExpr
+    object <- interpretExpr objectExpr
     case object of
-      -- TODO access property
-      ValInstance _inst -> pure ValNil
-      _ -> RTError.throwRT tk "Not an object."
+      ValInstance inst -> getProperty @cell inst tk
+      _ -> RTError.throwRT tk "Only instances have properties."
+
+instance ( Runtime cell sig m
+         , ExprInterpreter cell (AST.Expr f) m
+         ) => ExprInterpreter cell (AST.SetProperty f) m where
+  interpretExpr (AST.SetProperty objectExpr tk valueExpr) = do
+    object <- interpretExpr objectExpr
+    case object of
+      ValInstance inst -> do
+        value <- interpretExpr valueExpr
+        setProperty @cell inst tk value
+      _ -> RTError.throwRT tk "Only instances have properties."
+
+getProperty :: forall cell sig m
+             . Runtime cell sig m
+            => LoxInstance cell
+            -> Token
+            -> m (RTValue cell)
+getProperty (LoxInstance _klass properties) propertyName = do
+  let name = tokenLexeme propertyName
+  props <- Cells.readCell properties
+  case Map.lookup name props of
+    Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
+    Just val -> pure val
+
+setProperty :: forall cell sig m
+             . Runtime cell sig m
+            => LoxInstance cell
+            -> Token
+            -> RTValue cell
+            -> m (RTValue cell)
+setProperty (LoxInstance _klass properties) propertyName value = do
+  let name = tokenLexeme propertyName
+  Cells.updateCell (Map.insert name value) properties
+  pure value
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
@@ -369,7 +404,8 @@ instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
 instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
   loxArity (LoxClass _) = pure 0
   loxCall _ klass@(LoxClass _name) _args = do
-    pure $ ValInstance (LoxInstance klass)
+    instanceState <- Cells.newCell @cell (Map.empty)
+    pure $ ValInstance (LoxInstance klass instanceState)
 
 instance Runtime cell sig m => LoxCallable cell LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity

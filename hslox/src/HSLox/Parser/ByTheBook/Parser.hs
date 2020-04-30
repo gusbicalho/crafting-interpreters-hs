@@ -231,6 +231,7 @@ assignment = do
       right <- assignment
       case left of
         VariableE tk -> pure $ AssignmentE tk right
+        GetE obj prop -> pure $ SetPropertyE obj prop right
         _ -> do
           reportError $ ParserError (Just equals) "Invalid assignment target."
           empty

@@ -179,9 +179,9 @@ spec = do
       , "[ (class Klass (one [] { (print 1.0) }) (two [a] { (print a) })) ]")
   describe "programs with property access" $ do
     testParserImplementations
-      (scan "class Klass { one() { print(1); } } var a = Klass(); a.one();")
+      (scan "class Klass { one() { print(1); } } var a = Klass(); a.one(); a.two = 2;")
       ( Set.empty
-      , "[ (class Klass (one [] { (print 1.0) })) (var a (Klass)) ((.one a)) ]")
+      , "[ (class Klass (one [] { (print 1.0) })) (var a (Klass)) ((.one a)) (.two= a 2.0) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent
