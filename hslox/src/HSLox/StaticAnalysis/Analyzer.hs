@@ -13,8 +13,10 @@ import qualified HSLox.AST as AST
 import HSLox.AST.WalkAST
 import HSLox.AST.Meta
 import HSLox.StaticAnalysis.Error
+import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassTypeStack
 import qualified HSLox.StaticAnalysis.FunctionTypeStack as FunctionTypeStack
 import qualified HSLox.StaticAnalysis.CheckBadReturns as CheckBadReturns
+import qualified HSLox.StaticAnalysis.CheckBadThis as CheckBadThis
 import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
 
 analyze :: AsIdentity f
@@ -23,11 +25,16 @@ analyze :: AsIdentity f
         => AST.Program f
         -> m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
 analyze
-  = State.evalState ResolveLocals.emptyState
-  . State.evalState FunctionTypeStack.emptyState
+  = State.evalState FunctionTypeStack.emptyState
+  . State.evalState ClassTypeStack.emptyState
+  . State.evalState ResolveLocals.emptyState
   . walkAST (FunctionTypeStack.preFunctionTypeStack >=>
+             ClassTypeStack.preClassTypeStack >=>
              ResolveLocals.preResolvingLocals >=>
-             CheckBadReturns.preCheckForBadReturns)
-            (CheckBadReturns.postCheckForBadReturns >=>
+             CheckBadReturns.preCheckBadReturns >=>
+             CheckBadThis.preCheckBadThis)
+            (CheckBadThis.postCheckBadThis >=>
+             CheckBadReturns.postCheckBadReturns >=>
              ResolveLocals.postResolvingLocals >=>
+             ClassTypeStack.postClassTypeStack >=>
              FunctionTypeStack.postFunctionTypeStack)

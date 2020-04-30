@@ -1,6 +1,6 @@
 module HSLox.StaticAnalysis.CheckBadReturns
-  ( preCheckForBadReturns
-  , postCheckForBadReturns
+  ( preCheckBadReturns
+  , postCheckBadReturns
   ) where
 
 import Control.Carrier.State.Church (State)
@@ -13,12 +13,12 @@ import HSLox.AST.Meta
 import HSLox.StaticAnalysis.Error
 import qualified HSLox.StaticAnalysis.FunctionTypeStack as FunctionType
 
-preCheckForBadReturns :: AsIdentity f
+preCheckBadReturns :: AsIdentity f
                       => AsAST a g
                       => Has (State FunctionType.FunctionTypeStack) sig m
                       => Has (Writer (Set AnalysisError)) sig m
                       => f a -> m (f a)
-preCheckForBadReturns fa = do
+preCheckBadReturns fa = do
   case content fa of
     (toReturn -> Just (AST.Return tk _)) -> do
       fnType <- FunctionType.currentFunctionType
@@ -27,5 +27,5 @@ preCheckForBadReturns fa = do
     _ -> pure ()
   pure fa
 
-postCheckForBadReturns :: Applicative m => f a -> m (f a)
-postCheckForBadReturns = pure
+postCheckBadReturns :: Applicative m => f a -> m (f a)
+postCheckBadReturns = pure
