@@ -79,7 +79,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValFn (LoxFn (AST.Function tk _ _) _ _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValClass (LoxClass className _)) = "<class " <> className <> ">"
 showValue (ValInstance (LoxInstance (LoxClass className _) _)) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
@@ -151,9 +151,10 @@ instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration Runtim
       RTState.defineM @cell name klass
     where
       methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
+      isInit (AST.Function tk _ _) = tokenLexeme tk == "init"
       addMethod frame table (AST.Meta.content -> methodExpr) =
         Map.insert (tokenLexeme $ AST.functionToken methodExpr)
-                   (LoxFn methodExpr frame)
+                   (LoxFn methodExpr frame (isInit methodExpr))
                    table
 
 instance ( Runtime cell sig m
@@ -319,7 +320,7 @@ instance ( Runtime cell sig m
 instance Runtime cell sig m => ExprInterpreter cell (AST.Function RuntimeAST) m where
   interpretExpr fn = do
     frame <- gets (RTState.localFrame @cell)
-    pure . ValFn $ LoxFn fn frame
+    pure . ValFn $ LoxFn fn frame False
 
 instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitString s) = pure $ ValString s
@@ -367,9 +368,9 @@ findMethod name (LoxClass _ methodTable) = Map.lookup name methodTable
 
 bindThis :: Runtime cell sig m
          => LoxInstance cell -> LoxFn cell -> m (LoxFn cell)
-bindThis inst (LoxFn function env) = RTState.runInChildEnvOf env $ do
+bindThis inst (LoxFn function env isInit) = RTState.runInChildEnvOf env $ do
   RTState.defineM "this" (ValInstance inst)
-  LoxFn function <$> gets RTState.localFrame
+  LoxFn function <$> gets RTState.localFrame <*> pure isInit
 
 setProperty :: forall cell sig m
              . Runtime cell sig m
@@ -414,14 +415,18 @@ class LoxCallable cell e m where
   loxCall :: Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 
 instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
-  loxArity (LoxFn (AST.Function _ params _) _) = pure (Seq.length params)
-  loxCall _ (LoxFn (AST.Function _ params body) env) args = do
-    RTReturn.catchReturn $
-      RTState.runInChildEnvOf env $ do
-        for_ (Seq.zip params args) $ \(param, arg) -> do
-          RTState.defineM (tokenLexeme param) arg
-        interpretStmt @cell body
-        pure ValNil
+  loxArity (LoxFn (AST.Function _ params _) _ _) = pure (Seq.length params)
+  loxCall _ (LoxFn (AST.Function _ params body) env isInit) args = do
+    returnVal <- RTReturn.catchReturn $
+                  RTState.runInChildEnvOf env $ do
+                    for_ (Seq.zip params args) $ \(param, arg) -> do
+                      RTState.defineM (tokenLexeme param) arg
+                    interpretStmt @cell body
+                    pure ValNil
+    if isInit
+    then RTState.runInChildEnvOf env $ do
+      RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (Just 1)
+    else pure returnVal
 
 instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
   loxArity klass = case findMethod "init" klass of

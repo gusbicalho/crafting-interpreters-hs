@@ -87,6 +87,7 @@ asRuntimeAST ast = WalkAST.walkAST pure postWalk ast
 
 data LoxFn cell = LoxFn { loxFnAST :: AST.Function RuntimeAST
                         , loxClosedEnv :: Maybe (RTFrame cell)
+                        , loxFnIsInitializer :: Bool
                         }
 
 data LoxClass (cell :: Type -> Type) =
