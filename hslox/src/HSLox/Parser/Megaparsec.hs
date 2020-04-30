@@ -215,11 +215,10 @@ finishBlock = do
 returnStmt :: MonadParsec ParserError TokenStream m => m StmtI
 returnStmt = do
   returnTk <- singleMatching [ Token.RETURN ]
-  expr <- (NilE <$ singleMatching [Token.SEMICOLON])
-          <|> (do expr <- expression
-                  consume [Token.SEMICOLON] "Expect ';' after expression."
-                  pure expr)
-  pure . ReturnStmtI $ Return returnTk expr
+  (ReturnStmtI (Return returnTk Nothing) <$ singleMatching [Token.SEMICOLON])
+    <|> (do expr <- expression
+            consume [Token.SEMICOLON] "Expect ';' after expression."
+            pure . ReturnStmtI $ Return returnTk (Just expr))
 
 expressionStmt :: MonadParsec ParserError TokenStream m => m StmtI
 expressionStmt = do

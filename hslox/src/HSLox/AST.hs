@@ -89,7 +89,7 @@ data While f = While { whileCondition :: Expr f
 deriving instance (Show (Stmt f), Show (Expr f)) => Show (While f)
 
 data Return f = Return { returnToken :: Token
-                       , returnValue :: Expr f
+                       , returnValue :: Maybe (Expr f)
                        }
 deriving instance (Show (Expr f)) => Show (Return f)
 

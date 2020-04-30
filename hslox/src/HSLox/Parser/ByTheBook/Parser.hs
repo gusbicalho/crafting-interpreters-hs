@@ -198,10 +198,11 @@ forStmt = do
 returnStmt :: Has Empty sig m => StmtParser sig m
 returnStmt = do
   returnTk <- match [ Token.RETURN ]
-  expr <- (NilE <$ match [Token.SEMICOLON])
-          `Util.recoverFromEmptyWith`
-          (expression <* consume [Token.SEMICOLON] "Expect ';' after expression.")
-  pure . ReturnStmtI $ Return returnTk expr
+  (ReturnStmtI (Return returnTk Nothing) <$ match [Token.SEMICOLON])
+    `Util.recoverFromEmptyWith`
+    (do expr <- expression
+        consume [Token.SEMICOLON] "Expect ';' after expression."
+        pure . ReturnStmtI $ Return returnTk (Just expr))
 
 expressionStmt :: StmtParser sig m
 expressionStmt = do

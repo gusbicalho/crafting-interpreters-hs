@@ -6,6 +6,7 @@ module HSLox.StaticAnalysis.CheckBadReturns
 import Control.Carrier.State.Church (State)
 import Control.Effect.Writer
 import Control.Monad
+import Data.Maybe (isJust)
 import Data.Set (Set)
 import qualified HSLox.AST as AST
 import HSLox.AST.AsAST
@@ -20,10 +21,12 @@ preCheckBadReturns :: AsIdentity f
                       => f a -> m (f a)
 preCheckBadReturns fa = do
   case content fa of
-    (toReturn -> Just (AST.Return tk _)) -> do
+    (toReturn -> Just (AST.Return tk expr)) -> do
       fnType <- FunctionType.currentFunctionType
       when (fnType == FunctionType.None) $
         tellAnalysisError tk "Cannot return from top-level code."
+      when (fnType == FunctionType.Initializer && isJust expr) $
+        tellAnalysisError tk "Cannot return a value from an initializer."
     _ -> pure ()
   pure fa
 

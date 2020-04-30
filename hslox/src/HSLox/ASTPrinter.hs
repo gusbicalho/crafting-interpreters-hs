@@ -86,7 +86,7 @@ instance ASTPrinter (Block f) => ASTPrinter (Function f) where
    <> ")"
 
 instance ASTPrinter (Expr f) => ASTPrinter (Return f) where
-  printAST (Return tk expr) = parenthesize (tokenLexeme tk) [expr]
+  printAST (Return tk expr) = parenthesize (tokenLexeme tk) (toList expr)
 
 instance ( ASTPrinter (f (Unary f))
          , ASTPrinter (f (Logical f))

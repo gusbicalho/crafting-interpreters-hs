@@ -186,8 +186,11 @@ instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
          ) => StmtInterpreter cell (AST.Return f) m where
   interpretStmt (AST.Return tk expr) = do
-    val <- interpretExpr @cell expr
-    RTReturn.throwReturn tk val
+    case expr of
+      Just expr -> do
+        val <- interpretExpr @cell expr
+        RTReturn.throwReturn tk val
+      Nothing -> RTReturn.throwReturn @cell tk ValNil
 
 class ExprInterpreter (cell :: Type -> Type)
                       (e :: Type)

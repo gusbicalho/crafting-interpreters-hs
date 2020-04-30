@@ -92,7 +92,7 @@ instance WalkAST While where
 
 instance WalkAST Return where
   {-# INLINE walkAST #-}
-  walkAST preW postW (Return tk expr) = Return tk <$> walkAST preW postW expr
+  walkAST preW postW (Return tk expr) = Return tk <$> traverse (walkAST preW postW) expr
 
 instance WalkAST Expr where
   {-# INLINE walkAST #-}
