@@ -38,6 +38,9 @@ preResolvingLocals fa = do
       declareLocal tk
       defineLocal tk
       beginFunctionScope fn
+    (toClassDeclaration -> Just (AST.ClassDeclaration tk _)) -> do
+      declareLocal tk
+      defineLocal tk
     (toFunction -> Just fn) -> do
       beginFunctionScope fn
     _ -> pure ()

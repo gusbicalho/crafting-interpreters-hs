@@ -9,6 +9,7 @@ module HSLox.TreeWalk.Runtime
 import Control.Effect.Trace
 import Control.Effect.Error
 import Control.Effect.State
+import Data.Kind
 import Data.Map.Strict (Map)
 import Data.Sequence (Seq (..))
 import qualified Data.Text as T
@@ -57,6 +58,8 @@ data RTValue cell
   | ValBool Bool
   | ValNil
   | ValFn (LoxFn cell)
+  | ValClass (LoxClass cell)
+  | ValInstance (LoxInstance cell)
   | ValNativeFn LoxNativeFn
 
 newtype RuntimeAST a = RuntimeAST (AST.Meta.WithMeta Analyzer.ResolverMeta
@@ -85,6 +88,12 @@ asRuntimeAST ast = WalkAST.walkAST preWalk pure ast
 data LoxFn cell = LoxFn { loxFnAST :: AST.Function RuntimeAST
                         , loxClosedEnv :: Maybe (RTFrame cell)
                         }
+
+data LoxClass (cell :: Type -> Type) =
+  LoxClass { loxClassName :: T.Text }
+
+data LoxInstance cell =
+  LoxInstance { loxInstanceClass :: LoxClass cell }
 
 pattern NativeDef :: Int
                   -> (forall cell sig m. NativeFnImplFn cell sig m)

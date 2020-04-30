@@ -79,6 +79,8 @@ showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
 showValue (ValFn (LoxFn (AST.Function tk _ _) _)) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValClass (LoxClass className)) = "<class " <> className <> ">"
+showValue (ValInstance (LoxInstance (LoxClass className))) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -142,9 +144,11 @@ instance ( Runtime cell sig m
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Function f) m
          ) => StmtInterpreter cell (AST.ClassDeclaration f) m where
-  interpretStmt (AST.ClassDeclaration tk methods) = do
+  interpretStmt (AST.ClassDeclaration tk _methods) = do
     let name = tokenLexeme tk
     RTState.defineM @cell name ValNil
+    let klass = ValClass $ LoxClass (tokenLexeme tk)
+    RTState.defineM @cell name klass
     -- TODO build class
     -- val <- interpretExpr @cell expr
     -- RTState.defineM @cell name val
@@ -226,17 +230,17 @@ instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
          ) => ExprInterpreter cell (AST.Ternary f) m where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
-      leftVal <- interpretExpr @cell left
-      case (tokenType op1, tokenType op2) of
-        (Token.QUESTION_MARK, Token.COLON) ->
-          if isTruthy leftVal
-          then interpretExpr middle
-          else interpretExpr right
-        _ -> RTError.throwRT op2 $ "AST Error: Operator pair "
-                                <> tokenLexeme op1
-                                <> " and "
-                                <> tokenLexeme op2
-                                <> " not supported in ternary position"
+    leftVal <- interpretExpr @cell left
+    case (tokenType op1, tokenType op2) of
+      (Token.QUESTION_MARK, Token.COLON) ->
+        if isTruthy leftVal
+        then interpretExpr middle
+        else interpretExpr right
+      _ -> RTError.throwRT op2 $ "AST Error: Operator pair "
+                              <> tokenLexeme op1
+                              <> " and "
+                              <> tokenLexeme op2
+                              <> " not supported in ternary position"
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
@@ -318,6 +322,7 @@ instance ( Runtime cell sig m
       args <- traverse interpretExpr argExprs
       case callee of
         ValFn fn -> call paren fn args
+        ValClass klass -> call paren klass args
         ValNativeFn nativeFn -> call paren nativeFn args
         _ -> RTError.throwRT paren "Can only call functions and classes."
 
@@ -349,6 +354,11 @@ instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
           RTState.defineM (tokenLexeme param) arg
         interpretStmt @cell body
         pure ValNil
+
+instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
+  loxArity (LoxClass _) = pure 0
+  loxCall _ klass@(LoxClass _name) _args = do
+    pure $ ValInstance (LoxInstance klass)
 
 instance Runtime cell sig m => LoxCallable cell LoxNativeFn m where
   loxArity (LoxNativeFn arity _) = pure arity
