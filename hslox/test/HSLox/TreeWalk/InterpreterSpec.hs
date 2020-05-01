@@ -171,6 +171,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["7"])
+    it "a program with classes and subclasses" $ do
+      "class A { one() { return 1; } } class B < A { two() { return 2; } } var b = B(); print(b.one()+b.two());"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["3"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

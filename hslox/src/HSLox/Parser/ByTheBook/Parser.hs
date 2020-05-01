@@ -89,10 +89,14 @@ classDeclaration :: Has Empty sig m => StmtParser sig m
 classDeclaration = do
     match [Token.CLASS]
     className <- consume [Token.IDENTIFIER] "Expect class name."
+    superclass <- Util.runEmptyToMaybe $ do
+                    match [Token.LESS]
+                    tk <- consume [Token.IDENTIFIER] "Expect superclass name."
+                    pure . Identity . Variable $ tk
     consume [Token.LEFT_BRACE] "Expect '{' before class body."
     methods <- parseMethods Seq.empty
     consume [Token.RIGHT_BRACE] "Expect '}' after class body."
-    pure $ ClassDeclarationStmtI $ ClassDeclaration className Nothing methods
+    pure $ ClassDeclarationStmtI $ ClassDeclaration className superclass methods
   where
     parseMethods acc = do
       endOfClass <- check [Token.RIGHT_BRACE, Token.EOF]

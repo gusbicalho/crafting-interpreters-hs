@@ -187,6 +187,11 @@ spec = do
       (scan "class A { play() { print(this.song); }} var a = A(); a.song = \"The Lemon Song\"; var play = a.play; play();")
       ( Set.empty
       , "[ (class A (play [] { (print (.song this)) })) (var a (A)) (.song= a \"The Lemon Song\") (var play (.play a)) (play) ]")
+  describe "programs with classes extending classes" $ do
+    testParserImplementations
+      (scan "class Klass { one() { print(1); } } class Qlass < Klass { two(a) { print(a); } }")
+      ( Set.empty
+      , "[ (class Klass (one [] { (print 1.0) })) (class Qlass < Klass (two [a] { (print a) })) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

@@ -92,6 +92,7 @@ data LoxFn cell = LoxFn { loxFnAST :: AST.Function RuntimeAST
 
 data LoxClass (cell :: Type -> Type) =
   LoxClass { loxClassName :: T.Text
+           , loxClassSuperclass :: Maybe (LoxClass cell)
            , loxClassMethodTable :: Map T.Text (LoxFn cell)
            }
 

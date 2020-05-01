@@ -104,10 +104,14 @@ classDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 classDeclaration = do
     singleMatching [Token.CLASS]
     className <- consume [Token.IDENTIFIER] "Expect class name."
+    superclass <- (do singleMatching [Token.LESS]
+                      tk <- consume [Token.IDENTIFIER] "Expect superclass name."
+                      pure . Just . Identity . Variable $ tk)
+                  <|> pure Nothing
     consume [Token.LEFT_BRACE] "Expect '{' before class body."
     methods <- parseMethods Seq.empty
     consume [Token.RIGHT_BRACE] "Expect '}' after class body."
-    pure $ ClassDeclarationStmtI $ ClassDeclaration className Nothing methods
+    pure $ ClassDeclarationStmtI $ ClassDeclaration className superclass methods
   where
     parseMethods acc = do
       endOfClass <- check [Token.RIGHT_BRACE, Token.EOF]

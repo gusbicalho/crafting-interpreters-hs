@@ -8,6 +8,7 @@ module HSLox.TreeWalk.Interpreter
   , baseEnv
   ) where
 
+import Control.Applicative
 import Control.Carrier.Error.Church
 import Control.Carrier.State.Church
 import Control.Monad (when)
@@ -19,6 +20,7 @@ import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
+import Data.Traversable
 import qualified HSLox.AST as AST
 import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.Cells.Effect as Cells
@@ -80,8 +82,8 @@ showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
 showValue (ValFn (LoxFn (AST.Function tk _ _) _ _)) = "<fn " <> tokenLexeme tk <> ">"
-showValue (ValClass (LoxClass className _)) = "<class " <> className <> ">"
-showValue (ValInstance (LoxInstance (LoxClass className _) _)) = "<instance " <> className <> ">"
+showValue (ValClass (LoxClass className _ _)) = "<class " <> className <> ">"
+showValue (ValInstance (LoxInstance (LoxClass className _ _) _)) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
 showValue (ValNum d) = dropZeroDecimal doubleString
   where
@@ -143,12 +145,19 @@ instance ( Runtime cell sig m
     RTState.defineM @cell name val
 
 instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration RuntimeAST) m where
-  interpretStmt (AST.ClassDeclaration tk _superclass methodExprs) = do
-      -- TODO use superclass
+  interpretStmt (AST.ClassDeclaration tk superclass methodExprs) = do
+      -- TODO use super
+      super <- for superclass $ \variable -> do
+        super <- interpretExpr @cell variable
+        case super of
+          ValClass super -> pure super
+          _ -> RTError.throwRT
+                (AST.variableIdentifier . AST.Meta.content $ variable)
+                "Superclass must be a class."
       let name = tokenLexeme tk
       RTState.defineM @cell name ValNil
       frame <- gets (RTState.localFrame @cell)
-      let klass = ValClass $ LoxClass (tokenLexeme tk) (methodTable frame methodExprs)
+      let klass = ValClass $ LoxClass (tokenLexeme tk) super (methodTable frame methodExprs)
       RTState.defineM @cell name klass
     where
       methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
@@ -368,7 +377,8 @@ getProperty inst@(LoxInstance klass properties) propertyName = do
         Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
 
 findMethod :: T.Text -> LoxClass cell -> Maybe (LoxFn cell)
-findMethod name (LoxClass _ methodTable) = Map.lookup name methodTable
+findMethod name (LoxClass _ superclass methodTable) =
+  Map.lookup name methodTable <|> (findMethod name =<< superclass)
 
 bindThis :: Runtime cell sig m
          => LoxInstance cell -> LoxFn cell -> m (LoxFn cell)
@@ -436,7 +446,7 @@ instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
   loxArity klass = case findMethod "init" klass of
     Nothing -> pure 0
     Just fn -> loxArity @cell fn
-  loxCall tk klass@(LoxClass _name _methods) args = do
+  loxCall tk klass args = do
     instanceState <- Cells.newCell @cell (Map.empty)
     let inst = LoxInstance klass instanceState
     case findMethod "init" klass of
