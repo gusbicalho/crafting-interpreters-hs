@@ -34,7 +34,7 @@ preResolvingLocals fa = do
       beginScope
     (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
       declareLocal tk
-    (toClassDeclaration -> Just (AST.ClassDeclaration tk _)) -> do
+    (toClassDeclaration -> Just (AST.ClassDeclaration tk _ _)) -> do
       declareLocal tk
       defineLocal (tokenLexeme tk)
       beginScope -- class

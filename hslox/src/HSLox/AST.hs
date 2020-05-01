@@ -70,9 +70,12 @@ data FunDeclaration f = FunDeclaration { funDeclarationIdentifier :: Token
 deriving instance (Show (Function f)) => Show (FunDeclaration f)
 
 data ClassDeclaration f = ClassDeclaration { classDeclarationIdentifier :: Token
+                                           , classDeclarationSuperclass :: Maybe (f Variable)
                                            , classDeclarationMethods :: Seq (f (Function f))
                                            }
-deriving instance (Show (f (Function f))) => Show (ClassDeclaration f)
+deriving instance ( Show (f (Function f))
+                  , Show (f Variable)
+                  ) => Show (ClassDeclaration f)
 
 newtype Block f = Block { blockBody :: Seq (Stmt f) }
 deriving instance (Show (Stmt f)) => Show (Block f)

@@ -107,7 +107,7 @@ classDeclaration = do
     consume [Token.LEFT_BRACE] "Expect '{' before class body."
     methods <- parseMethods Seq.empty
     consume [Token.RIGHT_BRACE] "Expect '}' after class body."
-    pure $ ClassDeclarationStmtI $ ClassDeclaration className methods
+    pure $ ClassDeclarationStmtI $ ClassDeclaration className Nothing methods
   where
     parseMethods acc = do
       endOfClass <- check [Token.RIGHT_BRACE, Token.EOF]

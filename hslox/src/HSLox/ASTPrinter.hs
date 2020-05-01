@@ -50,10 +50,13 @@ instance ( ASTPrinter (Block f)
       <> printAST body
       <> ")"
 
-instance ASTPrinter (f (Function f)) => ASTPrinter (ClassDeclaration f) where
-  printAST (ClassDeclaration tkName methods)
+instance ( ASTPrinter (f (Function f))
+         , ASTPrinter (f Variable)
+         ) => ASTPrinter (ClassDeclaration f) where
+  printAST (ClassDeclaration tkName superclass methods)
       = "(class "
       <> tokenLexeme tkName
+      <> foldMap ((" < " <>) . printAST) superclass
       <> foldMap ((" " <>) . printAST) methods
       <> ")"
 

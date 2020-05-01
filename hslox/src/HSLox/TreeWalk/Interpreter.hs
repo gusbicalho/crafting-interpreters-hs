@@ -143,7 +143,8 @@ instance ( Runtime cell sig m
     RTState.defineM @cell name val
 
 instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration RuntimeAST) m where
-  interpretStmt (AST.ClassDeclaration tk methodExprs) = do
+  interpretStmt (AST.ClassDeclaration tk _superclass methodExprs) = do
+      -- TODO use superclass
       let name = tokenLexeme tk
       RTState.defineM @cell name ValNil
       frame <- gets (RTState.localFrame @cell)

@@ -72,8 +72,9 @@ instance WalkAST FunDeclaration where
 
 instance WalkAST ClassDeclaration where
   {-# INLINE walkAST #-}
-  walkAST preW postW (ClassDeclaration identifier methods) =
-    ClassDeclaration identifier <$> traverse (walkWrapped preW postW) methods
+  walkAST preW postW (ClassDeclaration identifier superclass methods) =
+    ClassDeclaration identifier <$> traverse (walkLeaf preW postW) superclass
+                                <*> traverse (walkWrapped preW postW) methods
 
 instance WalkAST Block where
   {-# INLINE walkAST #-}
