@@ -136,10 +136,10 @@ pattern CallExprI e = CallExpr (Identity e)
 pattern CallE :: ExprI -> Token -> Seq ExprI -> ExprI
 pattern CallE callee paren args = CallExpr (Identity (Call callee paren args))
 
-pattern GetExprI :: Get Identity -> Expr Identity
-pattern GetExprI e = GetExpr (Identity e)
-pattern GetE :: ExprI -> Token -> ExprI
-pattern GetE object name = GetExpr (Identity (Get object name))
+pattern GetPropertyExprI :: GetProperty Identity -> Expr Identity
+pattern GetPropertyExprI e = GetPropertyExpr (Identity e)
+pattern GetPropertyE :: ExprI -> Token -> ExprI
+pattern GetPropertyE object name = GetPropertyExpr (Identity (GetProperty object name))
 
 pattern SetPropertyExprI :: SetProperty Identity -> Expr Identity
 pattern SetPropertyExprI e = SetPropertyExpr (Identity e)
@@ -178,7 +178,7 @@ data Expr f = UnaryExpr (f (Unary f))
             | VariableExpr (f Variable)
             | AssignmentExpr (f (Assignment f))
             | CallExpr (f (Call f))
-            | GetExpr (f (Get f))
+            | GetPropertyExpr (f (GetProperty f))
             | SetPropertyExpr (f (SetProperty f))
             | ThisExpr (f This)
             | FunctionExpr (f (Function f))
@@ -192,7 +192,7 @@ deriving instance ( Show (f (Unary f))
                   , Show (f Variable)
                   , Show (f (Assignment f))
                   , Show (f (Call f))
-                  , Show (f (Get f))
+                  , Show (f (GetProperty f))
                   , Show (f (SetProperty f))
                   , Show (f This)
                   , Show (f (Function f))
@@ -253,10 +253,10 @@ data Call f = Call { callCallee :: Expr f
                    }
 deriving instance (Show (Expr f)) => Show (Call f)
 
-data Get f = Get { getObject :: Expr f
-                 , getProperty :: Token
-                 }
-deriving instance (Show (Expr f)) => Show (Get f)
+data GetProperty f = GetProperty { getPropertyObject :: Expr f
+                                 , getPropertyProperty :: Token
+                                 }
+deriving instance (Show (Expr f)) => Show (GetProperty f)
 
 data SetProperty f = SetProperty { setPropertyObject :: Expr f
                                  , setPropertyProperty :: Token

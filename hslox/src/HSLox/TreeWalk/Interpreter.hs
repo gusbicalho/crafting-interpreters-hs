@@ -222,7 +222,7 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.GroupingExpr t) = interpretExpr t
   interpretExpr (AST.LiteralExpr t) = interpretExpr t
   interpretExpr (AST.CallExpr t) = interpretExpr t
-  interpretExpr (AST.GetExpr t) = interpretExpr t
+  interpretExpr (AST.GetPropertyExpr t) = interpretExpr t
   interpretExpr (AST.SetPropertyExpr t) = interpretExpr t
   interpretExpr (AST.ThisExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
@@ -343,8 +343,8 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
 
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
-         ) => ExprInterpreter cell (AST.Get f) m where
-  interpretExpr (AST.Get objectExpr tk) = do
+         ) => ExprInterpreter cell (AST.GetProperty f) m where
+  interpretExpr (AST.GetProperty objectExpr tk) = do
     object <- interpretExpr objectExpr
     case object of
       ValInstance inst -> getProperty @cell inst tk

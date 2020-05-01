@@ -52,9 +52,9 @@ class AsAST a f | a -> f where
   {-# INLINE toCall #-}
   toCall :: a -> Maybe (Call f)
   toCall _ = Nothing
-  {-# INLINE toGet #-}
-  toGet :: a -> Maybe (Get f)
-  toGet _ = Nothing
+  {-# INLINE toGetProperty #-}
+  toGetProperty :: a -> Maybe (GetProperty f)
+  toGetProperty _ = Nothing
   {-# INLINE toSetProperty #-}
   toSetProperty :: a -> Maybe (SetProperty f)
   toSetProperty _ = Nothing
@@ -119,9 +119,9 @@ instance AsAST (Assignment f) f where
 instance AsAST (Call f) f where
   {-# INLINE toCall #-}
   toCall = Just
-instance AsAST (Get f) f where
-  {-# INLINE toGet #-}
-  toGet = Just
+instance AsAST (GetProperty f) f where
+  {-# INLINE toGetProperty #-}
+  toGetProperty = Just
 instance AsAST (SetProperty f) f where
   {-# INLINE toSetProperty #-}
   toSetProperty = Just

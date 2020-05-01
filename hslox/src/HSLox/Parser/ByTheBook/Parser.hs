@@ -236,7 +236,7 @@ assignment = do
       right <- assignment
       case left of
         VariableE tk -> pure $ AssignmentE tk right
-        GetE obj prop -> pure $ SetPropertyE obj prop right
+        GetPropertyE obj prop -> pure $ SetPropertyE obj prop right
         _ -> do
           reportError $ ParserError (Just equals) "Invalid assignment target."
           empty
@@ -333,7 +333,7 @@ call = primary >>= sequenceOfCalls
             sequenceOfCalls (CallE callee paren args)
           | Token.DOT == tokenType tk -> do
             property <- consume [Token.IDENTIFIER] "Expect property name after '.'."
-            sequenceOfCalls (GetE callee property)
+            sequenceOfCalls (GetPropertyE callee property)
         _ -> pure callee
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
