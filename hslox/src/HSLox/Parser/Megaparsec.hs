@@ -363,19 +363,23 @@ primary =
        , singleMatching [ Token.IDENTIFIER ] <&> VariableE
        , singleMatching [ Token.THIS ]       <&> ThisE
        , singleMatching [ Token.FUN ]        >>= anonymousFunction
-       , do tk <- singleMatching [ Token.STRING ]
-            case tokenLiteral tk of
-              Just (Token.LitString s) -> pure (StringE s)
-              _ -> fancyFailure $ makeError (Just tk) "SCANNER ERROR: Expected string literal in STRING token."
-       , do tk <- singleMatching [ Token.NUMBER ]
+       , singleMatching [ Token.SUPER ]      >>= \tk -> do
+          consume [Token.DOT] "Expect '.' after 'super'."
+          property <- consume [Token.IDENTIFIER] "Expect superclass method name."
+          pure (SuperE tk property)
+       , singleMatching [ Token.STRING ]     >>= \tk ->
+          case tokenLiteral tk of
+            Just (Token.LitString s) -> pure (StringE s)
+            _ -> fancyFailure $ makeError (Just tk) "SCANNER ERROR: Expected string literal in STRING token."
+       , singleMatching [ Token.NUMBER ]     >>= \tk ->
             case tokenLiteral tk of
               Just (Token.LitNum n) -> pure (NumE n)
               _ -> fancyFailure $ makeError (Just tk) "SCANNER ERROR: Expected numeric literal in NUMBER token."
-       , do singleMatching [ Token.LEFT_PAREN ]
+       , singleMatching [ Token.LEFT_PAREN ]  *> do
             expr <- expression
             consume [ Token.RIGHT_PAREN ] "Expect ')' after expression."
             pure $ GroupingE expr
-       , do tk <- lookAhead maybeAny
+       , lookAhead maybeAny                  >>= \tk ->
             fancyFailure (makeError tk "Expect expression.")
        ]
 

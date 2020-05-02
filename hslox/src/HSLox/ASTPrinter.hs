@@ -103,6 +103,7 @@ instance ( ASTPrinter (f (Unary f))
          , ASTPrinter (f (GetProperty f))
          , ASTPrinter (f (SetProperty f))
          , ASTPrinter (f This)
+         , ASTPrinter (f Super)
          , ASTPrinter (f (Function f))
          ) => ASTPrinter (Expr f) where
   printAST (UnaryExpr e) = printAST e
@@ -117,6 +118,7 @@ instance ( ASTPrinter (f (Unary f))
   printAST (GetPropertyExpr e) = printAST e
   printAST (SetPropertyExpr e) = printAST e
   printAST (ThisExpr e) = printAST e
+  printAST (SuperExpr e) = printAST e
   printAST (FunctionExpr e) = printAST e
 
 instance ASTPrinter (Expr f) => ASTPrinter (Call f) where
@@ -130,6 +132,9 @@ instance ASTPrinter (Expr f) => ASTPrinter (SetProperty f) where
 
 instance ASTPrinter This where
   printAST (This tk) = tokenLexeme tk
+
+instance ASTPrinter Super where
+  printAST (Super keyword property) = tokenLexeme keyword <> "." <> tokenLexeme property
 
 instance ASTPrinter (Expr f) => ASTPrinter (Assignment f) where
   printAST (Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]

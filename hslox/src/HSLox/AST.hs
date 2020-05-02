@@ -149,6 +149,9 @@ pattern SetPropertyE object name value = SetPropertyExpr (Identity (SetProperty 
 pattern ThisE :: Token -> ExprI
 pattern ThisE tk = ThisExpr (Identity (This tk))
 
+pattern SuperE :: Token -> Token -> ExprI
+pattern SuperE keyword property = SuperExpr (Identity (Super keyword property))
+
 pattern LiteralExprI :: Literal -> Expr Identity
 pattern LiteralExprI e = LiteralExpr (Identity e)
 
@@ -181,6 +184,7 @@ data Expr f = UnaryExpr (f (Unary f))
             | GetPropertyExpr (f (GetProperty f))
             | SetPropertyExpr (f (SetProperty f))
             | ThisExpr (f This)
+            | SuperExpr (f Super)
             | FunctionExpr (f (Function f))
 
 deriving instance ( Show (f (Unary f))
@@ -195,6 +199,7 @@ deriving instance ( Show (f (Unary f))
                   , Show (f (GetProperty f))
                   , Show (f (SetProperty f))
                   , Show (f This)
+                  , Show (f Super)
                   , Show (f (Function f))
                   ) => Show (Expr f)
 
@@ -265,4 +270,9 @@ data SetProperty f = SetProperty { setPropertyObject :: Expr f
 deriving instance (Show (Expr f)) => Show (SetProperty f)
 
 newtype This = This { thisToken :: Token }
+  deriving (Eq, Show)
+
+data Super = Super { superKeyword :: Token
+                   , superProperty :: Token
+                   }
   deriving (Eq, Show)

@@ -8,10 +8,12 @@ module HSLox.StaticAnalysis.ResolveLocals
 import Control.Carrier.State.Church (State)
 import qualified Control.Carrier.State.Church as State
 import Control.Effect.Writer
+import Control.Monad (when)
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (isJust)
 import Data.Set (Set)
 import qualified Data.Text as T
 import qualified HSLox.AST as AST
@@ -34,10 +36,13 @@ preResolvingLocals fa = do
       beginScope
     (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
       declareLocal tk
-    (toClassDeclaration -> Just (AST.ClassDeclaration tk _ _)) -> do
+    (toClassDeclaration -> Just (AST.ClassDeclaration tk superclass _)) -> do
       declareLocal tk
       defineLocal (tokenLexeme tk)
-      beginScope -- class
+      when (isJust superclass) $ do
+        beginScope -- super
+        defineLocal "super"
+      beginScope -- instance
       defineLocal "this"
     (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
       declareLocal tk
@@ -61,8 +66,10 @@ postResolvingLocals fa = do
     (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
       defineLocal (tokenLexeme tk)
       pure emptyResolverMeta
-    (toClassDeclaration -> Just _) -> do
+    (toClassDeclaration -> Just (AST.ClassDeclaration _ superclass _)) -> do
       endScope -- class
+      when (isJust superclass) $
+        endScope -- super
       pure emptyResolverMeta
     (toFunDeclaration -> Just (AST.FunDeclaration _ fn)) -> do
       endFunctionScope fn
@@ -80,6 +87,9 @@ postResolvingLocals fa = do
       pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
     (toThis -> Just (AST.This tk)) -> do
       distance <- resolveLocalScopeDistance (tokenLexeme tk)
+      pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
+    (toSuper -> Just (AST.Super keywordTk _)) -> do
+      distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
       pure $ emptyResolverMeta { resolverMetaLocalVariableScopeDistance = distance }
     _ -> pure emptyResolverMeta
   pure $ withMeta meta fa

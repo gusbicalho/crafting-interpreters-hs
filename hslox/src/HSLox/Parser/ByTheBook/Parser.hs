@@ -361,6 +361,7 @@ primary = do
                                         , Token.IDENTIFIER
                                         , Token.THIS
                                         , Token.FUN
+                                        , Token.SUPER
                                         ])
     case mbTk of
       Just (Token { tokenType = Token.FALSE })         -> pure (BoolE False)
@@ -369,6 +370,10 @@ primary = do
       Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
       Just tk@(Token { tokenType = Token.THIS })       -> pure (ThisE tk)
       Just tk@(Token { tokenType = Token.FUN})         -> anonymousFunction tk
+      Just tk@(Token { tokenType = Token.SUPER })      -> do
+        consume [Token.DOT] "Expect '.' after 'super'."
+        property <- consume [Token.IDENTIFIER] "Expect superclass method name."
+        pure (SuperE tk property)
       Just (Token { tokenType = Token.STRING, tokenLiteral }) ->
         case tokenLiteral of
           Just (Token.LitString s) -> pure (StringE s)

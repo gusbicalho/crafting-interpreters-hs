@@ -3,7 +3,7 @@
 module HSLox.TreeWalk.RTState
   ( RTState, newState
   , RTFrame, localFrame
-  , runInChildEnv, runInChildEnvOf
+  , runInChildEnv, runInChildEnvOf, childFrameWithBinding
   , defineM, assignM, assignAtM, getBoundValueM, getBoundValueAtM
   ) where
 
@@ -219,6 +219,16 @@ runInChildEnv action = do
       case atParentEnv s of
         Just (_, s) -> s
         Nothing -> newState
+
+childFrameWithBinding :: forall cell sig m
+                       . Has (Cells cell) sig m
+                      => Has (State (RTState cell)) sig m
+                      => BindingName -> RTValue cell -> m (RTFrame cell)
+childFrameWithBinding name val = do
+  frame <- gets @(RTState cell) localFrame
+  cell <- RTCell <$> newCell val
+  let env = newEnv @cell & overBindings (Map.insert name cell)
+  pure $ RTFrame env frame
 
 runInChildEnvOf :: forall cell sig m a
                  . Has (Error RTError) sig m

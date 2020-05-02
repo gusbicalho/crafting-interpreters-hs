@@ -70,6 +70,9 @@ class AsAST a f | a -> f where
   {-# INLINE toThis #-}
   toThis :: a -> Maybe This
   toThis _ = Nothing
+  {-# INLINE toSuper #-}
+  toSuper :: a -> Maybe Super
+  toSuper _ = Nothing
 
 instance AsAST (Stmt f) f where
   {-# INLINE toStmt #-}
@@ -140,3 +143,6 @@ instance AsAST (LeafNode Literal f) f where
 instance AsAST (LeafNode This f) f where
   {-# INLINE toThis #-}
   toThis = Just . unLeafNode
+instance AsAST (LeafNode Super f) f where
+  {-# INLINE toSuper #-}
+  toSuper = Just . unLeafNode

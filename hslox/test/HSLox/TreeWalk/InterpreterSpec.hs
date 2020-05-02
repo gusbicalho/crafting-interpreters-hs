@@ -176,6 +176,11 @@ spec = do
       `shouldEvaluateTo`
       ( Nothing
       , Seq.fromList ["3"])
+    it "a program that uses `super`" $ do
+      "class Klass { one(a) { print(a); } } class Qlass < Klass { one() { super.one(4); print(1); } } Qlass().one();"
+      `shouldEvaluateTo`
+      ( Nothing
+      , Seq.fromList ["4", "1"])
 
 shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =

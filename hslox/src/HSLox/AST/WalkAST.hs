@@ -106,8 +106,9 @@ instance WalkAST Expr where
   walkAST preW postW (VariableExpr t)    = VariableExpr    <$> walkLeaf preW postW t
   walkAST preW postW (AssignmentExpr t)  = AssignmentExpr  <$> walkWrapped preW postW t
   walkAST preW postW (CallExpr t)        = CallExpr        <$> walkWrapped preW postW t
-  walkAST preW postW (GetPropertyExpr t)         = GetPropertyExpr         <$> walkWrapped preW postW t
+  walkAST preW postW (GetPropertyExpr t) = GetPropertyExpr <$> walkWrapped preW postW t
   walkAST preW postW (ThisExpr t)        = ThisExpr        <$> walkLeaf preW postW t
+  walkAST preW postW (SuperExpr t)       = SuperExpr       <$> walkLeaf preW postW t
   walkAST preW postW (SetPropertyExpr t) = SetPropertyExpr <$> walkWrapped preW postW t
   walkAST preW postW (FunctionExpr t)    = FunctionExpr    <$> walkWrapped preW postW t
 

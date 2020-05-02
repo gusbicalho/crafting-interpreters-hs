@@ -192,6 +192,11 @@ spec = do
       (scan "class Klass { one() { print(1); } } class Qlass < Klass { two(a) { print(a); } }")
       ( Set.empty
       , "[ (class Klass (one [] { (print 1.0) })) (class Qlass < Klass (two [a] { (print a) })) ]")
+  describe "programs with classes extending classes and `super`" $ do
+    testParserImplementations
+      (scan "class Klass { one(a) { print(a); } } class Qlass < Klass { one() { super.one(a); print(1); } }")
+      ( Set.empty
+      , "[ (class Klass (one [a] { (print a) })) (class Qlass < Klass (one [] { (super.one a) (print 1.0) })) ]")
 
 parserImplementationsAreEquivalent :: QC.Property
 parserImplementationsAreEquivalent

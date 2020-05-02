@@ -20,7 +20,6 @@ import qualified Data.Map.Strict as Map
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
-import Data.Traversable
 import qualified HSLox.AST as AST
 import qualified HSLox.AST.Meta as AST.Meta
 import qualified HSLox.Cells.Effect as Cells
@@ -145,21 +144,22 @@ instance ( Runtime cell sig m
     RTState.defineM @cell name val
 
 instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration RuntimeAST) m where
-  interpretStmt (AST.ClassDeclaration tk superclass methodExprs) = do
-      -- TODO use super
-      super <- for superclass $ \variable -> do
+  interpretStmt (AST.ClassDeclaration tk superclassVar methodExprs) = do
+      superclass <- traverse getSuperclass superclassVar
+      RTState.defineM @cell (tokenLexeme tk) ValNil
+      classFrame <- case superclass of
+        Nothing -> gets (RTState.localFrame @cell)
+        Just super' -> Just <$> RTState.childFrameWithBinding "super" (ValClass super')
+      RTState.assignM @cell tk (buildClass superclass classFrame)
+    where
+      getSuperclass variable = do
         super <- interpretExpr @cell variable
         case super of
           ValClass super -> pure super
           _ -> RTError.throwRT
                 (AST.variableIdentifier . AST.Meta.content $ variable)
                 "Superclass must be a class."
-      let name = tokenLexeme tk
-      RTState.defineM @cell name ValNil
-      frame <- gets (RTState.localFrame @cell)
-      let klass = ValClass $ LoxClass (tokenLexeme tk) super (methodTable frame methodExprs)
-      RTState.defineM @cell name klass
-    where
+      buildClass super frame = ValClass $ LoxClass (tokenLexeme tk) super (methodTable frame methodExprs)
       methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
       isInit (AST.Function tk _ _) = tokenLexeme tk == "init"
       addMethod frame table (AST.Meta.content -> methodExpr) =
@@ -225,6 +225,7 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr RuntimeAST) m wher
   interpretExpr (AST.GetPropertyExpr t) = interpretExpr t
   interpretExpr (AST.SetPropertyExpr t) = interpretExpr t
   interpretExpr (AST.ThisExpr t) = interpretExpr t
+  interpretExpr (AST.SuperExpr t) = interpretExpr t
   interpretExpr (AST.FunctionExpr t) = interpretExpr t
   interpretExpr (AST.VariableExpr t) = interpretExpr t
   interpretExpr (AST.AssignmentExpr t) = interpretExpr t
@@ -341,6 +342,25 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
   interpretExpr (AST.LitBool b)   = pure $ ValBool b
   interpretExpr AST.LitNil        = pure $ ValNil
 
+instance {-# OVERLAPPING #-} Runtime cell sig m
+         => ExprInterpreter cell (RuntimeAST AST.Super) m where
+  interpretExpr super = do
+    let (AST.Super keyword propertyName) = AST.Meta.content super
+    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta super
+    let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
+    superclass <- RTState.getBoundValueAtM @cell keyword distance
+    superclass <- case superclass of
+      ValClass superclass -> pure superclass
+      _ -> RTError.throwRT keyword $ "Invalid 'super' binding, expected a class, found " <> showValue superclass
+    this <- RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (pred <$> distance)
+    this <- case this of
+      ValInstance inst -> pure inst
+      _ -> RTError.throwRT keyword $ "Invalid 'this' binding, expected an instance, found " <> showValue this
+    let methodName = tokenLexeme propertyName
+    case findMethod methodName superclass of
+      Just method -> ValFn <$> bindThis this method
+      _ -> RTError.throwRT propertyName $ "Undefined method '" <> methodName <> "'."
+
 instance ( Runtime cell sig m
          , ExprInterpreter cell (AST.Expr f) m
          ) => ExprInterpreter cell (AST.GetProperty f) m where
@@ -407,7 +427,7 @@ instance ( Runtime cell sig m
       ValFn fn -> call paren fn args
       ValClass klass -> call paren klass args
       ValNativeFn nativeFn -> call paren nativeFn args
-      _ -> RTError.throwRT paren "Can only call functions and classes."
+      _ -> RTError.throwRT paren $ "Can only call functions and classes."
 
 call :: forall cell e sig m
       . LoxCallable cell e m
