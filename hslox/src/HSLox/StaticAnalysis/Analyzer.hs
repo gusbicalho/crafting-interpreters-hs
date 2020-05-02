@@ -16,6 +16,7 @@ import HSLox.StaticAnalysis.Error
 import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassTypeStack
 import qualified HSLox.StaticAnalysis.FunctionTypeStack as FunctionTypeStack
 import qualified HSLox.StaticAnalysis.CheckBadReturns as CheckBadReturns
+import qualified HSLox.StaticAnalysis.CheckBadSuper as CheckBadSuper
 import qualified HSLox.StaticAnalysis.CheckBadSuperclass as CheckBadSuperclass
 import qualified HSLox.StaticAnalysis.CheckBadThis as CheckBadThis
 import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
@@ -34,8 +35,10 @@ analyze
              ResolveLocals.preResolvingLocals >=>
              CheckBadReturns.preCheckBadReturns >=>
              CheckBadThis.preCheckBadThis >=>
-             CheckBadSuperclass.preCheckBadSuperclass)
-            (CheckBadSuperclass.postCheckBadSuperclass >=>
+             CheckBadSuperclass.preCheckBadSuperclass >=>
+             CheckBadSuper.preCheckBadSuper)
+            (CheckBadSuper.postCheckBadSuper >=>
+             CheckBadSuperclass.postCheckBadSuperclass >=>
              CheckBadThis.postCheckBadThis >=>
              CheckBadReturns.postCheckBadReturns >=>
              ResolveLocals.postResolvingLocals >=>

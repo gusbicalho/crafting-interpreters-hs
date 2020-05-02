@@ -10,6 +10,8 @@ module HSLox.StaticAnalysis.ClassTypeStack
 import Control.Carrier.State.Church (State)
 import qualified Control.Carrier.State.Church as State
 import Control.Effect.Writer
+import Data.Maybe (isJust)
+import qualified HSLox.AST as AST
 import HSLox.AST.AsAST
 import HSLox.AST.Meta
 import HSLox.StaticAnalysis.Stack (Stack)
@@ -21,8 +23,10 @@ preClassTypeStack :: AsIdentity f
                      => f a -> m (f a)
 preClassTypeStack fa = do
   case content fa of
-    (toClassDeclaration -> Just _) -> do
-      beginClassType Class
+    (toClassDeclaration -> Just (AST.ClassDeclaration _ super _)) -> do
+      beginClassType $ if isJust super
+                       then Subclass
+                       else Class
     _ -> pure ()
   pure fa
 
@@ -45,7 +49,7 @@ emptyState = CTS Stack.emptyStack
 overStack :: (Stack ClassType -> Stack ClassType) -> ClassTypeStack -> ClassTypeStack
 overStack f rls@(CTS stack) = rls { getStack = f stack }
 
-data ClassType = None | Class
+data ClassType = None | Class | Subclass
   deriving (Eq, Ord, Show)
 
 currentClassType :: Has (State ClassTypeStack) sig m
