@@ -5,43 +5,19 @@
 
 packages:
 - completed:
-    cabal-file:
-      size: 5051
-      sha256: 60986ab27ee4b404b7829a87af82026d7d6b475ca4fb4d95ef3d4eb7b260a659
     name: fused-effects
-    version: 1.0.2.0
+    version: 1.1.0.0
     git: git@github.com:fused-effects/fused-effects.git
     pantry-tree:
-      size: 7381
-      sha256: d193c4c4b78622b55ec5d16cdd91402640208de2ab1821dcc5b1c8ed8edf2d2a
-    commit: 40cf33031576f179c9e4ba3f9e8a33ba642fcc91
+      size: 7377
+      sha256: 940b4f28ef0380592f38432275150ee3a7625f01a7517f2d1087fe983926434b
+    commit: 755f373682f35ffe7b86ec41e8d44b7dc9890855
   original:
     git: git@github.com:fused-effects/fused-effects.git
-    commit: 40cf33031576f179c9e4ba3f9e8a33ba642fcc91
-- completed:
-    hackage: fused-effects-exceptions-1.0.0.0@sha256:ee32e6e6a40ce2272603b93036e05945d79f68200b1f09624db39262724b0f98,1731
-    pantry-tree:
-      size: 520
-      sha256: de5cf7211020a5cb543faed316b760c8b9be7412d716b483f2ce8e152e63d278
-  original:
-    hackage: fused-effects-exceptions-1.0.0.0@sha256:ee32e6e6a40ce2272603b93036e05945d79f68200b1f09624db39262724b0f98,1731
-- completed:
-    hackage: haskell-lsp-0.19.0.0@sha256:03a1a05fbdea9376cb1edec358866dc5781925badc3f4b5029ccf4174e765efd,5271
-    pantry-tree:
-      size: 1726
-      sha256: 96ca98a39f69a0e3f0f5214caccfa3a2dca8df9db5bafb3f6437451a3c594f59
-  original:
-    hackage: haskell-lsp-0.19.0.0@sha256:03a1a05fbdea9376cb1edec358866dc5781925badc3f4b5029ccf4174e765efd,5271
-- completed:
-    hackage: haskell-lsp-types-0.19.0.0@sha256:b8b462948f506226f324e0e56010cc9b47df90ec9ebad3b18caa9390d5427287,2941
-    pantry-tree:
-      size: 2451
-      sha256: fb1034e11e42909804bd350e3e0de02886371e1935778a3dece3dd3177520c4a
-  original:
-    hackage: haskell-lsp-types-0.19.0.0@sha256:b8b462948f506226f324e0e56010cc9b47df90ec9ebad3b18caa9390d5427287,2941
+    commit: 755f373682f35ffe7b86ec41e8d44b7dc9890855
 snapshots:
 - completed:
-    size: 516880
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/4/24.yaml
-    sha256: 6d86f7c2bd4c898ef10ae42ccbd0df67f00236bb6d85c4be16f703ee3b90d495
-  original: nightly-2020-04-24
+    size: 520653
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2020/8/12.yaml
+    sha256: 2535c05edcc305c5600e26b69d95070cb946835e26699c8aa114b6aa532efce3
+  original: nightly-2020-08-12

@@ -4,16 +4,14 @@
 # For advanced use and comprehensive documentation of the format, please see:
 # https://docs.haskellstack.org/en/stable/yaml_configuration/
 
-resolver: nightly-2020-04-24
+resolver: nightly-2020-08-12
 
 packages:
 - hslox
 
 extra-deps:
 # >>> fused-effects
+# - fused-effects-1.0.2.2@sha256:d5158904908e9234a19f7a249e2dcf9fe1d5b663d553bc4d393214b5c6c5340d,4941
 - git: git@github.com:fused-effects/fused-effects.git
-  commit: 40cf33031576f179c9e4ba3f9e8a33ba642fcc91
-- fused-effects-exceptions-1.0.0.0@sha256:ee32e6e6a40ce2272603b93036e05945d79f68200b1f09624db39262724b0f98,1731
-# >>> ghcide
-- haskell-lsp-0.19.0.0@sha256:03a1a05fbdea9376cb1edec358866dc5781925badc3f4b5029ccf4174e765efd,5271
-- haskell-lsp-types-0.19.0.0@sha256:b8b462948f506226f324e0e56010cc9b47df90ec9ebad3b18caa9390d5427287,2941
+  commit: 755f373682f35ffe7b86ec41e8d44b7dc9890855
+# - fused-effects-exceptions-1.0.0.0@sha256:ee32e6e6a40ce2272603b93036e05945d79f68200b1f09624db39262724b0f98,1731

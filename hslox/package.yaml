@@ -24,8 +24,8 @@ library:
   source-dirs: src
   ghc-options:
   - -O2
-  - -fspecialise-aggressively
-  - -fexpose-all-unfoldings
+  # - -fspecialise-aggressively
+  # - -fexpose-all-unfoldings
 
 executables:
   hslox-exe:
@@ -34,21 +34,13 @@ executables:
     - app
     ghc-options:
     - -O2
-    - -fspecialise-aggressively
-    - -fexpose-all-unfoldings
+    # - -fspecialise-aggressively
+    # - -fexpose-all-unfoldings
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - hslox
-  hslox-test-dev:
-    main: Spec.hs
-    source-dirs:
-      - test
-      - src
-    dependencies:
-    - hspec
-    - QuickCheck
 
 tests:
   hslox-test:

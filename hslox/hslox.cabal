@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: dfb80a875fc20e02d9b2bb6507cf666cebeaad66d92402f4dcac7fd4c065da38
+-- hash: a8c5601745dabcbb75ede3f8a939c083a89e15428a4fa2f460bc10e0e6bbb58b
 
 name:           hslox
 version:        0.1.0.0
@@ -36,10 +36,6 @@ library
       HSLox.ErrorReport
       HSLox.NativeFns.Carrier.NativeFnsOnIO
       HSLox.NativeFns.Effect
-      HSLox.Output.Carrier.ToIO
-      HSLox.Output.Carrier.ToWriter
-      HSLox.Output.Carrier.Transform
-      HSLox.Output.Effect
       HSLox.Parser.ByTheBook.Parser
       HSLox.Parser.ByTheBook.ParserState
       HSLox.Parser.Megaparsec
@@ -51,6 +47,7 @@ library
       HSLox.Scanner.ScanError
       HSLox.StaticAnalysis.Analyzer
       HSLox.StaticAnalysis.CheckBadReturns
+      HSLox.StaticAnalysis.CheckBadSuper
       HSLox.StaticAnalysis.CheckBadSuperclass
       HSLox.StaticAnalysis.CheckBadThis
       HSLox.StaticAnalysis.ClassTypeStack
@@ -70,7 +67,7 @@ library
   hs-source-dirs:
       src
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2 -fspecialise-aggressively -fexpose-all-unfoldings
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2
   build-depends:
       base >=4.7 && <5
     , clock
@@ -89,83 +86,13 @@ executable hslox-exe
   hs-source-dirs:
       app
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2 -fspecialise-aggressively -fexpose-all-unfoldings -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , clock
     , containers
     , fused-effects
     , hslox
-    , megaparsec
-    , mtl
-    , optparse-applicative
-    , text
-  default-language: Haskell2010
-
-executable hslox-test-dev
-  main-is: Spec.hs
-  other-modules:
-      HSLox.ASTPrinterSpec
-      HSLox.ParserSpec
-      HSLox.ScannerSpec
-      HSLox.Test.NativeFnsMock
-      HSLox.TreeWalk.InterpreterSpec
-      HSLox.AST
-      HSLox.AST.AsAST
-      HSLox.AST.Meta
-      HSLox.AST.Sugar
-      HSLox.AST.WalkAST
-      HSLox.ASTPrinter
-      HSLox.Cells.Carrier.CellsOnIO
-      HSLox.Cells.Carrier.CellsOnST
-      HSLox.Cells.Effect
-      HSLox.CmdLine
-      HSLox.CmdLine.ReadLine
-      HSLox.ErrorReport
-      HSLox.NativeFns.Carrier.NativeFnsOnIO
-      HSLox.NativeFns.Effect
-      HSLox.Output.Carrier.ToIO
-      HSLox.Output.Carrier.ToWriter
-      HSLox.Output.Carrier.Transform
-      HSLox.Output.Effect
-      HSLox.Parser.ByTheBook.Parser
-      HSLox.Parser.ByTheBook.ParserState
-      HSLox.Parser.Megaparsec
-      HSLox.Parser.Megaparsec.TokenStream
-      HSLox.Parser.ParserError
-      HSLox.Scanner.ByTheBook.Scanner
-      HSLox.Scanner.ByTheBook.ScanState
-      HSLox.Scanner.Megaparsec
-      HSLox.Scanner.ScanError
-      HSLox.StaticAnalysis.Analyzer
-      HSLox.StaticAnalysis.CheckBadReturns
-      HSLox.StaticAnalysis.CheckBadSuperclass
-      HSLox.StaticAnalysis.CheckBadThis
-      HSLox.StaticAnalysis.ClassTypeStack
-      HSLox.StaticAnalysis.Error
-      HSLox.StaticAnalysis.FunctionTypeStack
-      HSLox.StaticAnalysis.ResolveLocals
-      HSLox.StaticAnalysis.Stack
-      HSLox.Token
-      HSLox.TreeWalk.Interpreter
-      HSLox.TreeWalk.RTError
-      HSLox.TreeWalk.RTReturn
-      HSLox.TreeWalk.RTState
-      HSLox.TreeWalk.Runtime
-      HSLox.Util
-      Paths_hslox
-  hs-source-dirs:
-      test
-      src
-  default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do
-  build-depends:
-      QuickCheck
-    , base >=4.7 && <5
-    , clock
-    , containers
-    , fused-effects
-    , hspec
     , megaparsec
     , mtl
     , optparse-applicative

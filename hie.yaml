@@ -1,1 +1,6 @@
-cradle: {stack: {component: "hslox:hslox-test-dev" }}
+cradle:
+  stack:
+    - path: "./hslox/src"
+      component: "hslox:lib"
+    - path: "./hslox/test"
+      component: "hslox:hslox-test"
