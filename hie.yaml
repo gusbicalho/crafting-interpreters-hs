@@ -1,6 +1,0 @@
-cradle:
-  stack:
-    - path: "./hslox/src"
-      component: "hslox:lib"
-    - path: "./hslox/test"
-      component: "hslox:hslox-test"
