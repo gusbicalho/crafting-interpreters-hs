@@ -131,7 +131,7 @@ library
     , clock
     , containers
     , fused-effects
-    , megaparsec
+    , megaparsec >= 9.0.0
     , mtl
     , text
   ghc-options: -fexpose-all-unfoldings
