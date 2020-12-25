@@ -5,7 +5,7 @@ import qualified Data.Text as T
 data LiteralValue
   = LitString T.Text
   | LitNum Double
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 data Token
   = Token
@@ -14,7 +14,7 @@ data Token
   , tokenLiteral :: Maybe LiteralValue
   , tokenLine :: Int
   }
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 data TokenType
   -- Single-character tokens
@@ -62,4 +62,4 @@ data TokenType
   | WHILE
   -- EOF
   | EOF
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving stock (Eq, Ord, Enum, Bounded, Show)

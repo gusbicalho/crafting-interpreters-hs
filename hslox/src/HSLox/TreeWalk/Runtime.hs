@@ -50,7 +50,7 @@ data RTReturn cell = RTReturn Token (RTValue cell)
 data RTError = RTError { rtErrorMessage :: T.Text
                        , rtErrorToken :: Token
                        }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 data RTValue cell
   = ValString T.Text
@@ -65,7 +65,7 @@ data RTValue cell
 newtype RuntimeAST a = RuntimeAST (AST.Meta.WithMeta Analyzer.ResolverMeta
                                     AST.Meta.Identity
                                     a)
-  deriving (Show, Functor, Foldable, Traversable)
+  deriving stock (Show, Functor, Foldable, Traversable)
 instance AST.Meta.AsIdentity RuntimeAST where
   asIdentity (RuntimeAST fa) = AST.Meta.asIdentity fa
 instance AST.Meta.HasMeta Analyzer.ResolverMeta RuntimeAST where
@@ -108,7 +108,7 @@ pattern NativeDef arity impl = ValNativeFn (LoxNativeFn arity (NativeFnImpl impl
 data LoxNativeFn = LoxNativeFn { loxNativeFnArity :: Int
                                , loxNativeFnNameImpl :: NativeFnImpl
                                }
-  deriving (Show)
+  deriving stock (Show)
 
 type NativeFnImplFn cell sig m = Has NativeFns sig m => Token -> Seq (RTValue cell) -> m (RTValue cell)
 

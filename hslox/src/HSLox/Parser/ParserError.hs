@@ -13,7 +13,7 @@ data ParserError
   = ParserError { parserErrorToken :: Maybe Token
                 , parserErrorMessage :: T.Text
                 }
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 instance ToErrorReport ParserError where
   toErrorReport ParserError { parserErrorToken, parserErrorMessage }

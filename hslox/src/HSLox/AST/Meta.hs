@@ -19,7 +19,7 @@ content = runIdentity . asIdentity
 {-# INLINE content #-}
 
 data WithMeta meta f a = WithMeta { withMetaMeta :: meta, withMetaContent :: f a }
-  deriving (Show, Functor, Foldable, Traversable)
+  deriving stock (Show, Functor, Foldable, Traversable)
 
 withMeta :: meta -> f a -> WithMeta meta f a
 withMeta = WithMeta

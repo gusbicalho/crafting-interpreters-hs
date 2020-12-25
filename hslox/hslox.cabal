@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 2.4
 
 -- This file has been generated from package.yaml by hpack version 0.34.2.
 --
@@ -20,7 +20,67 @@ source-repository head
   type: git
   location: https://github.com/gusbicalho/crafting-interpreters-hs
 
+common common-options
+  default-language: Haskell2010
+  default-extensions: ApplicativeDo
+                      BangPatterns
+                      ConstraintKinds
+                      DataKinds
+                      DefaultSignatures
+                      DeriveAnyClass
+                      DeriveFoldable
+                      DeriveFunctor
+                      DeriveGeneric
+                      DeriveLift
+                      DeriveTraversable
+                      DerivingStrategies
+                      EmptyCase
+                      ExistentialQuantification
+                      FlexibleContexts
+                      FlexibleInstances
+                      FunctionalDependencies
+                      GADTs
+                      GeneralizedNewtypeDeriving
+                      InstanceSigs
+                      KindSignatures
+                      LambdaCase
+                      MultiParamTypeClasses
+                      MultiWayIf
+                      NamedFieldPuns
+                      NoStarIsType
+                      OverloadedLabels
+                      OverloadedStrings
+                      PatternSynonyms
+                      RankNTypes
+                      ScopedTypeVariables
+                      StandaloneDeriving
+                      TupleSections
+                      TypeApplications
+                      TypeFamilies
+                      TypeFamilyDependencies
+                      TypeOperators
+                      ViewPatterns
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-uni-patterns
+                       -Wincomplete-record-updates
+                       -Wredundant-constraints
+                       -Wno-name-shadowing
+                       -foptimal-applicative-do
+  if impl(ghc >= 8.2)
+    ghc-options:       -fhide-source-paths
+  if impl(ghc >= 8.4)
+    ghc-options:       -Wpartial-fields
+  if impl(ghc >= 8.8)
+    ghc-options:       -Wmissing-deriving-strategies
+                       -fwrite-ide-info
+                       -hiedir=.hie
+  if impl(ghc >= 8.10)
+    ghc-options:       -Wunused-packages
+
 library
+  import: common-options
   exposed-modules:
       HSLox.AST
       HSLox.AST.AsAST
@@ -66,8 +126,6 @@ library
       Paths_hslox
   hs-source-dirs:
       src
-  default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2
   build-depends:
       base >=4.7 && <5
     , clock
@@ -75,31 +133,28 @@ library
     , fused-effects
     , megaparsec
     , mtl
-    , optparse-applicative
     , text
-  default-language: Haskell2010
+  ghc-options: -fexpose-all-unfoldings
+               -fspecialise-aggressively
+               -fcross-module-specialise
+               -flate-specialise
 
 executable hslox-exe
+  import: common-options
   main-is: Main.hs
   other-modules:
       Paths_hslox
   hs-source-dirs:
       app
-  default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded
+               -rtsopts
+               -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , clock
-    , containers
-    , fused-effects
     , hslox
-    , megaparsec
-    , mtl
-    , optparse-applicative
-    , text
-  default-language: Haskell2010
 
 test-suite hslox-test
+  import: common-options
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -111,18 +166,15 @@ test-suite hslox-test
       Paths_hslox
   hs-source-dirs:
       test
-  default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveAnyClass DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoStarIsType OverloadedLabels OverloadedStrings PatternSynonyms RankNTypes ScopedTypeVariables StandaloneDeriving TupleSections TypeApplications TypeFamilies TypeFamilyDependencies TypeOperators ViewPatterns
-  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Wno-name-shadowing -foptimal-applicative-do -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded
+               -rtsopts
+               -with-rtsopts=-N
+  build-tool-depends: hspec-discover:hspec-discover == 2.*
   build-depends:
       QuickCheck
     , base >=4.7 && <5
-    , clock
     , containers
     , fused-effects
     , hslox
     , hspec
-    , megaparsec
-    , mtl
-    , optparse-applicative
     , text
-  default-language: Haskell2010

@@ -33,7 +33,7 @@ import System.Exit (exitWith, ExitCode (..))
 import System.IO (hPutStrLn, stdin, stderr)
 
 data Args = Args (Maybe FilePath)
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 usage :: T.Text
 usage = "hslox [FILEPATH or -]"

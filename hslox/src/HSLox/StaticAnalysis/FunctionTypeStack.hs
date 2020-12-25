@@ -61,7 +61,7 @@ overStack :: (Stack FunctionType -> Stack FunctionType) -> FunctionTypeStack -> 
 overStack f rls@(FTS stack) = rls { getStack = f stack }
 
 data FunctionType = None | Function | Class | Method | Initializer
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 currentFunctionType :: Has (State FunctionTypeStack) sig m
                     => m FunctionType

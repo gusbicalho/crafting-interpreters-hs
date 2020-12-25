@@ -10,7 +10,7 @@ data ErrorReport
   , errorReportWhere :: T.Text
   , errorReportMessage :: T.Text
   }
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 class ToErrorReport e where
   toErrorReport :: e -> ErrorReport

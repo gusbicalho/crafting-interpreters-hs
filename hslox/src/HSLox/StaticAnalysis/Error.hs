@@ -8,7 +8,7 @@ import HSLox.ErrorReport
 import HSLox.Token (Token (..))
 
 data AnalysisError = AnalysisError Token T.Text
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 instance ToErrorReport AnalysisError where
   toErrorReport (AnalysisError token msg) =

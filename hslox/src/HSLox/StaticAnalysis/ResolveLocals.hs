@@ -106,7 +106,7 @@ overStackF :: Functor f => (Stack Scope -> f (Stack Scope)) -> ResolveLocalsStat
 overStackF f rls@(RLS stack) = (\newStack -> rls { getStack = newStack }) <$> f stack
 
 data ResolverMeta = ResolverMeta { resolverMetaLocalVariableScopeDistance :: Maybe Int }
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 emptyResolverMeta :: ResolverMeta
 emptyResolverMeta = ResolverMeta Nothing
@@ -127,9 +127,9 @@ endFunctionScope (AST.Function _ _ _) = do
   endScope -- args scope
 
 newtype Scope = Scope (Map T.Text Bool)
-  deriving (Show)
+  deriving stock (Show)
 data BindingStatus = Missing | Declared | Defined
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 emptyScope :: Scope
 emptyScope = Scope Map.empty

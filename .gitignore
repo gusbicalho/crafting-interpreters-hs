@@ -2,3 +2,4 @@
 *~
 *.sqlite
 dist-newstyle
+.hie

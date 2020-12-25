@@ -15,7 +15,7 @@ type StmtI = Stmt Identity
 type ExprI = Expr Identity
 
 newtype Program f = Program (Seq (Stmt f))
-deriving instance (Show (Stmt f)) => Show (Program f)
+deriving stock instance (Show (Stmt f)) => Show (Program f)
 
 data Stmt f = ExprStmt (f (Expr f))
             | VarDeclarationStmt (f (VarDeclaration f))
@@ -25,7 +25,7 @@ data Stmt f = ExprStmt (f (Expr f))
             | IfStmt (f (If f))
             | WhileStmt (f (While f))
             | ReturnStmt (f (Return f))
-deriving instance ( Show (f (Expr f))
+deriving stock instance ( Show (f (Expr f))
                   , Show (f (VarDeclaration f))
                   , Show (f (FunDeclaration f))
                   , Show (f (ClassDeclaration f))
@@ -62,39 +62,39 @@ pattern ReturnStmtI expr = ReturnStmt (Identity expr)
 data VarDeclaration f = VarDeclaration { varDeclarationIdentifier :: Token
                                        , varDeclarationInitializer :: Expr f
                                        }
-deriving instance (Show (Expr f)) => Show (VarDeclaration f)
+deriving stock instance (Show (Expr f)) => Show (VarDeclaration f)
 
 data FunDeclaration f = FunDeclaration { funDeclarationIdentifier :: Token
                                        , funDeclarationInitializer :: Function f
                                        }
-deriving instance (Show (Function f)) => Show (FunDeclaration f)
+deriving stock instance (Show (Function f)) => Show (FunDeclaration f)
 
 data ClassDeclaration f = ClassDeclaration { classDeclarationIdentifier :: Token
                                            , classDeclarationSuperclass :: Maybe (f Variable)
                                            , classDeclarationMethods :: Seq (f (Function f))
                                            }
-deriving instance ( Show (f (Function f))
+deriving stock instance ( Show (f (Function f))
                   , Show (f Variable)
                   ) => Show (ClassDeclaration f)
 
 newtype Block f = Block { blockBody :: Seq (Stmt f) }
-deriving instance (Show (Stmt f)) => Show (Block f)
+deriving stock instance (Show (Stmt f)) => Show (Block f)
 
 data If f = If { ifCondition :: Expr f
                , ifThenStmt :: Stmt f
                , ifElseStmt :: Maybe (Stmt f)
                }
-deriving instance (Show (Stmt f), Show (Expr f)) => Show (If f)
+deriving stock instance (Show (Stmt f), Show (Expr f)) => Show (If f)
 
 data While f = While { whileCondition :: Expr f
                      , whileBody :: Stmt f
                      }
-deriving instance (Show (Stmt f), Show (Expr f)) => Show (While f)
+deriving stock instance (Show (Stmt f), Show (Expr f)) => Show (While f)
 
 data Return f = Return { returnToken :: Token
                        , returnValue :: Maybe (Expr f)
                        }
-deriving instance (Show (Expr f)) => Show (Return f)
+deriving stock instance (Show (Expr f)) => Show (Return f)
 
 pattern UnaryExprI :: Unary Identity -> Expr Identity
 pattern UnaryExprI e = UnaryExpr (Identity e)
@@ -187,7 +187,7 @@ data Expr f = UnaryExpr (f (Unary f))
             | SuperExpr (f Super)
             | FunctionExpr (f (Function f))
 
-deriving instance ( Show (f (Unary f))
+deriving stock instance ( Show (f (Unary f))
                   , Show (f (Logical f))
                   , Show (f (Binary f))
                   , Show (f (Ternary f))
@@ -209,70 +209,70 @@ data Ternary f = Ternary { ternaryLeft :: Expr f
                          , ternarySecondOperator :: Token
                          , ternaryRight :: Expr f
                          }
-deriving instance (Show (Expr f)) => Show (Ternary f)
+deriving stock instance (Show (Expr f)) => Show (Ternary f)
 
 data Binary f = Binary { binaryLeft :: Expr f
                        , binaryOperator :: Token
                        , binaryRight :: Expr f
                        }
-deriving instance (Show (Expr f)) => Show (Binary f)
+deriving stock instance (Show (Expr f)) => Show (Binary f)
 
 data Logical f = Logical { logicalLeft :: Expr f
                          , logicalOperator :: Token
                          , logicalRight :: Expr f
                          }
-deriving instance (Show (Expr f)) => Show (Logical f)
+deriving stock instance (Show (Expr f)) => Show (Logical f)
 
 data Unary f = Unary { unaryOperator :: Token
                      , unaryRight :: Expr f
                      }
-deriving instance (Show (Expr f)) => Show (Unary f)
+deriving stock instance (Show (Expr f)) => Show (Unary f)
 
 newtype Grouping f = Grouping { groupingExpr :: Expr f }
-deriving instance (Show (Expr f)) => Show (Grouping f)
+deriving stock instance (Show (Expr f)) => Show (Grouping f)
 
 data Function f = Function { functionToken :: Token
                            , functionArgs :: Seq Token
                            , functionBody :: Block f
                            }
-deriving instance (Show (Block f)) => Show (Function f)
+deriving stock instance (Show (Block f)) => Show (Function f)
 
 data Literal
   = LitString T.Text
   | LitNum Double
   | LitBool Bool
   | LitNil
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 newtype Variable = Variable { variableIdentifier :: Token }
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 data Assignment f = Assignment { assignmentIdentifier :: Token
                                , assignmentRValue :: Expr f
                                }
-deriving instance (Show (Expr f)) => Show (Assignment f)
+deriving stock instance (Show (Expr f)) => Show (Assignment f)
 
 data Call f = Call { callCallee :: Expr f
                    , callParen :: Token
                    , callArguments :: Seq (Expr f)
                    }
-deriving instance (Show (Expr f)) => Show (Call f)
+deriving stock instance (Show (Expr f)) => Show (Call f)
 
 data GetProperty f = GetProperty { getPropertyObject :: Expr f
                                  , getPropertyProperty :: Token
                                  }
-deriving instance (Show (Expr f)) => Show (GetProperty f)
+deriving stock instance (Show (Expr f)) => Show (GetProperty f)
 
 data SetProperty f = SetProperty { setPropertyObject :: Expr f
                                  , setPropertyProperty :: Token
                                  , setPropertyValue :: Expr f
                                  }
-deriving instance (Show (Expr f)) => Show (SetProperty f)
+deriving stock instance (Show (Expr f)) => Show (SetProperty f)
 
 newtype This = This { thisToken :: Token }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
 data Super = Super { superKeyword :: Token
                    , superProperty :: Token
                    }
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)

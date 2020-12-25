@@ -4,7 +4,7 @@ module HSLox.StaticAnalysis.Stack
   ) where
 
 newtype Stack a = Stack [a]
-  deriving (Show)
+  deriving stock (Show)
   deriving newtype (Foldable)
 
 emptyStack :: Stack a

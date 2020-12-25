@@ -13,7 +13,7 @@ data ScanError
   , scanErrorWhere :: T.Text
   , scanErrorMessage :: T.Text
   }
-  deriving (Eq, Show, Ord)
+  deriving stock (Eq, Show, Ord)
 
 instance ToErrorReport ScanError where
   toErrorReport ScanError { scanErrorLine, scanErrorWhere, scanErrorMessage }

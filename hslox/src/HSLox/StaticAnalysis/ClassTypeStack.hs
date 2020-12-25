@@ -50,7 +50,7 @@ overStack :: (Stack ClassType -> Stack ClassType) -> ClassTypeStack -> ClassType
 overStack f rls@(CTS stack) = rls { getStack = f stack }
 
 data ClassType = None | Class | Subclass
-  deriving (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show)
 
 currentClassType :: Has (State ClassTypeStack) sig m
                     => m ClassType
