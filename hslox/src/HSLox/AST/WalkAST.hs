@@ -164,4 +164,4 @@ instance WalkAST SetProperty where
 
 instance WalkAST Function where
   {-# INLINE walkAST #-}
-  walkAST preW postW (Function tk argNames body) = Function tk argNames <$> walkAST preW postW body
+  walkAST preW postW (Function tk tkRec argNames body) = Function tk tkRec argNames <$> walkAST preW postW body

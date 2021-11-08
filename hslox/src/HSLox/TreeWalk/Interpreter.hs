@@ -80,7 +80,7 @@ showValue (ValString s) = s
 showValue (ValBool True) = "true"
 showValue (ValBool False) = "false"
 showValue ValNil = "nil"
-showValue (ValFn (LoxFn (AST.Function tk _ _) _ _)) = "<fn " <> tokenLexeme tk <> ">"
+showValue (ValFn (LoxFn (AST.Function tk _ _ _) _ _)) = "<fn " <> tokenLexeme tk <> ">"
 showValue (ValClass (LoxClass className _ _)) = "<class " <> className <> ">"
 showValue (ValInstance (LoxInstance (LoxClass className _ _) _)) = "<instance " <> className <> ">"
 showValue (ValNativeFn fn) = T.pack $ show fn
@@ -139,7 +139,6 @@ instance ( Runtime cell sig m
          ) => StmtInterpreter cell (AST.FunDeclaration f) m where
   interpretStmt (AST.FunDeclaration tk expr) = do
     let name = tokenLexeme tk
-    RTState.defineM @cell name ValNil
     val <- interpretExpr @cell expr
     RTState.defineM @cell name val
 
@@ -161,9 +160,9 @@ instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration Runtim
                 "Superclass must be a class."
       buildClass super frame = ValClass $ LoxClass (tokenLexeme tk) super (methodTable frame methodExprs)
       methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
-      isInit (AST.Function tk _ _) = tokenLexeme tk == "init"
+      isInit (AST.Function tk _ _ _) = tokenLexeme tk == "init"
       addMethod frame table (AST.Meta.content -> methodExpr) =
-        Map.insert (tokenLexeme $ AST.functionToken methodExpr)
+        Map.insert (tokenLexeme $ AST.functionMarker methodExpr)
                    (LoxFn methodExpr frame (isInit methodExpr))
                    table
 
@@ -449,10 +448,13 @@ class LoxCallable cell e m where
   loxCall :: Token -> e -> Seq (RTValue cell) -> m (RTValue cell)
 
 instance Runtime cell sig m => LoxCallable cell (LoxFn cell) m where
-  loxArity (LoxFn (AST.Function _ params _) _ _) = pure (Seq.length params)
-  loxCall _ (LoxFn (AST.Function _ params body) env isInit) args = do
+  loxArity (LoxFn (AST.Function _ _ params _) _ _) = pure (Seq.length params)
+  loxCall _ fn@(LoxFn (AST.Function _ fnRecId params body) env isInit) args = do
     returnVal <- RTReturn.catchReturn $
                   RTState.runInChildEnvOf env $ do
+                    case fnRecId of
+                      Just fnName -> RTState.defineM (Token.tokenLexeme fnName) (ValFn fn)
+                      Nothing -> pure ()
                     for_ (Seq.zip params args) $ \(param, arg) -> do
                       RTState.defineM (tokenLexeme param) arg
                     interpretStmt @cell body
@@ -467,7 +469,7 @@ instance Runtime cell sig m => LoxCallable cell (LoxClass cell) m where
     Nothing -> pure 0
     Just fn -> loxArity @cell fn
   loxCall tk klass args = do
-    instanceState <- Cells.newCell @cell (Map.empty)
+    instanceState <- Cells.newCell @cell Map.empty
     let inst = LoxInstance klass instanceState
     case findMethod "init" klass of
       Nothing -> pure ()

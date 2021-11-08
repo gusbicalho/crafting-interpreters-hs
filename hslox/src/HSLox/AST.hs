@@ -169,8 +169,8 @@ pattern NilE = LiteralExpr (Identity LitNil)
 
 pattern FunctionExprI :: Function Identity -> Expr Identity
 pattern FunctionExprI e = FunctionExpr (Identity e)
-pattern FunctionE :: Token -> Seq Token -> Block Identity -> ExprI
-pattern FunctionE tk args body = FunctionExpr (Identity (Function tk args body))
+pattern FunctionE :: Token -> Maybe Token -> Seq Token -> Block Identity -> ExprI
+pattern FunctionE funMarker funRecId args body = FunctionExpr (Identity (Function funMarker funRecId args body))
 
 data Expr f = UnaryExpr (f (Unary f))
             | LogicalExpr (f (Logical f))
@@ -231,7 +231,8 @@ deriving stock instance (Show (Expr f)) => Show (Unary f)
 newtype Grouping f = Grouping { groupingExpr :: Expr f }
 deriving stock instance (Show (Expr f)) => Show (Grouping f)
 
-data Function f = Function { functionToken :: Token
+data Function f = Function { functionMarker :: Token
+                           , functionRecursiveIdentifier :: Maybe Token
                            , functionArgs :: Seq Token
                            , functionBody :: Block f
                            }

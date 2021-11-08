@@ -44,9 +44,7 @@ preResolvingLocals fa = do
         defineLocal "super"
       beginScope -- instance
       defineLocal "this"
-    (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
-      declareLocal tk
-      defineLocal (tokenLexeme tk)
+    (toFunDeclaration -> Just (AST.FunDeclaration _ fn)) -> do
       beginFunctionScope fn
     (toFunction -> Just fn) -> do
       beginFunctionScope fn
@@ -71,8 +69,10 @@ postResolvingLocals fa = do
       when (isJust superclass) $
         endScope -- super
       pure emptyResolverMeta
-    (toFunDeclaration -> Just (AST.FunDeclaration _ fn)) -> do
+    (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
       endFunctionScope fn
+      declareLocal tk
+      defineLocal (tokenLexeme tk)
       pure emptyResolverMeta
     (toFunction -> Just fn) -> do
       endFunctionScope fn
@@ -114,15 +114,18 @@ emptyResolverMeta = ResolverMeta Nothing
 beginFunctionScope :: Has (State ResolveLocalsState) sig m
                    => Has (Writer (Set AnalysisError)) sig m
                    => AST.Function f -> m ()
-beginFunctionScope (AST.Function _ args _) = do
+beginFunctionScope (AST.Function _ funRecId args _) = do
   beginScope -- args scope
+  case funRecId of
+    Just funRecId -> declareLocal funRecId
+    Nothing -> pure ()
   Foldable.for_ args $ \argName -> do
     declareLocal argName
     defineLocal (tokenLexeme argName)
   beginScope -- body scope
 
 endFunctionScope :: Has (State ResolveLocalsState) sig m => AST.Function f -> m ()
-endFunctionScope (AST.Function _ _ _) = do
+endFunctionScope AST.Function {} = do
   endScope -- body scope
   endScope -- args scope
 
