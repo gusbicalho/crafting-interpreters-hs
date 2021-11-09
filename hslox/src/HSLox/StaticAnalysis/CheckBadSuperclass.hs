@@ -10,7 +10,7 @@ import Control.Monad (when)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
 import HSLox.StaticAnalysis.Error (
@@ -20,12 +20,11 @@ import HSLox.StaticAnalysis.Error (
 import HSLox.Token (Token (..))
 
 preCheckBadSuperclass ::
-  AsIdentity f =>
   AsAST a f =>
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 preCheckBadSuperclass fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration tk (Just superclass) _)) -> do
@@ -35,5 +34,5 @@ preCheckBadSuperclass fa = do
     _ -> pure ()
   pure fa
 
-postCheckBadSuperclass :: Applicative m => f a -> m (f a)
+postCheckBadSuperclass :: Applicative m => a -> m a
 postCheckBadSuperclass = pure

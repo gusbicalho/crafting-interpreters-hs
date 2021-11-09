@@ -13,17 +13,16 @@ import Control.Carrier.State.Church qualified as State
 import Data.Maybe (fromMaybe, isJust)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.Stack (Stack)
 import HSLox.StaticAnalysis.Stack qualified as Stack
 
 preClassTypeStack ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State ClassTypeStack) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 preClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration _ super _)) -> do
@@ -35,11 +34,10 @@ preClassTypeStack fa = do
   pure fa
 
 postClassTypeStack ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State ClassTypeStack) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 postClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just _) -> do

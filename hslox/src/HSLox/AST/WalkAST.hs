@@ -5,22 +5,23 @@ module HSLox.AST.WalkAST (
 import Control.Monad ((>=>))
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST, LeafNode (..))
+import HSLox.AST.Meta (WithMeta)
 
 type PreWalk input m =
   forall astNode.
   AsAST (astNode input) input =>
-  input (astNode input) ->
-  m (input (astNode input))
+  WithMeta input (astNode input) ->
+  m (WithMeta input (astNode input))
 
 type PostWalk input output m =
   forall astNode.
   AsAST (astNode output) output =>
-  input (astNode output) ->
-  m (output (astNode output))
+  WithMeta input (astNode output) ->
+  m (WithMeta output (astNode output))
 
 class WalkAST astNode where
   walkAST ::
-    (Monad m, Traversable input, Functor output) =>
+    Monad m =>
     PreWalk input m ->
     PostWalk input output m ->
     astNode input ->
@@ -29,15 +30,13 @@ class WalkAST astNode where
 {-# INLINE walkLeaf #-}
 walkLeaf ::
   ( Monad m
-  , Traversable input
-  , Functor output
   , AsAST (LeafNode a input) input
   , AsAST (LeafNode a output) output
   ) =>
   PreWalk input m ->
   PostWalk input output m ->
-  input a ->
-  m (output a)
+  WithMeta input a ->
+  m (WithMeta output a)
 walkLeaf preW postW t = do
   preWed <- preW (fmap LeafNode t)
   -- For a LeafNode, walking is a noop, just change the phantom functor type
@@ -51,13 +50,11 @@ walkWrapped ::
   , WalkAST astNode
   , AsAST (astNode input) input
   , AsAST (astNode output) output
-  , Traversable input
-  , Functor output
   ) =>
   PreWalk input m ->
   PostWalk input output m ->
-  input (astNode input) ->
-  m (output (astNode output))
+  WithMeta input (astNode input) ->
+  m (WithMeta output (astNode output))
 walkWrapped preW postW = preW >=> traverse (walkAST preW postW) >=> postW
 
 instance WalkAST AST.Program where

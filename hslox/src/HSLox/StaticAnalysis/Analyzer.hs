@@ -10,7 +10,6 @@ import Control.Effect.Writer (Writer)
 import Control.Monad ((>=>))
 import Data.Set (Set)
 import HSLox.AST qualified as AST
-import HSLox.AST.Meta (AsIdentity, WithMeta)
 import HSLox.AST.WalkAST (WalkAST (walkAST))
 import HSLox.StaticAnalysis.CheckBadReturns qualified as CheckBadReturns
 import HSLox.StaticAnalysis.CheckBadSuper qualified as CheckBadSuper
@@ -22,11 +21,9 @@ import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionTypeStack
 import HSLox.StaticAnalysis.ResolveLocals qualified as ResolveLocals
 
 analyze ::
-  AsIdentity f =>
-  Traversable f =>
   Has (Writer (Set AnalysisError)) sig m =>
-  AST.Program f ->
-  m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
+  AST.Program meta ->
+  m (AST.Program (ResolveLocals.ResolverMeta, meta))
 analyze =
   State.evalState FunctionTypeStack.emptyState
     . State.evalState ClassTypeStack.emptyState

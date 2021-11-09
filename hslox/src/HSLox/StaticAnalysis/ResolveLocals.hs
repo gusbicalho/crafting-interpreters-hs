@@ -20,7 +20,7 @@ import Data.Set (Set)
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity, WithMeta)
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
@@ -32,12 +32,11 @@ import HSLox.Token (Token (..))
 import HSLox.Util qualified as Util
 
 preResolvingLocals ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 preResolvingLocals fa = do
   case AST.Meta.content fa of
     (toBlock -> Just _) -> do
@@ -60,12 +59,11 @@ preResolvingLocals fa = do
   pure fa
 
 postResolvingLocals ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (WithMeta ResolverMeta f a)
+  WithMeta meta a ->
+  m (WithMeta (ResolverMeta, meta) a)
 postResolvingLocals fa = do
   meta <- case AST.Meta.content fa of
     (toBlock -> Just _) -> do
@@ -103,7 +101,7 @@ postResolvingLocals fa = do
       distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
       pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
     _ -> pure emptyResolverMeta
-  pure $ AST.Meta.withMeta meta fa
+  pure $ AST.Meta.addMetaItem meta fa
 
 newtype ResolveLocalsState = RLS {getStack :: Stack Scope}
 

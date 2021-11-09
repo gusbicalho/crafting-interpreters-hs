@@ -9,7 +9,7 @@ import Control.Effect.Writer (Writer)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
 import HSLox.StaticAnalysis.Error (
@@ -18,12 +18,11 @@ import HSLox.StaticAnalysis.Error (
  )
 
 preCheckBadSuper ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 preCheckBadSuper fa = do
   case AST.Meta.content fa of
     (toSuper -> Just (AST.Super tk _)) -> do
@@ -35,5 +34,5 @@ preCheckBadSuper fa = do
     _ -> pure ()
   pure fa
 
-postCheckBadSuper :: Applicative m => f a -> m (f a)
+postCheckBadSuper :: Applicative m => a -> m a
 postCheckBadSuper = pure

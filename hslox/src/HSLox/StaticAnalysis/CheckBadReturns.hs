@@ -11,7 +11,7 @@ import Data.Maybe (isJust)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
@@ -20,12 +20,11 @@ import HSLox.StaticAnalysis.Error (
 import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionType
 
 preCheckBadReturns ::
-  AsIdentity f =>
   AsAST a g =>
   Has (State FunctionType.FunctionTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (f a)
+  WithMeta meta a ->
+  m (WithMeta meta a)
 preCheckBadReturns fa = do
   case AST.Meta.content fa of
     (toReturn -> Just (AST.Return tk expr)) -> do
@@ -37,5 +36,5 @@ preCheckBadReturns fa = do
     _ -> pure ()
   pure fa
 
-postCheckBadReturns :: Applicative m => f a -> m (f a)
+postCheckBadReturns :: Applicative m => a -> m a
 postCheckBadReturns = pure

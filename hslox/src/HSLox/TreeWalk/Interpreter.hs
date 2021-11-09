@@ -22,6 +22,7 @@ import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
+import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.Cells.Effect qualified as Cells
 import HSLox.NativeFns.Effect qualified as NativeFns
@@ -57,13 +58,11 @@ baseEnv = State.Church.execState RTState.newState $ do
       )
 
 interpret ::
-  forall cell sig m f.
+  forall cell sig m meta.
   Has (Cells.Cells cell) sig m =>
   Has NativeFns.NativeFns sig m =>
-  Traversable f =>
-  AST.Meta.AsIdentity f =>
-  AST.Meta.HasMeta Analyzer.ResolverMeta f =>
-  AST.Program f ->
+  Runtime.RuntimeMeta meta =>
+  AST.Program meta ->
   m (Maybe Runtime.RTError)
 interpret prog = do
   env <- baseEnv @cell
@@ -72,17 +71,15 @@ interpret prog = do
 {-# INLINE interpret #-}
 
 interpretNext ::
-  forall cell sig m f.
+  forall cell sig m meta.
   Has (Cells.Cells cell) sig m =>
   Has NativeFns.NativeFns sig m =>
-  Traversable f =>
-  AST.Meta.AsIdentity f =>
-  AST.Meta.HasMeta Analyzer.ResolverMeta f =>
+  Runtime.RuntimeMeta meta =>
   Runtime.RTState cell ->
-  AST.Program f ->
+  AST.Program meta ->
   m (Runtime.RTState cell, Maybe Runtime.RTError)
 interpretNext env prog =
-  prog & Runtime.asRuntimeAST
+  pure prog
     & (interpretStmt @cell =<<)
     & RTReturn.runReturn @cell
     & Util.runErrorToEither @Runtime.RTError
@@ -117,33 +114,23 @@ class
   where
   interpretStmt :: e -> m ()
 
-instance (StmtInterpreter cell e m, AST.Meta.AsIdentity f) => StmtInterpreter cell (f e) m where
+instance (StmtInterpreter cell e m) => StmtInterpreter cell (WithMeta meta e) m where
   {-# INLINE interpretStmt #-}
-  interpretStmt =
-    interpretStmt @cell
-      . AST.Meta.runIdentity
-      . AST.Meta.asIdentity
+  interpretStmt = interpretStmt @cell . AST.Meta.content
 
 instance
-  ( Applicative m
-  , StmtInterpreter cell (AST.Stmt f) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.Program f) m
+  StmtInterpreter cell (AST.Program meta) m
   where
   interpretStmt (AST.Program stmts) = for_ stmts (interpretStmt @cell)
 
 instance
-  ( Applicative m
-  , ExprInterpreter cell (f (AST.Expr f)) m
-  , StmtInterpreter cell (f (AST.VarDeclaration f)) m
-  , StmtInterpreter cell (f (AST.FunDeclaration f)) m
-  , StmtInterpreter cell (f (AST.ClassDeclaration f)) m
-  , StmtInterpreter cell (f (AST.Block f)) m
-  , StmtInterpreter cell (f (AST.If f)) m
-  , StmtInterpreter cell (f (AST.While f)) m
-  , StmtInterpreter cell (f (AST.Return f)) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.Stmt f) m
+  StmtInterpreter cell (AST.Stmt meta) m
   where
   {-# INLINE interpretStmt #-}
   interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
@@ -157,9 +144,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.VarDeclaration f) m
+  StmtInterpreter cell (AST.VarDeclaration meta) m
   where
   interpretStmt (AST.VarDeclaration tk expr) = do
     val <- interpretExpr @cell expr
@@ -167,16 +154,21 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Function f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.FunDeclaration f) m
+  StmtInterpreter cell (AST.FunDeclaration meta) m
   where
   interpretStmt (AST.FunDeclaration tk expr) = do
     let name = tokenLexeme tk
     val <- interpretExpr @cell expr
     RTState.defineM @cell name val
 
-instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration Runtime.RuntimeAST) m where
+instance
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  StmtInterpreter cell (AST.ClassDeclaration meta) m
+  where
   interpretStmt (AST.ClassDeclaration tk superclassVar methodExprs) = do
     superclass <- traverse getSuperclass superclassVar
     RTState.defineM @cell (tokenLexeme tk) Runtime.ValNil
@@ -204,20 +196,19 @@ instance Runtime cell sig m => StmtInterpreter cell (AST.ClassDeclaration Runtim
 
 instance
   ( Runtime cell sig m
-  , StmtInterpreter cell (AST.Stmt f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.Block f) m
+  StmtInterpreter cell (AST.Block meta) m
   where
   interpretStmt (AST.Block stmts) =
     RTState.runInChildEnv @cell $ do
       for_ stmts (interpretStmt @cell)
 
 instance
-  ( Monad m
-  , StmtInterpreter cell (AST.Stmt f) m
-  , ExprInterpreter cell (AST.Expr f) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.If f) m
+  StmtInterpreter cell (AST.If meta) m
   where
   interpretStmt (AST.If cond thenStmt elseStmt) = do
     cond <- interpretExpr @cell cond
@@ -227,10 +218,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
-  , StmtInterpreter cell (AST.Stmt f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.While f) m
+  StmtInterpreter cell (AST.While meta) m
   where
   interpretStmt (AST.While cond body) =
     Util.whileM (isTruthy <$> interpretExpr @cell cond) $
@@ -238,9 +228,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  StmtInterpreter cell (AST.Return f) m
+  StmtInterpreter cell (AST.Return meta) m
   where
   interpretStmt (AST.Return tk expr) = do
     case expr of
@@ -257,14 +247,16 @@ class
   where
   interpretExpr :: e -> m (Runtime.RTValue cell)
 
-instance (ExprInterpreter cell e m, AST.Meta.AsIdentity f) => ExprInterpreter cell (f e) m where
+instance (ExprInterpreter cell e m) => ExprInterpreter cell (WithMeta meta e) m where
   {-# INLINE interpretExpr #-}
-  interpretExpr =
-    interpretExpr @cell
-      . AST.Meta.runIdentity
-      . AST.Meta.asIdentity
+  interpretExpr = interpretExpr @cell . AST.Meta.content
 
-instance Runtime cell sig m => ExprInterpreter cell (AST.Expr Runtime.RuntimeAST) m where
+instance
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (AST.Expr meta) m
+  where
   {-# INLINE interpretExpr #-}
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
   interpretExpr (AST.LogicalExpr t) = interpretExpr t
@@ -283,42 +275,48 @@ instance Runtime cell sig m => ExprInterpreter cell (AST.Expr Runtime.RuntimeAST
 
 instance
   {-# OVERLAPPING #-}
-  Runtime cell sig m =>
-  ExprInterpreter cell (Runtime.RuntimeAST AST.This) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (WithMeta meta AST.This) m
   where
   interpretExpr this = do
     let (AST.This tk) = AST.Meta.content this
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta this
+    let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta this
     RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
 
 instance
   {-# OVERLAPPING #-}
-  Runtime cell sig m =>
-  ExprInterpreter cell (Runtime.RuntimeAST AST.Variable) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (WithMeta meta AST.Variable) m
   where
   interpretExpr variable = do
     let (AST.Variable tk) = AST.Meta.content variable
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta variable
+    let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta variable
     RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
 
 instance
   {-# OVERLAPPING #-}
-  Runtime cell sig m =>
-  ExprInterpreter cell (Runtime.RuntimeAST (AST.Assignment Runtime.RuntimeAST)) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (WithMeta meta (AST.Assignment meta)) m
   where
   interpretExpr assignment = do
     let (AST.Assignment tk expr) = AST.Meta.content assignment
     val <- interpretExpr expr
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta assignment
+    let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta assignment
     let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
     RTState.assignAtM tk distance val
     pure val
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Ternary f) m
+  ExprInterpreter cell (AST.Ternary meta) m
   where
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
     leftVal <- interpretExpr @cell left
@@ -337,9 +335,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Logical f) m
+  ExprInterpreter cell (AST.Logical meta) m
   where
   interpretExpr (AST.Logical left op right) = do
     leftVal <- interpretExpr left
@@ -360,9 +358,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Binary f) m
+  ExprInterpreter cell (AST.Binary meta) m
   where
   interpretExpr (AST.Binary left op right) = do
     leftVal <- interpretExpr left
@@ -393,9 +391,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Unary f) m
+  ExprInterpreter cell (AST.Unary meta) m
   where
   interpretExpr (AST.Unary op expr) = do
     val <- interpretExpr @cell expr
@@ -410,13 +408,18 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Grouping f) m
+  ExprInterpreter cell (AST.Grouping meta) m
   where
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
-instance Runtime cell sig m => ExprInterpreter cell (AST.Function Runtime.RuntimeAST) m where
+instance
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (AST.Function meta) m
+  where
   interpretExpr fn = do
     frame <- State.gets (RTState.localFrame @cell)
     pure . Runtime.ValFn $ Runtime.LoxFn fn frame False
@@ -429,12 +432,14 @@ instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
 
 instance
   {-# OVERLAPPING #-}
-  Runtime cell sig m =>
-  ExprInterpreter cell (Runtime.RuntimeAST AST.Super) m
+  ( Runtime cell sig m
+  , Runtime.RuntimeMeta meta
+  ) =>
+  ExprInterpreter cell (WithMeta meta AST.Super) m
   where
   interpretExpr super = do
     let (AST.Super keyword propertyName) = AST.Meta.content super
-    let resolverMeta = AST.Meta.meta @Analyzer.ResolverMeta super
+    let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta super
     let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
     superclass <- RTState.getBoundValueAtM @cell keyword distance
     superclass <- case superclass of
@@ -451,9 +456,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.GetProperty f) m
+  ExprInterpreter cell (AST.GetProperty meta) m
   where
   interpretExpr (AST.GetProperty objectExpr tk) = do
     object <- interpretExpr objectExpr
@@ -463,9 +468,9 @@ instance
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.SetProperty f) m
+  ExprInterpreter cell (AST.SetProperty meta) m
   where
   interpretExpr (AST.SetProperty objectExpr tk valueExpr) = do
     object <- interpretExpr objectExpr
@@ -518,9 +523,9 @@ setProperty (Runtime.LoxInstance _klass properties) propertyName value = do
 
 instance
   ( Runtime cell sig m
-  , ExprInterpreter cell (AST.Expr f) m
+  , Runtime.RuntimeMeta meta
   ) =>
-  ExprInterpreter cell (AST.Call f) m
+  ExprInterpreter cell (AST.Call meta) m
   where
   interpretExpr (AST.Call calleeExpr paren argExprs) = do
     callee <- interpretExpr @cell calleeExpr

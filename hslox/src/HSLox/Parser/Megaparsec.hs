@@ -6,7 +6,6 @@ import Control.Monad (when)
 import Control.Monad.Trans (lift)
 import Data.Foldable (Foldable (foldl'), asum, for_)
 import Data.Functor (void, ($>), (<&>))
-import Data.Functor.Identity (Identity (Identity))
 import Data.Maybe (catMaybes)
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
@@ -20,6 +19,7 @@ import HSLox.Parser.ParserError qualified as ParserError
 import HSLox.Token (Token (..), TokenType)
 import HSLox.Token qualified as Token
 import Text.Megaparsec hiding (State, Token)
+import HSLox.AST.Meta (pattern NoMeta)
 
 parse ::
   Has (Writer (Set.Set ParserError)) sig m =>
@@ -118,7 +118,7 @@ classDeclaration = do
     ( do
         singleMatching [Token.LESS]
         tk <- consume [Token.IDENTIFIER] "Expect superclass name."
-        pure . Just . Identity . AST.Variable $ tk
+        pure . Just . NoMeta . AST.Variable $ tk
       )
       <|> pure Nothing
   consume [Token.LEFT_BRACE] "Expect '{' before class body."
@@ -132,7 +132,7 @@ classDeclaration = do
       then pure acc
       else do
         (_, method) <- function "method" parseMethodName
-        parseMethods (acc :|> Identity method)
+        parseMethods (acc :|> NoMeta method)
   parseMethodName =
     FunctionExprIdentifier
       <$> consume [Token.IDENTIFIER] "Expect method name."
@@ -147,7 +147,7 @@ function ::
   MonadParsec ParserError TokenStream m =>
   T.Text ->
   m FunctionExprIdentifier ->
-  m (Token, AST.Function Identity)
+  m (Token, AST.Function ())
 function kind parseName = do
   FunctionExprIdentifier
     { functionExprMarker
@@ -242,7 +242,7 @@ forStmt = do
 blockStmt :: MonadParsec ParserError TokenStream m => m AST.StmtI
 blockStmt = AST.BlockStmtI <$> (singleMatching [Token.LEFT_BRACE] *> finishBlock)
 
-finishBlock :: MonadParsec ParserError TokenStream m => m (AST.Block Identity)
+finishBlock :: MonadParsec ParserError TokenStream m => m (AST.Block ())
 finishBlock = do
   stmts <- blockBody Seq.empty
   consume [Token.RIGHT_BRACE] "Expect '}' after block."
