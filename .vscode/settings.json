@@ -1,5 +1,4 @@
 {
-  "hic.executablePath": "./run-ghcide",
   "editor.detectIndentation": false,
   "editor.autoIndent": "keep",
   "editor.tabSize": 2,

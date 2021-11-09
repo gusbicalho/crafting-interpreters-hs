@@ -21,7 +21,7 @@ import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
 parse :: Has (Writer (Set ParserError)) sig m
-      => (Seq Token)
+      => Seq Token
       -> m (Program Identity)
 parse tokens
   = evalState (initialParserState tokens)
@@ -83,7 +83,9 @@ funDeclaration = do
     (name, function) <- function "function" parseFunName
     pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
-    parseFunName = consume [Token.IDENTIFIER] $ "Expect function name."
+    parseFunName =
+      consume [Token.IDENTIFIER] "Expect function name." <&> \functionName ->
+        FunctionExprIdentifier functionName (Just functionName)
 
 classDeclaration :: Has Empty sig m => StmtParser sig m
 classDeclaration = do
@@ -105,17 +107,28 @@ classDeclaration = do
       else do
         (_, method) <- function "method" parseMethodName
         parseMethods (acc :|> Identity method)
-    parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
+    parseMethodName =
+      FunctionExprIdentifier
+        <$> consume [Token.IDENTIFIER] "Expect method name."
+        <*> pure Nothing
 
-function :: T.Text -> LoxParser Token sig m -> LoxParser (Token, Function Identity) sig m
+data FunctionExprIdentifier
+  = FunctionExprIdentifier { functionExprMarker :: Token
+                           , functionExprRecursiveIdentifier :: Maybe Token
+                           }
+
+function :: T.Text -> LoxParser FunctionExprIdentifier sig m -> LoxParser (Token, Function Identity) sig m
 function kind parseName = do
-    name <- parseName
+    FunctionExprIdentifier
+      { functionExprMarker
+      , functionExprRecursiveIdentifier
+      } <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure $ (name, Function name args body)
+    pure $ (functionExprMarker, Function functionExprMarker functionExprRecursiveIdentifier args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
@@ -369,7 +382,7 @@ primary = do
       Just (Token { tokenType = Token.NIL })           -> pure NilE
       Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
       Just tk@(Token { tokenType = Token.THIS })       -> pure (ThisE tk)
-      Just tk@(Token { tokenType = Token.FUN})         -> anonymousFunction tk
+      Just tk@(Token { tokenType = Token.FUN})         -> inlineFunction tk
       Just tk@(Token { tokenType = Token.SUPER })      -> do
         consume [Token.DOT] "Expect '.' after 'super'."
         property <- consume [Token.IDENTIFIER] "Expect superclass method name."
@@ -390,10 +403,14 @@ primary = do
         pure $ GroupingE expr
       _ -> throwParserError "Expect expression."
 
-anonymousFunction :: Token -> LoxParser ExprI sig m
-anonymousFunction marker = do
-  (_, function) <- function "function" (pure marker)
-  pure $ FunctionExprI function
+inlineFunction :: Token -> LoxParser ExprI sig m
+inlineFunction marker = do
+    (_, function) <- function "function" (parseFunName `Util.recoverFromEmptyWith` anonymousFunName)
+    pure $ FunctionExprI function
+  where
+    parseFunName = match [Token.IDENTIFIER] <&> \functionName ->
+      FunctionExprIdentifier functionName (Just functionName)
+    anonymousFunName = pure $ FunctionExprIdentifier marker Nothing
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m

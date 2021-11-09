@@ -27,7 +27,7 @@ preFunctionTypeStack fa = do
       beginFunctionType Function
     (toClassDeclaration -> Just _) -> do
       beginFunctionType Class
-    (toFunction -> Just (AST.Function tk _ _)) -> do
+    (toFunction -> Just (AST.Function tk _ _ _)) -> do
       current <- currentFunctionType
       case current of
         Class

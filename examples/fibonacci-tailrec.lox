@@ -1,0 +1,19 @@
+fun fibonacci(n) {
+  return (
+    fun fib(i, a, b) {
+      if (i <= 0) return a;
+      return fib(i-1, b, a+b);
+    }(n, 0, 1)
+  );
+}
+
+var maxN = 23;
+
+var time = clock();
+for (var n = 0; n < maxN; n = n + 1) {
+  print(fibonacci(n));
+}
+time = clock() - time;
+
+print("Time Spent:");
+print(time);

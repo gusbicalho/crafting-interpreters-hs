@@ -98,7 +98,9 @@ funDeclaration = do
     (name, function) <- function "function" parseFunName
     pure $ FunDeclarationStmtI $ FunDeclaration name function
   where
-    parseFunName = consume [Token.IDENTIFIER] "Expect function name."
+    parseFunName =
+      consume [Token.IDENTIFIER] "Expect function name." <&> \functionName ->
+        FunctionExprIdentifier functionName (Just functionName)
 
 classDeclaration :: MonadParsec ParserError TokenStream m => m StmtI
 classDeclaration = do
@@ -120,18 +122,29 @@ classDeclaration = do
       else do
         (_, method) <- function "method" parseMethodName
         parseMethods (acc :|> Identity method)
-    parseMethodName = consume [Token.IDENTIFIER] $ "Expect method name."
+    parseMethodName =
+      FunctionExprIdentifier
+        <$> consume [Token.IDENTIFIER] "Expect method name."
+        <*> pure Nothing
+
+data FunctionExprIdentifier
+  = FunctionExprIdentifier { functionExprMarker :: Token
+                           , functionExprRecursiveIdentifier :: Maybe Token
+                           }
 
 function :: MonadParsec ParserError TokenStream m
-         => T.Text -> m Token -> m (Token, Function Identity)
+         => T.Text -> m FunctionExprIdentifier -> m (Token, Function Identity)
 function kind parseName = do
-    name <- parseName
+    FunctionExprIdentifier
+      { functionExprMarker
+      , functionExprRecursiveIdentifier
+      } <- parseName
     consume [Token.LEFT_PAREN] $ "Expect '(' after " <> kind <> " name."
     args <- arguments
     consume [Token.RIGHT_PAREN] "Expect ')' after parameters."
     consume [Token.LEFT_BRACE] $ "Expect '{' before " <> kind <> " body."
     body <- finishBlock
-    pure (name, Function name args body)
+    pure (functionExprMarker, Function functionExprMarker functionExprRecursiveIdentifier args body)
   where
     arguments = do
       endOfArgsList <- check [ Token.RIGHT_PAREN ]
@@ -362,7 +375,7 @@ primary =
        , singleMatching [ Token.NIL ]         $> NilE
        , singleMatching [ Token.IDENTIFIER ] <&> VariableE
        , singleMatching [ Token.THIS ]       <&> ThisE
-       , singleMatching [ Token.FUN ]        >>= anonymousFunction
+       , singleMatching [ Token.FUN ]        >>= inlineFunction
        , singleMatching [ Token.SUPER ]      >>= \tk -> do
           consume [Token.DOT] "Expect '.' after 'super'."
           property <- consume [Token.IDENTIFIER] "Expect superclass method name."
@@ -383,10 +396,14 @@ primary =
             fancyFailure (makeError tk "Expect expression.")
        ]
 
-anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
-anonymousFunction marker = do
-  (_, function) <- function "function" (pure marker)
-  pure $ FunctionExprI function
+inlineFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
+inlineFunction marker = do
+    (_, function) <- function "function" (parseFunName <|> anonymousFunName)
+    pure $ FunctionExprI function
+  where
+    parseFunName = singleMatching [Token.IDENTIFIER] <&> \functionName ->
+      FunctionExprIdentifier functionName (Just functionName)
+    anonymousFunName = pure $ FunctionExprIdentifier marker Nothing
 
 leftAssociativeBinaryOp :: Foldable t
                         => MonadParsec ParserError TokenStream m

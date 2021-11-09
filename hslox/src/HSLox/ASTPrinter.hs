@@ -43,7 +43,7 @@ instance ( ASTPrinter (Expr f)
 
 instance ( ASTPrinter (Block f)
          ) => ASTPrinter (FunDeclaration f) where
-  printAST (FunDeclaration tkName (Function _ args body))
+  printAST (FunDeclaration tkName (Function _ _ args body))
       = "(fun "
       <> tokenLexeme tkName
       <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
@@ -81,7 +81,7 @@ instance ( ASTPrinter (Stmt f)
                             <> ")"
 
 instance ASTPrinter (Block f) => ASTPrinter (Function f) where
-  printAST (Function tk args body)
+  printAST (Function tk _ args body)
     = "("
    <> tokenLexeme tk
    <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "

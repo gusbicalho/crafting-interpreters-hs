@@ -1,0 +1,20 @@
+var inc1;
+var inc2;
+
+fun initCounters() {
+  var i = 0;
+  inc1 = fun() {
+    i = i + 1;
+    print(i);
+  };
+  inc2 = fun() {
+    i = i + 2;
+    print(i);
+  };
+}
+
+initCounters();
+inc1();
+inc2();
+inc1();
+inc2();
