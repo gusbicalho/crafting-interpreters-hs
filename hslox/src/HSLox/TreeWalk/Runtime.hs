@@ -19,7 +19,6 @@ import Data.Sequence (Seq (..))
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
 import HSLox.AST.Meta qualified as AST.Meta
-import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.Cells.Effect (Cells)
 import HSLox.NativeFns.Effect (NativeFns)
 import HSLox.StaticAnalysis.Analyzer qualified as Analyzer
@@ -70,41 +69,17 @@ data RTValue cell
   | ValInstance (LoxInstance cell)
   | ValNativeFn LoxNativeFn
 
-newtype RuntimeAST a
-  = RuntimeAST
-      ( AST.Meta.WithMeta
-          Analyzer.ResolverMeta
-          AST.Meta.Identity
-          a
-      )
-  deriving stock (Show, Functor, Foldable, Traversable)
-instance AST.Meta.AsIdentity RuntimeAST where
-  asIdentity (RuntimeAST fa) = AST.Meta.asIdentity fa
-instance AST.Meta.HasMeta Analyzer.ResolverMeta RuntimeAST where
-  meta (RuntimeAST fa) = AST.Meta.meta fa
+type RuntimeMeta meta = AST.Meta.HasMetaItem Analyzer.ResolverMeta meta
 
-asRuntimeAST ::
-  Monad m =>
-  Traversable f =>
-  AST.Meta.AsIdentity f =>
-  AST.Meta.HasMeta Analyzer.ResolverMeta f =>
-  WalkAST.WalkAST astNode =>
-  astNode f ->
-  m (astNode RuntimeAST)
-asRuntimeAST = WalkAST.walkAST pure postWalk
- where
-  postWalk fa = do
-    pure $
-      RuntimeAST
-        . AST.Meta.withMeta (AST.Meta.meta @Analyzer.ResolverMeta fa)
-        . AST.Meta.asIdentity
-        $ fa
-
-data LoxFn cell = LoxFn
-  { loxFnAST :: AST.Function RuntimeAST
-  , loxClosedEnv :: Maybe (RTFrame cell)
-  , loxFnIsInitializer :: Bool
-  }
+data LoxFn cell where
+  LoxFn ::
+    forall cell meta.
+    RuntimeMeta meta =>
+    { loxFnAST :: AST.Function meta
+    , loxClosedEnv :: Maybe (RTFrame cell)
+    , loxFnIsInitializer :: Bool
+    } ->
+    LoxFn cell
 
 data LoxClass (cell :: Type -> Type) = LoxClass
   { loxClassName :: T.Text

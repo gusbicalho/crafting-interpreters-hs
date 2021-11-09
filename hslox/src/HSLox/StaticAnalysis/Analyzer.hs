@@ -7,11 +7,9 @@ module HSLox.StaticAnalysis.Analyzer (
 import Control.Algebra (Has)
 import Control.Carrier.State.Church qualified as State
 import Control.Effect.Writer (Writer)
-import Control.Monad ((>=>))
 import Data.Set (Set)
 import HSLox.AST qualified as AST
-import HSLox.AST.Meta (AsIdentity, WithMeta)
-import HSLox.AST.WalkAST (WalkAST (walkAST))
+import HSLox.AST.WalkAST (WalkAST (walkAST), (/>/))
 import HSLox.StaticAnalysis.CheckBadReturns qualified as CheckBadReturns
 import HSLox.StaticAnalysis.CheckBadSuper qualified as CheckBadSuper
 import HSLox.StaticAnalysis.CheckBadSuperclass qualified as CheckBadSuperclass
@@ -22,29 +20,19 @@ import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionTypeStack
 import HSLox.StaticAnalysis.ResolveLocals qualified as ResolveLocals
 
 analyze ::
-  AsIdentity f =>
-  Traversable f =>
   Has (Writer (Set AnalysisError)) sig m =>
-  AST.Program f ->
-  m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
+  AST.Program meta ->
+  m (AST.Program (ResolveLocals.ResolverMeta, meta))
 analyze =
   State.evalState FunctionTypeStack.emptyState
     . State.evalState ClassTypeStack.emptyState
     . State.evalState ResolveLocals.emptyState
     . walkAST
-      ( FunctionTypeStack.preFunctionTypeStack
-          >=> ClassTypeStack.preClassTypeStack
-          >=> ResolveLocals.preResolvingLocals
-          >=> CheckBadReturns.preCheckBadReturns
-          >=> CheckBadThis.preCheckBadThis
-          >=> CheckBadSuperclass.preCheckBadSuperclass
-          >=> CheckBadSuper.preCheckBadSuper
-      )
-      ( CheckBadSuper.postCheckBadSuper
-          >=> CheckBadSuperclass.postCheckBadSuperclass
-          >=> CheckBadThis.postCheckBadThis
-          >=> CheckBadReturns.postCheckBadReturns
-          >=> ResolveLocals.postResolvingLocals
-          >=> ClassTypeStack.postClassTypeStack
-          >=> FunctionTypeStack.postFunctionTypeStack
+      ( FunctionTypeStack.walk
+          />/ ClassTypeStack.walk
+          />/ ResolveLocals.walk
+          />/ CheckBadReturns.walk
+          />/ CheckBadThis.walk
+          />/ CheckBadSuperclass.walk
+          />/ CheckBadSuper.walk
       )

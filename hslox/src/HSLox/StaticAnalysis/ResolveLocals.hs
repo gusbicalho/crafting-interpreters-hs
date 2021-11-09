@@ -2,8 +2,7 @@ module HSLox.StaticAnalysis.ResolveLocals (
   ResolverMeta (..),
   ResolveLocalsState,
   emptyState,
-  preResolvingLocals,
-  postResolvingLocals,
+  walk,
 ) where
 
 import Control.Algebra (Has)
@@ -20,8 +19,9 @@ import Data.Set (Set)
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (AsIdentity, WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST (Walker (Walker))
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
   tellAnalysisError,
@@ -31,13 +31,16 @@ import HSLox.StaticAnalysis.Stack qualified as Stack
 import HSLox.Token (Token (..))
 import HSLox.Util qualified as Util
 
-preResolvingLocals ::
-  AsIdentity f =>
-  AsAST a g =>
+walk ::
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (f a)
+  WalkAST.Walker input input interOut (ResolverMeta, interOut) m
+walk = Walker preResolvingLocals postResolvingLocals
+
+preResolvingLocals ::
+  Has (State ResolveLocalsState) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  WalkAST.PreWalk meta meta m
 preResolvingLocals fa = do
   case AST.Meta.content fa of
     (toBlock -> Just _) -> do
@@ -60,12 +63,9 @@ preResolvingLocals fa = do
   pure fa
 
 postResolvingLocals ::
-  AsIdentity f =>
-  AsAST a g =>
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  f a ->
-  m (WithMeta ResolverMeta f a)
+  WalkAST.PreWalk meta (ResolverMeta, meta) m
 postResolvingLocals fa = do
   meta <- case AST.Meta.content fa of
     (toBlock -> Just _) -> do
@@ -103,7 +103,7 @@ postResolvingLocals fa = do
       distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
       pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
     _ -> pure emptyResolverMeta
-  pure $ AST.Meta.withMeta meta fa
+  pure $ AST.Meta.addMetaItem meta fa
 
 newtype ResolveLocalsState = RLS {getStack :: Stack Scope}
 

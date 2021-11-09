@@ -14,7 +14,6 @@ import Control.Effect.Writer qualified as Writer
 import Control.Monad (when)
 import Data.Foldable (for_)
 import Data.Functor (void, ($>), (<&>))
-import Data.Functor.Identity (Identity (Identity))
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
@@ -28,6 +27,7 @@ import HSLox.Parser.ParserError qualified as ParserError
 import HSLox.Token (Token (..), TokenType)
 import HSLox.Token qualified as Token
 import HSLox.Util qualified as Util
+import HSLox.AST.Meta (pattern NoMeta)
 
 parse ::
   Has (Writer (Set ParserError)) sig m =>
@@ -110,7 +110,7 @@ classDeclaration = do
   superclass <- Util.runEmptyToMaybe $ do
     ParserState.match [Token.LESS]
     tk <- consume [Token.IDENTIFIER] "Expect superclass name."
-    pure . Identity . AST.Variable $ tk
+    pure . NoMeta . AST.Variable $ tk
   consume [Token.LEFT_BRACE] "Expect '{' before class body."
   methods <- parseMethods Seq.empty
   consume [Token.RIGHT_BRACE] "Expect '}' after class body."
@@ -122,7 +122,7 @@ classDeclaration = do
       then pure acc
       else do
         (_, method) <- function "method" parseMethodName
-        parseMethods (acc :|> Identity method)
+        parseMethods (acc :|> NoMeta method)
   parseMethodName =
     FunctionExprIdentifier
       <$> consume [Token.IDENTIFIER] "Expect method name."
@@ -133,7 +133,7 @@ data FunctionExprIdentifier = FunctionExprIdentifier
   , functionExprRecursiveIdentifier :: Maybe Token
   }
 
-function :: T.Text -> LoxParser FunctionExprIdentifier sig m -> LoxParser (Token, AST.Function Identity) sig m
+function :: T.Text -> LoxParser FunctionExprIdentifier sig m -> LoxParser (Token, AST.Function ()) sig m
 function kind parseName = do
   FunctionExprIdentifier
     { functionExprMarker
@@ -175,7 +175,7 @@ statement =
 blockStmt :: Has Empty sig m => StmtParser sig m
 blockStmt = AST.BlockStmtI <$> (ParserState.match [Token.LEFT_BRACE] *> finishBlock)
 
-finishBlock :: LoxParser (AST.Block Identity) sig m
+finishBlock :: LoxParser (AST.Block ()) sig m
 finishBlock = do
   stmts <- blockBody Seq.empty
   consume [Token.RIGHT_BRACE] "Expect '}' after block."

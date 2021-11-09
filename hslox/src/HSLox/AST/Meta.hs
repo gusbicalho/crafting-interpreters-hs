@@ -1,46 +1,49 @@
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module HSLox.AST.Meta (
-  module HSLox.AST.Meta,
-  Identity (..),
-  Compose (..),
+  WithMeta,
+  pattern NoMeta,
+  withMeta,
+  content,
+  meta,
+  getMetaItem,
+  addMetaItem,
+  HasMetaItem,
 ) where
 
-import Data.Functor.Compose (Compose (..))
-import Data.Functor.Identity (Identity (..))
+pattern NoMeta :: a -> WithMeta () a
+pattern NoMeta a = WithMeta () a
 
--- AST Meta stuff
-class Functor f => AsIdentity f where
-  asIdentity :: f a -> Identity a
+{-# COMPLETE NoMeta #-}
 
-content :: AsIdentity f => f c -> c
-content = runIdentity . asIdentity
-{-# INLINE content #-}
-
-data WithMeta meta f a = WithMeta {withMetaMeta :: meta, withMetaContent :: f a}
+data WithMeta meta a = WithMeta {meta :: meta, content :: a}
   deriving stock (Show, Functor, Foldable, Traversable)
 
-withMeta :: meta -> f a -> WithMeta meta f a
+withMeta :: meta -> a -> WithMeta meta a
 withMeta = WithMeta
 
-class HasMeta meta f where
-  meta :: forall a. f a -> meta
+getMetaItem ::
+  forall itemType meta x.
+  HasMetaItem itemType meta =>
+  WithMeta meta x ->
+  itemType
+getMetaItem = getMetaItem' . meta
 
-instance AsIdentity Identity where
-  asIdentity = id
-  {-# INLINE asIdentity #-}
+addMetaItem :: item -> WithMeta meta x -> WithMeta (item, meta) x
+addMetaItem item v = v{meta = (item, meta v)}
 
-instance AsIdentity f => AsIdentity (WithMeta meta f) where
-  asIdentity = asIdentity . withMetaContent
-  {-# INLINE asIdentity #-}
+class HasMetaItem itemType meta where
+  getMetaItem' :: meta -> itemType
 
-instance {-# OVERLAPPABLE #-} HasMeta a f => HasMeta a (WithMeta meta f) where
-  meta = meta . withMetaContent
-  {-# INLINE meta #-}
+instance HasMetaItem itemType itemType where
+  getMetaItem' = id
 
-instance {-# OVERLAPPING #-} HasMeta meta (WithMeta meta f) where
-  meta = withMetaMeta
-  {-# INLINE meta #-}
+instance {-# OVERLAPPING #-} HasMetaItem itemType (itemType, more) where
+  getMetaItem' = fst
+
+instance
+  {-# OVERLAPPABLE #-}
+  HasMetaItem itemType more =>
+  HasMetaItem itemType (differentItemType, more)
+  where
+  getMetaItem' = getMetaItem' . snd
