@@ -1,7 +1,4 @@
-module HSLox.StaticAnalysis.CheckBadSuperclass (
-  preCheckBadSuperclass,
-  postCheckBadSuperclass,
-) where
+module HSLox.StaticAnalysis.CheckBadSuperclass (walk) where
 
 import Control.Algebra (Has)
 import Control.Effect.State (State)
@@ -10,8 +7,9 @@ import Control.Monad (when)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST (Walker (Walker))
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
@@ -19,12 +17,16 @@ import HSLox.StaticAnalysis.Error (
  )
 import HSLox.Token (Token (..))
 
-preCheckBadSuperclass ::
-  AsAST a f =>
+walk ::
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.NeutralWalker input output m
+walk = Walker preCheckBadSuperclass pure
+
+preCheckBadSuperclass ::
+  Has (State ClassType.ClassTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  WalkAST.PreWalk meta meta m
 preCheckBadSuperclass fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration tk (Just superclass) _)) -> do
@@ -33,6 +35,3 @@ preCheckBadSuperclass fa = do
         tellAnalysisError tk "A class cannot inherit from itself."
     _ -> pure ()
   pure fa
-
-postCheckBadSuperclass :: Applicative m => a -> m a
-postCheckBadSuperclass = pure

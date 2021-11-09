@@ -135,10 +135,10 @@ library
     , megaparsec >= 9.0.0
     , mtl
     , text
-  ghc-options: -fexpose-all-unfoldings
-               -fspecialise-aggressively
-               -fcross-module-specialise
-               -flate-specialise
+  -- ghc-options: -fexpose-all-unfoldings
+  --              -fspecialise-aggressively
+  --              -fcross-module-specialise
+  --              -flate-specialise
 
 executable hslox-exe
   import: common-options

@@ -2,8 +2,7 @@ module HSLox.StaticAnalysis.FunctionTypeStack (
   FunctionTypeStack,
   FunctionType (..),
   emptyState,
-  preFunctionTypeStack,
-  postFunctionTypeStack,
+  walk,
   currentFunctionType,
 ) where
 
@@ -13,17 +12,20 @@ import Control.Carrier.State.Church qualified as State
 import Data.Maybe (fromMaybe)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Stack (Stack)
 import HSLox.StaticAnalysis.Stack qualified as Stack
 import HSLox.Token (Token (..))
 
-preFunctionTypeStack ::
-  AsAST a g =>
+walk ::
   Has (State FunctionTypeStack) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.NeutralWalker input output m
+walk = WalkAST.Walker preFunctionTypeStack postFunctionTypeStack
+
+preFunctionTypeStack ::
+  Has (State FunctionTypeStack) sig m =>
+  WalkAST.PreWalk meta meta m
 preFunctionTypeStack fa = do
   case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do
@@ -41,10 +43,8 @@ preFunctionTypeStack fa = do
   pure fa
 
 postFunctionTypeStack ::
-  AsAST a g =>
   Has (State FunctionTypeStack) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.PostWalk meta meta m
 postFunctionTypeStack fa = do
   case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do

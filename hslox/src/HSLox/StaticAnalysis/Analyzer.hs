@@ -7,10 +7,9 @@ module HSLox.StaticAnalysis.Analyzer (
 import Control.Algebra (Has)
 import Control.Carrier.State.Church qualified as State
 import Control.Effect.Writer (Writer)
-import Control.Monad ((>=>))
 import Data.Set (Set)
 import HSLox.AST qualified as AST
-import HSLox.AST.WalkAST (WalkAST (walkAST))
+import HSLox.AST.WalkAST (WalkAST (walkAST), (/>/))
 import HSLox.StaticAnalysis.CheckBadReturns qualified as CheckBadReturns
 import HSLox.StaticAnalysis.CheckBadSuper qualified as CheckBadSuper
 import HSLox.StaticAnalysis.CheckBadSuperclass qualified as CheckBadSuperclass
@@ -29,19 +28,11 @@ analyze =
     . State.evalState ClassTypeStack.emptyState
     . State.evalState ResolveLocals.emptyState
     . walkAST
-      ( FunctionTypeStack.preFunctionTypeStack
-          >=> ClassTypeStack.preClassTypeStack
-          >=> ResolveLocals.preResolvingLocals
-          >=> CheckBadReturns.preCheckBadReturns
-          >=> CheckBadThis.preCheckBadThis
-          >=> CheckBadSuperclass.preCheckBadSuperclass
-          >=> CheckBadSuper.preCheckBadSuper
-      )
-      ( CheckBadSuper.postCheckBadSuper
-          >=> CheckBadSuperclass.postCheckBadSuperclass
-          >=> CheckBadThis.postCheckBadThis
-          >=> CheckBadReturns.postCheckBadReturns
-          >=> ResolveLocals.postResolvingLocals
-          >=> ClassTypeStack.postClassTypeStack
-          >=> FunctionTypeStack.postFunctionTypeStack
+      ( FunctionTypeStack.walk
+          />/ ClassTypeStack.walk
+          />/ ResolveLocals.walk
+          />/ CheckBadReturns.walk
+          />/ CheckBadThis.walk
+          />/ CheckBadSuperclass.walk
+          />/ CheckBadSuper.walk
       )

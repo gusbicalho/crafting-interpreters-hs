@@ -1,7 +1,4 @@
-module HSLox.StaticAnalysis.CheckBadThis (
-  preCheckBadThis,
-  postCheckBadThis,
-) where
+module HSLox.StaticAnalysis.CheckBadThis (walk) where
 
 import Control.Algebra (Has)
 import Control.Effect.State (State)
@@ -10,20 +7,25 @@ import Control.Monad (when)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST (Walker (Walker))
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
   tellAnalysisError,
  )
 
-preCheckBadThis ::
-  AsAST a g =>
+walk ::
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.NeutralWalker input output m
+walk = Walker preCheckBadThis pure
+
+preCheckBadThis ::
+  Has (State ClassType.ClassTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  WalkAST.PreWalk meta meta m
 preCheckBadThis fa = do
   case AST.Meta.content fa of
     (toThis -> Just (AST.This tk)) -> do
@@ -32,6 +34,3 @@ preCheckBadThis fa = do
         tellAnalysisError tk "Cannot use 'this' outside of a class."
     _ -> pure ()
   pure fa
-
-postCheckBadThis :: Applicative m => a -> m a
-postCheckBadThis = pure

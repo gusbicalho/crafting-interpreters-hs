@@ -1,9 +1,8 @@
 module HSLox.StaticAnalysis.ClassTypeStack (
   ClassTypeStack,
   ClassType (..),
+  walk,
   emptyState,
-  preClassTypeStack,
-  postClassTypeStack,
   currentClassType,
 ) where
 
@@ -13,16 +12,20 @@ import Control.Carrier.State.Church qualified as State
 import Data.Maybe (fromMaybe, isJust)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST (Walker (Walker))
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Stack (Stack)
 import HSLox.StaticAnalysis.Stack qualified as Stack
 
-preClassTypeStack ::
-  AsAST a g =>
+walk ::
   Has (State ClassTypeStack) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.NeutralWalker input output m
+walk = Walker preClassTypeStack postClassTypeStack
+
+preClassTypeStack ::
+  Has (State ClassTypeStack) sig m =>
+  WalkAST.PreWalk meta meta m
 preClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration _ super _)) -> do
@@ -34,10 +37,8 @@ preClassTypeStack fa = do
   pure fa
 
 postClassTypeStack ::
-  AsAST a g =>
   Has (State ClassTypeStack) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.PostWalk meta meta m
 postClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just _) -> do

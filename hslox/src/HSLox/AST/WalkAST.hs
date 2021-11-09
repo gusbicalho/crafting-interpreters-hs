@@ -1,5 +1,12 @@
 module HSLox.AST.WalkAST (
   WalkAST (..),
+  Walker (..),
+  LeafWalker,
+  NeutralWalker,
+  (/>/),
+  done,
+  PreWalk,
+  PostWalk,
 ) where
 
 import Control.Monad ((>=>))
@@ -7,37 +14,57 @@ import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST, LeafNode (..))
 import HSLox.AST.Meta (WithMeta)
 
-type PreWalk input m =
-  forall astNode.
-  AsAST (astNode input) input =>
-  WithMeta input (astNode input) ->
-  m (WithMeta input (astNode input))
+type PreWalk input output m =
+  forall astNode inner.
+  AsAST astNode =>
+  WithMeta input (astNode inner) ->
+  m (WithMeta output (astNode inner))
 
 type PostWalk input output m =
-  forall astNode.
-  AsAST (astNode output) output =>
-  WithMeta input (astNode output) ->
-  m (WithMeta output (astNode output))
+  forall astNode inner.
+  AsAST astNode =>
+  WithMeta input (astNode inner) ->
+  m (WithMeta output (astNode inner))
+
+data Walker input interIn interOut output m = Walker
+  { preWalker :: !(PreWalk input interIn m)
+  , postWalker :: !(PostWalk interOut output m)
+  }
+
+type LeafWalker input inter output = Walker input inter inter output
+type NeutralWalker input output = Walker input input output output
+
+done :: Applicative m => LeafWalker meta meta meta m
+done = Walker pure pure
+
+(/>/) ::
+  forall input interIn1 interIn2 interOut2 interOut1 output m.
+  Monad m =>
+  Walker input interIn1 interOut1 output m ->
+  Walker interIn1 interIn2 interOut2 interOut1 m ->
+  Walker input interIn2 interOut2 output m
+(/>/) = composeWalkers
+ where
+  composeWalkers (Walker preW1 postW1) (Walker preW2 postW2) =
+    Walker (preW1 >=> preW2) (postW2 >=> postW1)
+infixl 1 />/
 
 class WalkAST astNode where
   walkAST ::
     Monad m =>
-    PreWalk input m ->
-    PostWalk input output m ->
+    LeafWalker input inter output m ->
     astNode input ->
     m (astNode output)
 
 {-# INLINE walkLeaf #-}
 walkLeaf ::
   ( Monad m
-  , AsAST (LeafNode a input) input
-  , AsAST (LeafNode a output) output
+  , AsAST (LeafNode a)
   ) =>
-  PreWalk input m ->
-  PostWalk input output m ->
+  LeafWalker input inter output m ->
   WithMeta input a ->
   m (WithMeta output a)
-walkLeaf preW postW t = do
+walkLeaf (Walker preW postW) t = do
   preWed <- preW (fmap LeafNode t)
   -- For a LeafNode, walking is a noop, just change the phantom functor type
   let walked = fmap (LeafNode . unLeafNode) preWed
@@ -48,139 +75,137 @@ walkLeaf preW postW t = do
 walkWrapped ::
   ( Monad m
   , WalkAST astNode
-  , AsAST (astNode input) input
-  , AsAST (astNode output) output
+  , AsAST astNode
   ) =>
-  PreWalk input m ->
-  PostWalk input output m ->
+  LeafWalker input inter output m ->
   WithMeta input (astNode input) ->
   m (WithMeta output (astNode output))
-walkWrapped preW postW = preW >=> traverse (walkAST preW postW) >=> postW
+walkWrapped walker@(Walker preW postW) = preW >=> traverse (walkAST walker) >=> postW
 
 instance WalkAST AST.Program where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Program stmts) = AST.Program <$> traverse (walkAST preW postW) stmts
+  walkAST walker (AST.Program stmts) = AST.Program <$> traverse (walkAST walker) stmts
 
 instance WalkAST AST.Stmt where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.ExprStmt t) = AST.ExprStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.VarDeclarationStmt t) = AST.VarDeclarationStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.FunDeclarationStmt t) = AST.FunDeclarationStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.ClassDeclarationStmt t) = AST.ClassDeclarationStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.BlockStmt t) = AST.BlockStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.IfStmt t) = AST.IfStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.WhileStmt t) = AST.WhileStmt <$> walkWrapped preW postW t
-  walkAST preW postW (AST.ReturnStmt t) = AST.ReturnStmt <$> walkWrapped preW postW t
+  walkAST walker (AST.ExprStmt t) = AST.ExprStmt <$> walkWrapped walker t
+  walkAST walker (AST.VarDeclarationStmt t) = AST.VarDeclarationStmt <$> walkWrapped walker t
+  walkAST walker (AST.FunDeclarationStmt t) = AST.FunDeclarationStmt <$> walkWrapped walker t
+  walkAST walker (AST.ClassDeclarationStmt t) = AST.ClassDeclarationStmt <$> walkWrapped walker t
+  walkAST walker (AST.BlockStmt t) = AST.BlockStmt <$> walkWrapped walker t
+  walkAST walker (AST.IfStmt t) = AST.IfStmt <$> walkWrapped walker t
+  walkAST walker (AST.WhileStmt t) = AST.WhileStmt <$> walkWrapped walker t
+  walkAST walker (AST.ReturnStmt t) = AST.ReturnStmt <$> walkWrapped walker t
 
 instance WalkAST AST.VarDeclaration where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.VarDeclaration identifier expr) =
-    AST.VarDeclaration identifier <$> walkAST preW postW expr
+  walkAST walker (AST.VarDeclaration identifier expr) =
+    AST.VarDeclaration identifier <$> walkAST walker expr
 
 instance WalkAST AST.FunDeclaration where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.FunDeclaration identifier expr) =
-    AST.FunDeclaration identifier <$> walkAST preW postW expr
+  walkAST walker (AST.FunDeclaration identifier expr) =
+    AST.FunDeclaration identifier <$> walkAST walker expr
 
 instance WalkAST AST.ClassDeclaration where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.ClassDeclaration identifier superclass methods) =
-    AST.ClassDeclaration identifier <$> traverse (walkLeaf preW postW) superclass
-      <*> traverse (walkWrapped preW postW) methods
+  walkAST walker (AST.ClassDeclaration identifier superclass methods) =
+    AST.ClassDeclaration identifier <$> traverse (walkLeaf walker) superclass
+      <*> traverse (walkWrapped walker) methods
 
 instance WalkAST AST.Block where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Block stmts) = AST.Block <$> traverse (walkAST preW postW) stmts
+  walkAST walker (AST.Block stmts) = AST.Block <$> traverse (walkAST walker) stmts
 
 instance WalkAST AST.If where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.If cond thenStmt elseStmt) =
-    AST.If <$> walkAST preW postW cond
-      <*> walkAST preW postW thenStmt
-      <*> traverse (walkAST preW postW) elseStmt
+  walkAST walker (AST.If cond thenStmt elseStmt) =
+    AST.If <$> walkAST walker cond
+      <*> walkAST walker thenStmt
+      <*> traverse (walkAST walker) elseStmt
 
 instance WalkAST AST.While where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.While cond body) =
-    AST.While <$> walkAST preW postW cond
-      <*> walkAST preW postW body
+  walkAST walker (AST.While cond body) =
+    AST.While <$> walkAST walker cond
+      <*> walkAST walker body
 
 instance WalkAST AST.Return where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Return tk expr) = AST.Return tk <$> traverse (walkAST preW postW) expr
+  walkAST walker (AST.Return tk expr) = AST.Return tk <$> traverse (walkAST walker) expr
 
 instance WalkAST AST.Expr where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.UnaryExpr t) = AST.UnaryExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.LogicalExpr t) = AST.LogicalExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.BinaryExpr t) = AST.BinaryExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.TernaryExpr t) = AST.TernaryExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.GroupingExpr t) = AST.GroupingExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.LiteralExpr t) = AST.LiteralExpr <$> walkLeaf preW postW t
-  walkAST preW postW (AST.VariableExpr t) = AST.VariableExpr <$> walkLeaf preW postW t
-  walkAST preW postW (AST.AssignmentExpr t) = AST.AssignmentExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.CallExpr t) = AST.CallExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.GetPropertyExpr t) = AST.GetPropertyExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.ThisExpr t) = AST.ThisExpr <$> walkLeaf preW postW t
-  walkAST preW postW (AST.SuperExpr t) = AST.SuperExpr <$> walkLeaf preW postW t
-  walkAST preW postW (AST.SetPropertyExpr t) = AST.SetPropertyExpr <$> walkWrapped preW postW t
-  walkAST preW postW (AST.FunctionExpr t) = AST.FunctionExpr <$> walkWrapped preW postW t
+  walkAST walker (AST.UnaryExpr t) = AST.UnaryExpr <$> walkWrapped walker t
+  walkAST walker (AST.LogicalExpr t) = AST.LogicalExpr <$> walkWrapped walker t
+  walkAST walker (AST.BinaryExpr t) = AST.BinaryExpr <$> walkWrapped walker t
+  walkAST walker (AST.TernaryExpr t) = AST.TernaryExpr <$> walkWrapped walker t
+  walkAST walker (AST.GroupingExpr t) = AST.GroupingExpr <$> walkWrapped walker t
+  walkAST walker (AST.LiteralExpr t) = AST.LiteralExpr <$> walkLeaf walker t
+  walkAST walker (AST.VariableExpr t) = AST.VariableExpr <$> walkLeaf walker t
+  walkAST walker (AST.AssignmentExpr t) = AST.AssignmentExpr <$> walkWrapped walker t
+  walkAST walker (AST.CallExpr t) = AST.CallExpr <$> walkWrapped walker t
+  walkAST walker (AST.GetPropertyExpr t) = AST.GetPropertyExpr <$> walkWrapped walker t
+  walkAST walker (AST.ThisExpr t) = AST.ThisExpr <$> walkLeaf walker t
+  walkAST walker (AST.SuperExpr t) = AST.SuperExpr <$> walkLeaf walker t
+  walkAST walker (AST.SetPropertyExpr t) = AST.SetPropertyExpr <$> walkWrapped walker t
+  walkAST walker (AST.FunctionExpr t) = AST.FunctionExpr <$> walkWrapped walker t
 
 instance WalkAST AST.Unary where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Unary op e) = AST.Unary op <$> walkAST preW postW e
+  walkAST walker (AST.Unary op e) = AST.Unary op <$> walkAST walker e
 
 instance WalkAST AST.Logical where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Logical left op right) =
-    AST.Logical <$> walkAST preW postW left
+  walkAST walker (AST.Logical left op right) =
+    AST.Logical <$> walkAST walker left
       <*> pure op
-      <*> walkAST preW postW right
+      <*> walkAST walker right
 
 instance WalkAST AST.Binary where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Binary left op right) =
-    AST.Binary <$> walkAST preW postW left
+  walkAST walker (AST.Binary left op right) =
+    AST.Binary <$> walkAST walker left
       <*> pure op
-      <*> walkAST preW postW right
+      <*> walkAST walker right
 
 instance WalkAST AST.Ternary where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Ternary left op1 middle op2 right) =
-    AST.Ternary <$> walkAST preW postW left
+  walkAST walker (AST.Ternary left op1 middle op2 right) =
+    AST.Ternary <$> walkAST walker left
       <*> pure op1
-      <*> walkAST preW postW middle
+      <*> walkAST walker middle
       <*> pure op2
-      <*> walkAST preW postW right
+      <*> walkAST walker right
 
 instance WalkAST AST.Grouping where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Grouping t) = AST.Grouping <$> walkAST preW postW t
+  walkAST walker (AST.Grouping t) = AST.Grouping <$> walkAST walker t
 
 instance WalkAST AST.Assignment where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Assignment op e) = AST.Assignment op <$> walkAST preW postW e
+  walkAST walker (AST.Assignment op e) = AST.Assignment op <$> walkAST walker e
 
 instance WalkAST AST.Call where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Call callee paren args) =
-    AST.Call <$> walkAST preW postW callee
+  walkAST walker (AST.Call callee paren args) =
+    AST.Call <$> walkAST walker callee
       <*> pure paren
-      <*> traverse (walkAST preW postW) args
+      <*> traverse (walkAST walker) args
 
 instance WalkAST AST.GetProperty where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.GetProperty callee prop) =
-    AST.GetProperty <$> walkAST preW postW callee
+  walkAST walker (AST.GetProperty callee prop) =
+    AST.GetProperty <$> walkAST walker callee
       <*> pure prop
 
 instance WalkAST AST.SetProperty where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.SetProperty obj prop val) =
-    AST.SetProperty <$> walkAST preW postW obj
+  walkAST walker (AST.SetProperty obj prop val) =
+    AST.SetProperty <$> walkAST walker obj
       <*> pure prop
-      <*> walkAST preW postW val
+      <*> walkAST walker val
 
 instance WalkAST AST.Function where
   {-# INLINE walkAST #-}
-  walkAST preW postW (AST.Function tk tkRec argNames body) = AST.Function tk tkRec argNames <$> walkAST preW postW body
+  walkAST walker (AST.Function tk tkRec argNames body) = AST.Function tk tkRec argNames <$> walkAST walker body

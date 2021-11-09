@@ -1,7 +1,4 @@
-module HSLox.StaticAnalysis.CheckBadReturns (
-  preCheckBadReturns,
-  postCheckBadReturns,
-) where
+module HSLox.StaticAnalysis.CheckBadReturns (walk) where
 
 import Control.Algebra (Has)
 import Control.Effect.State (State)
@@ -11,20 +8,24 @@ import Data.Maybe (isJust)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST (..))
-import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
   tellAnalysisError,
  )
 import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionType
 
-preCheckBadReturns ::
-  AsAST a g =>
+walk ::
   Has (State FunctionType.FunctionTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WithMeta meta a ->
-  m (WithMeta meta a)
+  WalkAST.NeutralWalker input output m
+walk = WalkAST.Walker preCheckBadReturns pure
+
+preCheckBadReturns ::
+  Has (State FunctionType.FunctionTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  WalkAST.PreWalk meta meta m
 preCheckBadReturns fa = do
   case AST.Meta.content fa of
     (toReturn -> Just (AST.Return tk expr)) -> do
@@ -35,6 +36,3 @@ preCheckBadReturns fa = do
         tellAnalysisError tk "Cannot return a value from an initializer."
     _ -> pure ()
   pure fa
-
-postCheckBadReturns :: Applicative m => a -> m a
-postCheckBadReturns = pure
