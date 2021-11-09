@@ -375,7 +375,7 @@ primary =
        , singleMatching [ Token.NIL ]         $> NilE
        , singleMatching [ Token.IDENTIFIER ] <&> VariableE
        , singleMatching [ Token.THIS ]       <&> ThisE
-       , singleMatching [ Token.FUN ]        >>= anonymousFunction
+       , singleMatching [ Token.FUN ]        >>= inlineFunction
        , singleMatching [ Token.SUPER ]      >>= \tk -> do
           consume [Token.DOT] "Expect '.' after 'super'."
           property <- consume [Token.IDENTIFIER] "Expect superclass method name."
@@ -396,10 +396,14 @@ primary =
             fancyFailure (makeError tk "Expect expression.")
        ]
 
-anonymousFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
-anonymousFunction marker = do
-  (_, function) <- function "function" (pure $ FunctionExprIdentifier marker Nothing)
-  pure $ FunctionExprI function
+inlineFunction :: MonadParsec ParserError TokenStream m => Token -> m ExprI
+inlineFunction marker = do
+    (_, function) <- function "function" (parseFunName <|> anonymousFunName)
+    pure $ FunctionExprI function
+  where
+    parseFunName = singleMatching [Token.IDENTIFIER] <&> \functionName ->
+      FunctionExprIdentifier functionName (Just functionName)
+    anonymousFunName = pure $ FunctionExprIdentifier marker Nothing
 
 leftAssociativeBinaryOp :: Foldable t
                         => MonadParsec ParserError TokenStream m

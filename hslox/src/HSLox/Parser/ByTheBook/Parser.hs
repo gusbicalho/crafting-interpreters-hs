@@ -21,7 +21,7 @@ import qualified HSLox.Token as Token
 import qualified HSLox.Util as Util
 
 parse :: Has (Writer (Set ParserError)) sig m
-      => (Seq Token)
+      => Seq Token
       -> m (Program Identity)
 parse tokens
   = evalState (initialParserState tokens)
@@ -382,7 +382,7 @@ primary = do
       Just (Token { tokenType = Token.NIL })           -> pure NilE
       Just tk@(Token { tokenType = Token.IDENTIFIER }) -> pure (VariableE tk)
       Just tk@(Token { tokenType = Token.THIS })       -> pure (ThisE tk)
-      Just tk@(Token { tokenType = Token.FUN})         -> anonymousFunction tk
+      Just tk@(Token { tokenType = Token.FUN})         -> inlineFunction tk
       Just tk@(Token { tokenType = Token.SUPER })      -> do
         consume [Token.DOT] "Expect '.' after 'super'."
         property <- consume [Token.IDENTIFIER] "Expect superclass method name."
@@ -403,10 +403,14 @@ primary = do
         pure $ GroupingE expr
       _ -> throwParserError "Expect expression."
 
-anonymousFunction :: Token -> LoxParser ExprI sig m
-anonymousFunction marker = do
-  (_, function) <- function "function" (pure $ FunctionExprIdentifier marker Nothing)
-  pure $ FunctionExprI function
+inlineFunction :: Token -> LoxParser ExprI sig m
+inlineFunction marker = do
+    (_, function) <- function "function" (parseFunName `Util.recoverFromEmptyWith` anonymousFunName)
+    pure $ FunctionExprI function
+  where
+    parseFunName = match [Token.IDENTIFIER] <&> \functionName ->
+      FunctionExprIdentifier functionName (Just functionName)
+    anonymousFunName = pure $ FunctionExprIdentifier marker Nothing
 
 makeParserError :: Has (ErrorEff.Throw ParserError) sig m
                 => Has (State ParserState) sig m
