@@ -1,10 +1,10 @@
 module HSLox.ASTPrinterSpec where
 
-import qualified Data.Text as T
-import HSLox.AST
-import HSLox.ASTPrinter
+import Data.Text qualified as T
+import HSLox.AST qualified as AST
+import HSLox.ASTPrinter (ASTPrinter (..))
 import HSLox.Token (Token (..))
-import qualified HSLox.Token as Token
+import HSLox.Token qualified as Token
 import Test.Hspec
 
 spec :: Spec
@@ -18,28 +18,33 @@ spec = do
 printedBookExpr :: T.Text
 printedBookExpr = "(* (- 123.0) (group 45.67))"
 
-bookExpr :: ExprI
+bookExpr :: AST.ExprI
 bookExpr =
-  BinaryE
-    (UnaryE
-      (Token "-" Token.MINUS Nothing 1)
-      (NumE 123))
+  AST.BinaryE
+    ( AST.UnaryE
+        (Token "-" Token.MINUS Nothing 1)
+        (AST.NumE 123)
+    )
     (Token "*" Token.STAR Nothing 1)
-    (GroupingE
-      (NumE 45.67))
+    ( AST.GroupingE
+        (AST.NumE 45.67)
+    )
 
 printedBiggerExpr :: T.Text
 printedBiggerExpr = "(+ (group (- 3.0 (- 1.0))) \"asd\")"
 
-biggerExpr :: ExprI
+biggerExpr :: AST.ExprI
 biggerExpr =
-  BinaryE
-    (GroupingE
-      (BinaryE
-        (NumE 3)
-        (Token "-" Token.MINUS Nothing 0)
-        (UnaryE
-          (Token "-" Token.MINUS Nothing 0)
-          (NumE 1))))
+  AST.BinaryE
+    ( AST.GroupingE
+        ( AST.BinaryE
+            (AST.NumE 3)
+            (Token "-" Token.MINUS Nothing 0)
+            ( AST.UnaryE
+                (Token "-" Token.MINUS Nothing 0)
+                (AST.NumE 1)
+            )
+        )
+    )
     (Token "+" Token.PLUS Nothing 0)
-    (StringE "asd")
+    (AST.StringE "asd")
