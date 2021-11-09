@@ -1,24 +1,31 @@
-module HSLox.StaticAnalysis.CheckBadSuper
-  ( preCheckBadSuper
-  , postCheckBadSuper
-  ) where
+module HSLox.StaticAnalysis.CheckBadSuper (
+  preCheckBadSuper,
+  postCheckBadSuper,
+) where
 
-import Control.Carrier.State.Church (State)
-import Control.Effect.Writer
+import Control.Algebra (Has)
+import Control.Effect.State (State)
+import Control.Effect.Writer (Writer)
 import Data.Set (Set)
-import qualified HSLox.AST as AST
-import HSLox.AST.AsAST
-import HSLox.AST.Meta
-import HSLox.StaticAnalysis.Error
-import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassType
+import HSLox.AST qualified as AST
+import HSLox.AST.AsAST (AsAST (..))
+import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
+import HSLox.StaticAnalysis.Error (
+  AnalysisError,
+  tellAnalysisError,
+ )
 
-preCheckBadSuper :: AsIdentity f
-                 => AsAST a g
-                 => Has (State ClassType.ClassTypeStack) sig m
-                 => Has (Writer (Set AnalysisError)) sig m
-                 => f a -> m (f a)
+preCheckBadSuper ::
+  AsIdentity f =>
+  AsAST a g =>
+  Has (State ClassType.ClassTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  f a ->
+  m (f a)
 preCheckBadSuper fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toSuper -> Just (AST.Super tk _)) -> do
       fnType <- ClassType.currentClassType
       case fnType of

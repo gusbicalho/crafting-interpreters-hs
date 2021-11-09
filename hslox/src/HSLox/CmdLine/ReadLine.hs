@@ -1,35 +1,44 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE UndecidableInstances #-}
-module HSLox.CmdLine.ReadLine
-  ( ReadLine (..), readLine
-  , ReadLineC, runReadLine
-  -- * Re-exports
-  , Has
-  ) where
 
-import Control.Algebra
-import Control.Carrier.Lift
+module HSLox.CmdLine.ReadLine (
+  ReadLine (..),
+  readLine,
+  ReadLineC,
+  runReadLine,
+
+  -- * Re-exports
+  Has,
+) where
+
+import Control.Algebra (Algebra (..), Has, send, type (:+:) (..))
+import Control.Carrier.Lift (Lift)
+import Control.Carrier.Lift qualified as Lift
 import Data.Coerce (coerce)
-import Data.Kind
-import Data.Text
-import System.IO (hGetLine, hFlush, hPutStr, stdin, stdout)
+import Data.Kind (Type)
+import Data.Text (Text)
+import Data.Text qualified as T
+import System.IO (hFlush, stdout)
 
 data ReadLine (m :: Type -> Type) k where
   ReadLine :: ReadLine m Text
 
 readLine :: (Has ReadLine sig m) => m Text
-readLine = send $ ReadLine
+readLine = send ReadLine
 
-newtype ReadLineC m a = ReadLineC {
-  runReadLine :: m a
-  } deriving newtype (Functor, Applicative, Monad)
+newtype ReadLineC m a = ReadLineC
+  { runReadLine :: m a
+  }
+  deriving newtype (Functor, Applicative, Monad)
 
-instance Has (Lift IO) sig m
-      => Algebra (ReadLine :+: sig) (ReadLineC m) where
+instance
+  Has (Lift IO) sig m =>
+  Algebra (ReadLine :+: sig) (ReadLineC m)
+  where
   alg hdl sig ctx = case sig of
     L ReadLine -> fmap (<$ ctx) $
-      sendM @IO $ do
-        hPutStr stdout "> "
+      Lift.sendM @IO $ do
+        putStr "> "
         hFlush stdout
-        pack <$> hGetLine stdin
+        T.pack <$> getLine
     R other -> ReadLineC (alg (coerce . hdl) other ctx)

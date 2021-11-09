@@ -1,7 +1,13 @@
-module HSLox.StaticAnalysis.Stack
-  ( Stack
-  , emptyStack, push, pop, pop_, peek, overPeek, overPeekA
-  ) where
+module HSLox.StaticAnalysis.Stack (
+  Stack,
+  emptyStack,
+  push,
+  pop,
+  pop_,
+  peek,
+  overPeek,
+  overPeekA,
+) where
 
 newtype Stack a = Stack [a]
   deriving stock (Show)
@@ -15,15 +21,15 @@ push scope (Stack scopes) = Stack (scope : scopes)
 
 pop :: Stack a -> (Maybe a, Stack a)
 pop s@(Stack []) = (Nothing, s)
-pop (Stack (x:xs)) = (Just x, Stack xs)
+pop (Stack (x : xs)) = (Just x, Stack xs)
 
 pop_ :: Stack a -> Stack a
 pop_ s@(Stack []) = s
-pop_ (Stack (_:xs)) = Stack xs
+pop_ (Stack (_ : xs)) = Stack xs
 
 peek :: Stack a -> Maybe a
 peek (Stack []) = Nothing
-peek (Stack (x:_)) = Just x
+peek (Stack (x : _)) = Just x
 
 overPeek :: (a -> a) -> Stack a -> Stack a
 overPeek _ s@(Stack []) = s

@@ -1,7 +1,31 @@
 module HSLox.AST.AsAST where
 
-import Data.Kind
-import HSLox.AST
+import Data.Kind (Type)
+import HSLox.AST (
+  Assignment,
+  Binary,
+  Block,
+  Call,
+  ClassDeclaration,
+  Expr,
+  FunDeclaration,
+  Function,
+  GetProperty,
+  Grouping,
+  If,
+  Literal,
+  Logical,
+  Return,
+  SetProperty,
+  Stmt,
+  Super,
+  Ternary,
+  This,
+  Unary,
+  VarDeclaration,
+  Variable,
+  While,
+ )
 
 class AsAST a f | a -> f where
   {-# INLINE toExpr #-}
@@ -132,7 +156,7 @@ instance AsAST (Function f) f where
   {-# INLINE toFunction #-}
   toFunction = Just
 
-newtype LeafNode a (f :: Type -> Type) = LeafNode { unLeafNode :: a }
+newtype LeafNode a (f :: Type -> Type) = LeafNode {unLeafNode :: a}
 
 instance AsAST (LeafNode Variable f) f where
   {-# INLINE toVariable #-}

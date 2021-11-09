@@ -1,172 +1,207 @@
 {-# LANGUAGE UndecidableInstances #-}
+
 module HSLox.ASTPrinter where
 
-import Data.Foldable
-import qualified Data.Text as T
-import HSLox.AST
-import HSLox.AST.Meta
+import Data.Foldable (Foldable (toList))
+import Data.Text qualified as T
+import HSLox.AST qualified as AST
+import HSLox.AST.Meta (AsIdentity (..), Identity (runIdentity))
 import HSLox.Token (Token (..))
-import qualified HSLox.Util as Util
+import HSLox.Util qualified as Util
 
 class ASTPrinter e where
   printAST :: e -> T.Text
 
 instance (ASTPrinter e, AsIdentity f) => ASTPrinter (f e) where
-  printAST = printAST
-           . runIdentity
-           . asIdentity
+  printAST =
+    printAST
+      . runIdentity
+      . asIdentity
 
-instance ASTPrinter (Stmt f) => ASTPrinter (Program f) where
-  printAST (Program stmts) = "[" <> foldMap ((" " <>) . printAST) stmts <> " ]"
+instance ASTPrinter (AST.Stmt f) => ASTPrinter (AST.Program f) where
+  printAST (AST.Program stmts) = "[" <> foldMap ((" " <>) . printAST) stmts <> " ]"
 
-instance ( ASTPrinter (f (Expr f))
-         , ASTPrinter (f (VarDeclaration f))
-         , ASTPrinter (f (FunDeclaration f))
-         , ASTPrinter (f (ClassDeclaration f))
-         , ASTPrinter (f (Block f))
-         , ASTPrinter (f (If f))
-         , ASTPrinter (f (While f))
-         , ASTPrinter (f (Return f))
-         ) => ASTPrinter (Stmt f) where
-  printAST (ExprStmt e) = printAST e
-  printAST (VarDeclarationStmt decl) = printAST decl
-  printAST (FunDeclarationStmt decl) = printAST decl
-  printAST (ClassDeclarationStmt decl) = printAST decl
-  printAST (BlockStmt block) = printAST block
-  printAST (IfStmt ifStmt) = printAST ifStmt
-  printAST (WhileStmt whileStmt) = printAST whileStmt
-  printAST (ReturnStmt returnStmt) = printAST returnStmt
+instance
+  ( ASTPrinter (f (AST.Expr f))
+  , ASTPrinter (f (AST.VarDeclaration f))
+  , ASTPrinter (f (AST.FunDeclaration f))
+  , ASTPrinter (f (AST.ClassDeclaration f))
+  , ASTPrinter (f (AST.Block f))
+  , ASTPrinter (f (AST.If f))
+  , ASTPrinter (f (AST.While f))
+  , ASTPrinter (f (AST.Return f))
+  ) =>
+  ASTPrinter (AST.Stmt f)
+  where
+  printAST (AST.ExprStmt e) = printAST e
+  printAST (AST.VarDeclarationStmt decl) = printAST decl
+  printAST (AST.FunDeclarationStmt decl) = printAST decl
+  printAST (AST.ClassDeclarationStmt decl) = printAST decl
+  printAST (AST.BlockStmt block) = printAST block
+  printAST (AST.IfStmt ifStmt) = printAST ifStmt
+  printAST (AST.WhileStmt whileStmt) = printAST whileStmt
+  printAST (AST.ReturnStmt returnStmt) = printAST returnStmt
 
-instance ( ASTPrinter (Expr f)
-         ) => ASTPrinter (VarDeclaration f) where
-  printAST (VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
+instance
+  ( ASTPrinter (AST.Expr f)
+  ) =>
+  ASTPrinter (AST.VarDeclaration f)
+  where
+  printAST (AST.VarDeclaration tk init) = parenthesize ("var " <> tokenLexeme tk) [init]
 
-instance ( ASTPrinter (Block f)
-         ) => ASTPrinter (FunDeclaration f) where
-  printAST (FunDeclaration tkName (Function _ _ args body))
-      = "(fun "
+instance
+  ( ASTPrinter (AST.Block f)
+  ) =>
+  ASTPrinter (AST.FunDeclaration f)
+  where
+  printAST (AST.FunDeclaration tkName (AST.Function _ _ args body)) =
+    "(fun "
       <> tokenLexeme tkName
-      <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
+      <> " ["
+      <> Util.foldMapIntersperse tokenLexeme " " args
+      <> "] "
       <> printAST body
       <> ")"
 
-instance ( ASTPrinter (f (Function f))
-         , ASTPrinter (f Variable)
-         ) => ASTPrinter (ClassDeclaration f) where
-  printAST (ClassDeclaration tkName superclass methods)
-      = "(class "
+instance
+  ( ASTPrinter (f (AST.Function f))
+  , ASTPrinter (f AST.Variable)
+  ) =>
+  ASTPrinter (AST.ClassDeclaration f)
+  where
+  printAST (AST.ClassDeclaration tkName superclass methods) =
+    "(class "
       <> tokenLexeme tkName
       <> foldMap ((" < " <>) . printAST) superclass
       <> foldMap ((" " <>) . printAST) methods
       <> ")"
 
-instance ASTPrinter (Stmt f) => ASTPrinter (Block f) where
-  printAST (Block stmts) = "{" <> foldMap ((" " <>) . printAST) stmts <> " }"
+instance ASTPrinter (AST.Stmt f) => ASTPrinter (AST.Block f) where
+  printAST (AST.Block stmts) = "{" <> foldMap ((" " <>) . printAST) stmts <> " }"
 
-instance ( ASTPrinter (Stmt f)
-         , ASTPrinter (Expr f)
-         ) => ASTPrinter (If f) where
-  printAST (If cond thenStmt elseStmt) = "(if"
-                                      <> " " <> printAST cond
-                                      <> " " <> printAST thenStmt
-                                      <> maybe "" ((" " <>) . printAST) elseStmt
-                                      <> ")"
+instance
+  ( ASTPrinter (AST.Stmt f)
+  , ASTPrinter (AST.Expr f)
+  ) =>
+  ASTPrinter (AST.If f)
+  where
+  printAST (AST.If cond thenStmt elseStmt) =
+    "(if"
+      <> " "
+      <> printAST cond
+      <> " "
+      <> printAST thenStmt
+      <> maybe "" ((" " <>) . printAST) elseStmt
+      <> ")"
 
-instance ( ASTPrinter (Stmt f)
-         , ASTPrinter (Expr f)
-         ) => ASTPrinter (While f) where
-  printAST (While cond body) = "(while"
-                            <> " " <> printAST cond
-                            <> " " <> printAST body
-                            <> ")"
+instance
+  ( ASTPrinter (AST.Stmt f)
+  , ASTPrinter (AST.Expr f)
+  ) =>
+  ASTPrinter (AST.While f)
+  where
+  printAST (AST.While cond body) =
+    "(while"
+      <> " "
+      <> printAST cond
+      <> " "
+      <> printAST body
+      <> ")"
 
-instance ASTPrinter (Block f) => ASTPrinter (Function f) where
-  printAST (Function tk _ args body)
-    = "("
-   <> tokenLexeme tk
-   <> " [" <> Util.foldMapIntersperse tokenLexeme " " args <> "] "
-   <> printAST body
-   <> ")"
+instance ASTPrinter (AST.Block f) => ASTPrinter (AST.Function f) where
+  printAST (AST.Function tk _ args body) =
+    "("
+      <> tokenLexeme tk
+      <> " ["
+      <> Util.foldMapIntersperse tokenLexeme " " args
+      <> "] "
+      <> printAST body
+      <> ")"
 
-instance ASTPrinter (Expr f) => ASTPrinter (Return f) where
-  printAST (Return tk expr) = parenthesize (tokenLexeme tk) (toList expr)
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Return f) where
+  printAST (AST.Return tk expr) = parenthesize (tokenLexeme tk) (toList expr)
 
-instance ( ASTPrinter (f (Unary f))
-         , ASTPrinter (f (Logical f))
-         , ASTPrinter (f (Binary f))
-         , ASTPrinter (f (Ternary f))
-         , ASTPrinter (f (Grouping f))
-         , ASTPrinter (f Literal)
-         , ASTPrinter (f Variable)
-         , ASTPrinter (f (Assignment f))
-         , ASTPrinter (f (Call f))
-         , ASTPrinter (f (GetProperty f))
-         , ASTPrinter (f (SetProperty f))
-         , ASTPrinter (f This)
-         , ASTPrinter (f Super)
-         , ASTPrinter (f (Function f))
-         ) => ASTPrinter (Expr f) where
-  printAST (UnaryExpr e) = printAST e
-  printAST (LogicalExpr e) = printAST e
-  printAST (BinaryExpr e) = printAST e
-  printAST (TernaryExpr e) = printAST e
-  printAST (GroupingExpr e) = printAST e
-  printAST (LiteralExpr e) = printAST e
-  printAST (VariableExpr e) = printAST e
-  printAST (AssignmentExpr e) = printAST e
-  printAST (CallExpr e) = printAST e
-  printAST (GetPropertyExpr e) = printAST e
-  printAST (SetPropertyExpr e) = printAST e
-  printAST (ThisExpr e) = printAST e
-  printAST (SuperExpr e) = printAST e
-  printAST (FunctionExpr e) = printAST e
+instance
+  ( ASTPrinter (f (AST.Unary f))
+  , ASTPrinter (f (AST.Logical f))
+  , ASTPrinter (f (AST.Binary f))
+  , ASTPrinter (f (AST.Ternary f))
+  , ASTPrinter (f (AST.Grouping f))
+  , ASTPrinter (f AST.Literal)
+  , ASTPrinter (f AST.Variable)
+  , ASTPrinter (f (AST.Assignment f))
+  , ASTPrinter (f (AST.Call f))
+  , ASTPrinter (f (AST.GetProperty f))
+  , ASTPrinter (f (AST.SetProperty f))
+  , ASTPrinter (f AST.This)
+  , ASTPrinter (f AST.Super)
+  , ASTPrinter (f (AST.Function f))
+  ) =>
+  ASTPrinter (AST.Expr f)
+  where
+  printAST (AST.UnaryExpr e) = printAST e
+  printAST (AST.LogicalExpr e) = printAST e
+  printAST (AST.BinaryExpr e) = printAST e
+  printAST (AST.TernaryExpr e) = printAST e
+  printAST (AST.GroupingExpr e) = printAST e
+  printAST (AST.LiteralExpr e) = printAST e
+  printAST (AST.VariableExpr e) = printAST e
+  printAST (AST.AssignmentExpr e) = printAST e
+  printAST (AST.CallExpr e) = printAST e
+  printAST (AST.GetPropertyExpr e) = printAST e
+  printAST (AST.SetPropertyExpr e) = printAST e
+  printAST (AST.ThisExpr e) = printAST e
+  printAST (AST.SuperExpr e) = printAST e
+  printAST (AST.FunctionExpr e) = printAST e
 
-instance ASTPrinter (Expr f) => ASTPrinter (Call f) where
-  printAST (Call callee _ args) = parenthesize (printAST callee) (toList args)
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Call f) where
+  printAST (AST.Call callee _ args) = parenthesize (printAST callee) (toList args)
 
-instance ASTPrinter (Expr f) => ASTPrinter (GetProperty f) where
-  printAST (GetProperty object tk) = parenthesize ("." <> tokenLexeme tk) [object]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.GetProperty f) where
+  printAST (AST.GetProperty object tk) = parenthesize ("." <> tokenLexeme tk) [object]
 
-instance ASTPrinter (Expr f) => ASTPrinter (SetProperty f) where
-  printAST (SetProperty object tk value) = parenthesize ("." <> tokenLexeme tk <> "=") [object, value]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.SetProperty f) where
+  printAST (AST.SetProperty object tk value) = parenthesize ("." <> tokenLexeme tk <> "=") [object, value]
 
-instance ASTPrinter This where
-  printAST (This tk) = tokenLexeme tk
+instance ASTPrinter AST.This where
+  printAST (AST.This tk) = tokenLexeme tk
 
-instance ASTPrinter Super where
-  printAST (Super keyword property) = tokenLexeme keyword <> "." <> tokenLexeme property
+instance ASTPrinter AST.Super where
+  printAST (AST.Super keyword property) = tokenLexeme keyword <> "." <> tokenLexeme property
 
-instance ASTPrinter (Expr f) => ASTPrinter (Assignment f) where
-  printAST (Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Assignment f) where
+  printAST (AST.Assignment tk expr) = parenthesize ("= " <> tokenLexeme tk) [expr]
 
-instance ASTPrinter Variable where
-  printAST (Variable tk) = tokenLexeme tk
+instance ASTPrinter AST.Variable where
+  printAST (AST.Variable tk) = tokenLexeme tk
 
-instance ASTPrinter Literal where
-  printAST (LitString t) = T.pack . show $ t
-  printAST (LitBool t) = T.pack . show $ t
-  printAST (LitNum t) = T.pack . show $ t
-  printAST LitNil = "nil"
+instance ASTPrinter AST.Literal where
+  printAST (AST.LitString t) = T.pack . show $ t
+  printAST (AST.LitBool t) = T.pack . show $ t
+  printAST (AST.LitNum t) = T.pack . show $ t
+  printAST AST.LitNil = "nil"
 
-instance ASTPrinter (Expr f) => ASTPrinter (Grouping f) where
-  printAST (Grouping expr) = parenthesize "group" [expr]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Grouping f) where
+  printAST (AST.Grouping expr) = parenthesize "group" [expr]
 
-instance ASTPrinter (Expr f) => ASTPrinter (Unary f) where
-  printAST (Unary op expr) = parenthesize (tokenLexeme op) [expr]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Unary f) where
+  printAST (AST.Unary op expr) = parenthesize (tokenLexeme op) [expr]
 
-instance ASTPrinter (Expr f) => ASTPrinter (Binary f) where
-  printAST (Binary left op right) = parenthesize (tokenLexeme op) [left, right]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Binary f) where
+  printAST (AST.Binary left op right) = parenthesize (tokenLexeme op) [left, right]
 
-instance ASTPrinter (Expr f) => ASTPrinter (Logical f) where
-  printAST (Logical left op right) = parenthesize (tokenLexeme op) [left, right]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Logical f) where
+  printAST (AST.Logical left op right) = parenthesize (tokenLexeme op) [left, right]
 
-instance ASTPrinter (Expr f) => ASTPrinter (Ternary f) where
-  printAST (Ternary left op1 middle op2 right)
-    = parenthesize (tokenLexeme op1 <> tokenLexeme op2)
-                   [left, middle, right]
+instance ASTPrinter (AST.Expr f) => ASTPrinter (AST.Ternary f) where
+  printAST (AST.Ternary left op1 middle op2 right) =
+    parenthesize
+      (tokenLexeme op1 <> tokenLexeme op2)
+      [left, middle, right]
 
-parenthesize :: ASTPrinter (Expr f) => T.Text -> [Expr f] -> T.Text
-parenthesize name exprs = "("
-                       <> name
-                       <> foldMap ((" " <>) . printAST) exprs
-                       <> ")"
+parenthesize :: ASTPrinter (AST.Expr f) => T.Text -> [AST.Expr f] -> T.Text
+parenthesize name exprs =
+  "("
+    <> name
+    <> foldMap ((" " <>) . printAST) exprs
+    <> ")"

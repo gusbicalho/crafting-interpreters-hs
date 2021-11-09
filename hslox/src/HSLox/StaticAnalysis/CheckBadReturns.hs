@@ -1,26 +1,33 @@
-module HSLox.StaticAnalysis.CheckBadReturns
-  ( preCheckBadReturns
-  , postCheckBadReturns
-  ) where
+module HSLox.StaticAnalysis.CheckBadReturns (
+  preCheckBadReturns,
+  postCheckBadReturns,
+) where
 
-import Control.Carrier.State.Church (State)
-import Control.Effect.Writer
-import Control.Monad
+import Control.Algebra (Has)
+import Control.Effect.State (State)
+import Control.Effect.Writer (Writer)
+import Control.Monad (when)
 import Data.Maybe (isJust)
 import Data.Set (Set)
-import qualified HSLox.AST as AST
-import HSLox.AST.AsAST
-import HSLox.AST.Meta
-import HSLox.StaticAnalysis.Error
-import qualified HSLox.StaticAnalysis.FunctionTypeStack as FunctionType
+import HSLox.AST qualified as AST
+import HSLox.AST.AsAST (AsAST (..))
+import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.StaticAnalysis.Error (
+  AnalysisError,
+  tellAnalysisError,
+ )
+import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionType
 
-preCheckBadReturns :: AsIdentity f
-                      => AsAST a g
-                      => Has (State FunctionType.FunctionTypeStack) sig m
-                      => Has (Writer (Set AnalysisError)) sig m
-                      => f a -> m (f a)
+preCheckBadReturns ::
+  AsIdentity f =>
+  AsAST a g =>
+  Has (State FunctionType.FunctionTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  f a ->
+  m (f a)
 preCheckBadReturns fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toReturn -> Just (AST.Return tk expr)) -> do
       fnType <- FunctionType.currentFunctionType
       when (fnType == FunctionType.None) $

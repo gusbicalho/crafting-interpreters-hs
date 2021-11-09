@@ -1,12 +1,12 @@
 module HSLox.Parser.Megaparsec.TokenStream where
 
-import Data.Foldable
+import Data.Foldable (Foldable (toList))
 import Data.Sequence (Seq (..))
-import qualified Data.Sequence as Seq
+import Data.Sequence qualified as Seq
 import HSLox.Token (Token (..))
-import qualified Text.Megaparsec.Stream as Stream
+import Text.Megaparsec.Stream qualified as Stream
 
-newtype TokenStream = TokenStream { unTokenStream :: Seq Token }
+newtype TokenStream = TokenStream {unTokenStream :: Seq Token}
 
 instance Stream.Stream TokenStream where
   type Token TokenStream = Token
@@ -32,8 +32,8 @@ instance Stream.Stream TokenStream where
       (TokenStream Empty) -> Nothing
       (TokenStream s) ->
         let (front, back) = Seq.splitAt n s
-        in Just (front, TokenStream back)
+         in Just (front, TokenStream back)
 
   takeWhile_ pred (TokenStream seq) =
     let (front, back) = Seq.spanl pred seq
-    in (front, TokenStream back)
+     in (front, TokenStream back)

@@ -1,14 +1,13 @@
 module HSLox.Token where
 
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 data LiteralValue
   = LitString T.Text
   | LitNum Double
   deriving stock (Eq, Show, Ord)
 
-data Token
-  = Token
+data Token = Token
   { tokenLexeme :: T.Text
   , tokenType :: TokenType
   , tokenLiteral :: Maybe LiteralValue
@@ -17,8 +16,8 @@ data Token
   deriving stock (Eq, Show, Ord)
 
 data TokenType
-  -- Single-character tokens
-  = LEFT_PAREN
+  = -- Single-character tokens
+    LEFT_PAREN
   | RIGHT_PAREN
   | LEFT_BRACE
   | RIGHT_BRACE
@@ -31,8 +30,8 @@ data TokenType
   | SEMICOLON
   | SLASH
   | STAR
-  -- One or two character tokens
-  | BANG
+  | -- One or two character tokens
+    BANG
   | BANG_EQUAL
   | EQUAL
   | EQUAL_EQUAL
@@ -40,12 +39,12 @@ data TokenType
   | GREATER_EQUAL
   | LESS
   | LESS_EQUAL
-  -- Literals
-  | IDENTIFIER
+  | -- Literals
+    IDENTIFIER
   | STRING
   | NUMBER
-  -- Keywords
-  | AND
+  | -- Keywords
+    AND
   | CLASS
   | ELSE
   | FALSE
@@ -60,6 +59,6 @@ data TokenType
   | TRUE
   | VAR
   | WHILE
-  -- EOF
-  | EOF
+  | -- EOF
+    EOF
   deriving stock (Eq, Ord, Enum, Bounded, Show)

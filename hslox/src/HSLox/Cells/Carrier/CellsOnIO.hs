@@ -1,32 +1,40 @@
 {-# LANGUAGE UndecidableInstances #-}
-module HSLox.Cells.Carrier.CellsOnIO
-  ( CellsOnIOC, runCellsOnIO, Cell
-  -- * Re-exports
-  , module HSLox.Cells.Effect
-  ) where
 
-import Control.Algebra
-import Control.Effect.Lift
-import Data.Functor
-import HSLox.Cells.Effect
-import qualified Data.IORef as IORef
+module HSLox.Cells.Carrier.CellsOnIO (
+  CellsOnIOC,
+  runCellsOnIO,
+  Cell,
+
+  -- * Re-exports
+  module HSLox.Cells.Effect,
+) where
+
+import Control.Algebra (Algebra (..), Has, type (:+:) (..))
+import Control.Effect.Lift (Lift)
+import Control.Effect.Lift qualified as Lift
+import Data.Functor (($>))
+import Data.IORef qualified as IORef
+import HSLox.Cells.Effect (Cells)
+import HSLox.Cells.Effect qualified as Cells
 
 type Cell = IORef.IORef
 
-newtype CellsOnIOC m a = CellsOnIOC { runCellsOnIO :: m a }
+newtype CellsOnIOC m a = CellsOnIOC {runCellsOnIO :: m a}
   deriving newtype (Functor, Applicative, Monad)
 
-instance Has (Lift IO) sig m
-         => Algebra (Cells Cell :+: sig) (CellsOnIOC m) where
+instance
+  Has (Lift IO) sig m =>
+  Algebra (Cells Cell :+: sig) (CellsOnIOC m)
+  where
   alg hdl sig ctx = CellsOnIOC $ case sig of
-    L (NewCell initialVal) -> do
-      ref <- sendM @IO $ IORef.newIORef initialVal
+    L (Cells.NewCell initialVal) -> do
+      ref <- Lift.sendM @IO $ IORef.newIORef initialVal
       pure $ ctx $> ref
-    L (ReadCell ref) -> do
-      val <- sendM @IO $ IORef.readIORef ref
+    L (Cells.ReadCell ref) -> do
+      val <- Lift.sendM @IO $ IORef.readIORef ref
       pure $ ctx $> val
-    L (WriteCell val ref) -> do
-      sendM @IO $ IORef.writeIORef ref val
+    L (Cells.WriteCell val ref) -> do
+      Lift.sendM @IO $ IORef.writeIORef ref val
       pure ctx
     R other -> alg (runCellsOnIO . hdl) other ctx
   {-# INLINE alg #-}

@@ -1,28 +1,35 @@
-module HSLox.StaticAnalysis.CheckBadSuperclass
-  ( preCheckBadSuperclass
-  , postCheckBadSuperclass
-  ) where
+module HSLox.StaticAnalysis.CheckBadSuperclass (
+  preCheckBadSuperclass,
+  postCheckBadSuperclass,
+) where
 
-import Control.Carrier.State.Church (State)
-import Control.Effect.Writer
-import Control.Monad
+import Control.Algebra (Has)
+import Control.Effect.State (State)
+import Control.Effect.Writer (Writer)
+import Control.Monad (when)
 import Data.Set (Set)
-import qualified HSLox.AST as AST
-import HSLox.AST.AsAST
-import HSLox.AST.Meta
-import HSLox.StaticAnalysis.Error
-import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassType
+import HSLox.AST qualified as AST
+import HSLox.AST.AsAST (AsAST (..))
+import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
+import HSLox.StaticAnalysis.Error (
+  AnalysisError,
+  tellAnalysisError,
+ )
 import HSLox.Token (Token (..))
 
-preCheckBadSuperclass :: AsIdentity f
-                      => AsAST a f
-                      => Has (State ClassType.ClassTypeStack) sig m
-                      => Has (Writer (Set AnalysisError)) sig m
-                      => f a -> m (f a)
+preCheckBadSuperclass ::
+  AsIdentity f =>
+  AsAST a f =>
+  Has (State ClassType.ClassTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  f a ->
+  m (f a)
 preCheckBadSuperclass fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration tk (Just superclass) _)) -> do
-      let superclassTk = AST.variableIdentifier . content $ superclass
+      let superclassTk = AST.variableIdentifier . AST.Meta.content $ superclass
       when (tokenLexeme tk == tokenLexeme superclassTk) $
         tellAnalysisError tk "A class cannot inherit from itself."
     _ -> pure ()

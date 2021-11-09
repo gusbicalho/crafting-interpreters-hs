@@ -1,28 +1,32 @@
-module HSLox.StaticAnalysis.FunctionTypeStack
-  ( FunctionTypeStack, FunctionType (..)
-  , emptyState
-  , preFunctionTypeStack
-  , postFunctionTypeStack
-  , currentFunctionType
-  ) where
+module HSLox.StaticAnalysis.FunctionTypeStack (
+  FunctionTypeStack,
+  FunctionType (..),
+  emptyState,
+  preFunctionTypeStack,
+  postFunctionTypeStack,
+  currentFunctionType,
+) where
 
-
+import Control.Algebra (Has)
 import Control.Carrier.State.Church (State)
-import qualified Control.Carrier.State.Church as State
-import Control.Effect.Writer
-import qualified HSLox.AST as AST
-import HSLox.AST.AsAST
-import HSLox.AST.Meta
+import Control.Carrier.State.Church qualified as State
+import Data.Maybe (fromMaybe)
+import HSLox.AST qualified as AST
+import HSLox.AST.AsAST (AsAST (..))
+import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.StaticAnalysis.Stack (Stack)
-import qualified HSLox.StaticAnalysis.Stack as Stack
+import HSLox.StaticAnalysis.Stack qualified as Stack
 import HSLox.Token (Token (..))
 
-preFunctionTypeStack :: AsIdentity f
-                     => AsAST a g
-                     => Has (State FunctionTypeStack) sig m
-                     => f a -> m (f a)
+preFunctionTypeStack ::
+  AsIdentity f =>
+  AsAST a g =>
+  Has (State FunctionTypeStack) sig m =>
+  f a ->
+  m (f a)
 preFunctionTypeStack fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do
       beginFunctionType Function
     (toClassDeclaration -> Just _) -> do
@@ -33,16 +37,18 @@ preFunctionTypeStack fa = do
         Class
           | tokenLexeme tk == "init" -> beginFunctionType Initializer
           | otherwise -> beginFunctionType Method
-        _     -> beginFunctionType Function
+        _ -> beginFunctionType Function
     _ -> pure ()
   pure fa
 
-postFunctionTypeStack :: AsIdentity f
-                      => AsAST a g
-                      => Has (State FunctionTypeStack) sig m
-                      => f a -> m (f a)
+postFunctionTypeStack ::
+  AsIdentity f =>
+  AsAST a g =>
+  Has (State FunctionTypeStack) sig m =>
+  f a ->
+  m (f a)
 postFunctionTypeStack fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do
       endFunctionType
     (toClassDeclaration -> Just _) -> do
@@ -52,29 +58,35 @@ postFunctionTypeStack fa = do
     _ -> pure ()
   pure fa
 
-newtype FunctionTypeStack = FTS { getStack :: Stack FunctionType }
+newtype FunctionTypeStack = FTS {getStack :: Stack FunctionType}
 
 emptyState :: FunctionTypeStack
 emptyState = FTS Stack.emptyStack
 
 overStack :: (Stack FunctionType -> Stack FunctionType) -> FunctionTypeStack -> FunctionTypeStack
-overStack f rls@(FTS stack) = rls { getStack = f stack }
+overStack f rls@(FTS stack) = rls{getStack = f stack}
 
 data FunctionType = None | Function | Class | Method | Initializer
   deriving stock (Eq, Ord, Show)
 
-currentFunctionType :: Has (State FunctionTypeStack) sig m
-                    => m FunctionType
-currentFunctionType = State.gets $ maybe None id . Stack.peek . getStack
+currentFunctionType ::
+  Has (State FunctionTypeStack) sig m =>
+  m FunctionType
+currentFunctionType = State.gets $ fromMaybe None . Stack.peek . getStack
 
-beginFunctionType :: Has (State FunctionTypeStack) sig m
-                  => FunctionType -> m ()
-beginFunctionType functionType = State.modify @FunctionTypeStack
-                               . overStack
-                               $ Stack.push functionType
+beginFunctionType ::
+  Has (State FunctionTypeStack) sig m =>
+  FunctionType ->
+  m ()
+beginFunctionType functionType =
+  State.modify @FunctionTypeStack
+    . overStack
+    $ Stack.push functionType
 
-endFunctionType :: Has (State FunctionTypeStack) sig m
-                => m ()
-endFunctionType = State.modify @FunctionTypeStack
-                . overStack
-                $ Stack.pop_
+endFunctionType ::
+  Has (State FunctionTypeStack) sig m =>
+  m ()
+endFunctionType =
+  State.modify @FunctionTypeStack
+    . overStack
+    $ Stack.pop_
