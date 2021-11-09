@@ -2,13 +2,15 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE UndecidableInstances #-}
-module HSLox.AST.Meta
-  ( module HSLox.AST.Meta
-  , Identity (..), Compose (..)
-  ) where
 
-import Data.Functor.Compose
-import Data.Functor.Identity
+module HSLox.AST.Meta (
+  module HSLox.AST.Meta,
+  Identity (..),
+  Compose (..),
+) where
+
+import Data.Functor.Compose (Compose (..))
+import Data.Functor.Identity (Identity (..))
 
 -- AST Meta stuff
 class Functor f => AsIdentity f where
@@ -18,7 +20,7 @@ content :: AsIdentity f => f c -> c
 content = runIdentity . asIdentity
 {-# INLINE content #-}
 
-data WithMeta meta f a = WithMeta { withMetaMeta :: meta, withMetaContent :: f a }
+data WithMeta meta f a = WithMeta {withMetaMeta :: meta, withMetaContent :: f a}
   deriving stock (Show, Functor, Foldable, Traversable)
 
 withMeta :: meta -> f a -> WithMeta meta f a

@@ -1,11 +1,8 @@
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 module HSLox.ErrorReport where
 
-import qualified Data.Text as T
+import Data.Text qualified as T
 
-data ErrorReport
-  = ErrorReport
+data ErrorReport = ErrorReport
   { errorReportLine :: Int
   , errorReportWhere :: T.Text
   , errorReportMessage :: T.Text

@@ -1,12 +1,18 @@
-module HSLox.Cells.Effect
-  ( Cells (..)
-  , newCell, readCell, writeCell, updateCell
-  -- * Re-exports
-  , Algebra, Has, run
-  ) where
+module HSLox.Cells.Effect (
+  Cells (..),
+  newCell,
+  readCell,
+  writeCell,
+  updateCell,
 
-import Control.Algebra
-import Data.Kind
+  -- * Re-exports
+  Algebra,
+  Has,
+  run,
+) where
+
+import Control.Algebra (Algebra, Has, run, send)
+import Data.Kind (Type)
 
 data Cells cellType (m :: Type -> Type) k where
   NewCell :: val -> Cells cellType m (cellType val)

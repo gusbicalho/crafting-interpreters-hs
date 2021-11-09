@@ -1,46 +1,50 @@
-{-# LANGUAGE StrictData #-}
-module HSLox.StaticAnalysis.Analyzer
-  ( module HSLox.StaticAnalysis.Analyzer
-  , AnalysisError
-  , ResolveLocals.ResolverMeta (..)
-  ) where
+module HSLox.StaticAnalysis.Analyzer (
+  module HSLox.StaticAnalysis.Analyzer,
+  AnalysisError,
+  ResolveLocals.ResolverMeta (..),
+) where
 
-import qualified Control.Carrier.State.Church as State
-import Control.Effect.Writer
-import Control.Monad
+import Control.Algebra (Has)
+import Control.Carrier.State.Church qualified as State
+import Control.Effect.Writer (Writer)
+import Control.Monad ((>=>))
 import Data.Set (Set)
-import qualified HSLox.AST as AST
-import HSLox.AST.WalkAST
-import HSLox.AST.Meta
-import HSLox.StaticAnalysis.Error
-import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassTypeStack
-import qualified HSLox.StaticAnalysis.FunctionTypeStack as FunctionTypeStack
-import qualified HSLox.StaticAnalysis.CheckBadReturns as CheckBadReturns
-import qualified HSLox.StaticAnalysis.CheckBadSuper as CheckBadSuper
-import qualified HSLox.StaticAnalysis.CheckBadSuperclass as CheckBadSuperclass
-import qualified HSLox.StaticAnalysis.CheckBadThis as CheckBadThis
-import qualified HSLox.StaticAnalysis.ResolveLocals as ResolveLocals
+import HSLox.AST qualified as AST
+import HSLox.AST.Meta (AsIdentity, WithMeta)
+import HSLox.AST.WalkAST (WalkAST (walkAST))
+import HSLox.StaticAnalysis.CheckBadReturns qualified as CheckBadReturns
+import HSLox.StaticAnalysis.CheckBadSuper qualified as CheckBadSuper
+import HSLox.StaticAnalysis.CheckBadSuperclass qualified as CheckBadSuperclass
+import HSLox.StaticAnalysis.CheckBadThis qualified as CheckBadThis
+import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassTypeStack
+import HSLox.StaticAnalysis.Error (AnalysisError)
+import HSLox.StaticAnalysis.FunctionTypeStack qualified as FunctionTypeStack
+import HSLox.StaticAnalysis.ResolveLocals qualified as ResolveLocals
 
-analyze :: AsIdentity f
-        => Traversable f
-        => Has (Writer (Set AnalysisError)) sig m
-        => AST.Program f
-        -> m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
-analyze
-  = State.evalState FunctionTypeStack.emptyState
-  . State.evalState ClassTypeStack.emptyState
-  . State.evalState ResolveLocals.emptyState
-  . walkAST (FunctionTypeStack.preFunctionTypeStack >=>
-             ClassTypeStack.preClassTypeStack >=>
-             ResolveLocals.preResolvingLocals >=>
-             CheckBadReturns.preCheckBadReturns >=>
-             CheckBadThis.preCheckBadThis >=>
-             CheckBadSuperclass.preCheckBadSuperclass >=>
-             CheckBadSuper.preCheckBadSuper)
-            (CheckBadSuper.postCheckBadSuper >=>
-             CheckBadSuperclass.postCheckBadSuperclass >=>
-             CheckBadThis.postCheckBadThis >=>
-             CheckBadReturns.postCheckBadReturns >=>
-             ResolveLocals.postResolvingLocals >=>
-             ClassTypeStack.postClassTypeStack >=>
-             FunctionTypeStack.postFunctionTypeStack)
+analyze ::
+  AsIdentity f =>
+  Traversable f =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  AST.Program f ->
+  m (AST.Program (WithMeta ResolveLocals.ResolverMeta f))
+analyze =
+  State.evalState FunctionTypeStack.emptyState
+    . State.evalState ClassTypeStack.emptyState
+    . State.evalState ResolveLocals.emptyState
+    . walkAST
+      ( FunctionTypeStack.preFunctionTypeStack
+          >=> ClassTypeStack.preClassTypeStack
+          >=> ResolveLocals.preResolvingLocals
+          >=> CheckBadReturns.preCheckBadReturns
+          >=> CheckBadThis.preCheckBadThis
+          >=> CheckBadSuperclass.preCheckBadSuperclass
+          >=> CheckBadSuper.preCheckBadSuper
+      )
+      ( CheckBadSuper.postCheckBadSuper
+          >=> CheckBadSuperclass.postCheckBadSuperclass
+          >=> CheckBadThis.postCheckBadThis
+          >=> CheckBadReturns.postCheckBadReturns
+          >=> ResolveLocals.postResolvingLocals
+          >=> ClassTypeStack.postClassTypeStack
+          >=> FunctionTypeStack.postFunctionTypeStack
+      )

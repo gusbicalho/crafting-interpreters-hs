@@ -1,25 +1,32 @@
-module HSLox.StaticAnalysis.CheckBadThis
-  ( preCheckBadThis
-  , postCheckBadThis
-  ) where
+module HSLox.StaticAnalysis.CheckBadThis (
+  preCheckBadThis,
+  postCheckBadThis,
+) where
 
-import Control.Carrier.State.Church (State)
-import Control.Effect.Writer
-import Control.Monad
+import Control.Algebra (Has)
+import Control.Effect.State (State)
+import Control.Effect.Writer (Writer)
+import Control.Monad (when)
 import Data.Set (Set)
-import qualified HSLox.AST as AST
-import HSLox.AST.AsAST
-import HSLox.AST.Meta
-import HSLox.StaticAnalysis.Error
-import qualified HSLox.StaticAnalysis.ClassTypeStack as ClassType
+import HSLox.AST qualified as AST
+import HSLox.AST.AsAST (AsAST (..))
+import HSLox.AST.Meta (AsIdentity)
+import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.StaticAnalysis.ClassTypeStack qualified as ClassType
+import HSLox.StaticAnalysis.Error (
+  AnalysisError,
+  tellAnalysisError,
+ )
 
-preCheckBadThis :: AsIdentity f
-                      => AsAST a g
-                      => Has (State ClassType.ClassTypeStack) sig m
-                      => Has (Writer (Set AnalysisError)) sig m
-                      => f a -> m (f a)
+preCheckBadThis ::
+  AsIdentity f =>
+  AsAST a g =>
+  Has (State ClassType.ClassTypeStack) sig m =>
+  Has (Writer (Set AnalysisError)) sig m =>
+  f a ->
+  m (f a)
 preCheckBadThis fa = do
-  case content fa of
+  case AST.Meta.content fa of
     (toThis -> Just (AST.This tk)) -> do
       fnType <- ClassType.currentClassType
       when (fnType == ClassType.None) $

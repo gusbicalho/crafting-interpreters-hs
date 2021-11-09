@@ -41,6 +41,7 @@ common common-options
                       FunctionalDependencies
                       GADTs
                       GeneralizedNewtypeDeriving
+                      ImportQualifiedPost
                       InstanceSigs
                       KindSignatures
                       LambdaCase

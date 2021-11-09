@@ -1,12 +1,12 @@
-{-# LANGUAGE UndecidableInstances #-}
-module HSLox.NativeFns.Effect
-  ( Algebra, Has
-  , module HSLox.NativeFns.Effect
-  ) where
+module HSLox.NativeFns.Effect (
+  Algebra,
+  Has,
+  module HSLox.NativeFns.Effect,
+) where
 
-import Control.Algebra
-import Data.Kind
-import qualified Data.Text as T
+import Control.Algebra (Algebra, Has, send)
+import Data.Kind (Type)
+import Data.Text qualified as T
 
 data NativeFns (m :: Type -> Type) k where
   Clock :: NativeFns m Integer
