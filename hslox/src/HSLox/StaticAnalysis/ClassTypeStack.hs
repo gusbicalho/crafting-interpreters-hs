@@ -25,7 +25,7 @@ walk = Walker preClassTypeStack postClassTypeStack
 
 preClassTypeStack ::
   Has (State ClassTypeStack) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration _ super _)) -> do
@@ -38,7 +38,7 @@ preClassTypeStack fa = do
 
 postClassTypeStack ::
   Has (State ClassTypeStack) sig m =>
-  WalkAST.PostWalk meta meta m
+  WalkAST.Walk meta meta m
 postClassTypeStack fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just _) -> do

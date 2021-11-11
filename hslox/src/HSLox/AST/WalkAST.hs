@@ -5,8 +5,7 @@ module HSLox.AST.WalkAST (
   NeutralWalker,
   (/>/),
   done,
-  PreWalk,
-  PostWalk,
+  Walk,
 ) where
 
 import Control.Monad ((>=>))
@@ -14,21 +13,15 @@ import HSLox.AST qualified as AST
 import HSLox.AST.AsAST (AsAST, LeafNode (..))
 import HSLox.AST.Meta (WithMeta)
 
-type PreWalk input output m =
-  forall astNode inner.
-  AsAST astNode =>
-  WithMeta input (astNode inner) ->
-  m (WithMeta output (astNode inner))
-
-type PostWalk input output m =
+type Walk input output m =
   forall astNode inner.
   AsAST astNode =>
   WithMeta input (astNode inner) ->
   m (WithMeta output (astNode inner))
 
 data Walker input interIn interOut output m = Walker
-  { preWalker :: !(PreWalk input interIn m)
-  , postWalker :: !(PostWalk interOut output m)
+  { preWalker :: !(Walk input interIn m)
+  , postWalker :: !(Walk interOut output m)
   }
 
 type LeafWalker input inter output = Walker input inter inter output

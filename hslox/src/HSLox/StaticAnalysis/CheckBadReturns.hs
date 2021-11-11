@@ -25,7 +25,7 @@ walk = WalkAST.Walker preCheckBadReturns pure
 preCheckBadReturns ::
   Has (State FunctionType.FunctionTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preCheckBadReturns fa = do
   case AST.Meta.content fa of
     (toReturn -> Just (AST.Return tk expr)) -> do

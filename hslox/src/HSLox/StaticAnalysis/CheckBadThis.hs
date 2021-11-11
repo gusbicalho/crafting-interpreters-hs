@@ -25,7 +25,7 @@ walk = Walker preCheckBadThis pure
 preCheckBadThis ::
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preCheckBadThis fa = do
   case AST.Meta.content fa of
     (toThis -> Just (AST.This tk)) -> do

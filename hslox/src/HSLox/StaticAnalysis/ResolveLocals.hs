@@ -40,7 +40,7 @@ walk = Walker preResolvingLocals postResolvingLocals
 preResolvingLocals ::
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preResolvingLocals fa = do
   case AST.Meta.content fa of
     (toBlock -> Just _) -> do
@@ -65,7 +65,7 @@ preResolvingLocals fa = do
 postResolvingLocals ::
   Has (State ResolveLocalsState) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WalkAST.PreWalk meta (ResolverMeta, meta) m
+  WalkAST.Walk meta (ResolverMeta, meta) m
 postResolvingLocals fa = do
   meta <- case AST.Meta.content fa of
     (toBlock -> Just _) -> do

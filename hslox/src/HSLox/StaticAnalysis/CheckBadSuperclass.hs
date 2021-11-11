@@ -26,7 +26,7 @@ walk = Walker preCheckBadSuperclass pure
 preCheckBadSuperclass ::
   Has (State ClassType.ClassTypeStack) sig m =>
   Has (Writer (Set AnalysisError)) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preCheckBadSuperclass fa = do
   case AST.Meta.content fa of
     (toClassDeclaration -> Just (AST.ClassDeclaration tk (Just superclass) _)) -> do

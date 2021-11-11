@@ -25,7 +25,7 @@ walk = WalkAST.Walker preFunctionTypeStack postFunctionTypeStack
 
 preFunctionTypeStack ::
   Has (State FunctionTypeStack) sig m =>
-  WalkAST.PreWalk meta meta m
+  WalkAST.Walk meta meta m
 preFunctionTypeStack fa = do
   case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do
@@ -44,7 +44,7 @@ preFunctionTypeStack fa = do
 
 postFunctionTypeStack ::
   Has (State FunctionTypeStack) sig m =>
-  WalkAST.PostWalk meta meta m
+  WalkAST.Walk meta meta m
 postFunctionTypeStack fa = do
   case AST.Meta.content fa of
     (toFunDeclaration -> Just _) -> do
