@@ -1,3 +1,5 @@
+{-# LANGUAGE DerivingVia #-}
+
 module HSLox.StaticAnalysis.ResolveLocals (
   ResolverMeta (..),
   ResolveLocalsState,
@@ -11,15 +13,18 @@ import Control.Carrier.State.Church qualified as State
 import Control.Effect.Writer (Writer)
 import Control.Monad (when)
 import Data.Foldable qualified as Foldable
+import Data.Function ((&))
+import Data.Functor.Const (Const (Const))
 import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
+import Data.Semigroup (Sum (..))
 import Data.Set (Set)
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
-import HSLox.AST.AsAST (AsAST (..))
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.VisitAST (visit_, visitor)
 import HSLox.AST.WalkAST (Walker (Walker))
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Error (
@@ -42,24 +47,25 @@ preResolvingLocals ::
   Has (Writer (Set AnalysisError)) sig m =>
   WalkAST.Walk meta meta m
 preResolvingLocals fa = do
-  case AST.Meta.content fa of
-    (toBlock -> Just _) -> do
-      beginScope
-    (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
-      declareLocal tk
-    (toClassDeclaration -> Just (AST.ClassDeclaration tk superclass _)) -> do
-      declareLocal tk
-      defineLocal (tokenLexeme tk)
-      when (isJust superclass) $ do
-        beginScope -- super
-        defineLocal "super"
-      beginScope -- instance
-      defineLocal "this"
-    (toFunDeclaration -> Just (AST.FunDeclaration _ fn)) -> do
-      beginFunctionScope fn
-    (toFunction -> Just fn) -> do
-      beginFunctionScope fn
-    _ -> pure ()
+  AST.Meta.content fa
+    & visit_
+      [ visitor $ \AST.Block{} -> do
+          beginScope
+      , visitor $ \(AST.VarDeclaration tk _) -> do
+          declareLocal tk
+      , visitor $ \(AST.ClassDeclaration tk superclass _) -> do
+          declareLocal tk
+          defineLocal (tokenLexeme tk)
+          when (isJust superclass) $ do
+            beginScope -- super
+            defineLocal "super"
+          beginScope -- instance
+          defineLocal "this"
+      , visitor $ \(AST.FunDeclaration _ fn) -> do
+          beginFunctionScope fn
+      , visitor $ \fn@AST.Function{} -> do
+          beginFunctionScope fn
+      ]
   pure fa
 
 postResolvingLocals ::
@@ -67,42 +73,44 @@ postResolvingLocals ::
   Has (Writer (Set AnalysisError)) sig m =>
   WalkAST.Walk meta (ResolverMeta, meta) m
 postResolvingLocals fa = do
-  meta <- case AST.Meta.content fa of
-    (toBlock -> Just _) -> do
-      endScope
-      pure emptyResolverMeta
-    (toVarDeclaration -> Just (AST.VarDeclaration tk _)) -> do
-      defineLocal (tokenLexeme tk)
-      pure emptyResolverMeta
-    (toClassDeclaration -> Just (AST.ClassDeclaration _ superclass _)) -> do
-      endScope -- class
-      when
-        (isJust superclass)
-        endScope -- super
-      pure emptyResolverMeta
-    (toFunDeclaration -> Just (AST.FunDeclaration tk fn)) -> do
-      endFunctionScope fn
-      declareLocal tk
-      defineLocal (tokenLexeme tk)
-      pure emptyResolverMeta
-    (toFunction -> Just fn) -> do
-      endFunctionScope fn
-      pure emptyResolverMeta
-    (toVariable -> Just (AST.Variable tk)) -> do
-      checkLocalIsNotBeingDeclared tk
-      distance <- resolveLocalScopeDistance (tokenLexeme tk)
-      pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-    (toAssignment -> Just (AST.Assignment tk _)) -> do
-      checkLocalIsNotBeingDeclared tk
-      distance <- resolveLocalScopeDistance (tokenLexeme tk)
-      pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-    (toThis -> Just (AST.This tk)) -> do
-      distance <- resolveLocalScopeDistance (tokenLexeme tk)
-      pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-    (toSuper -> Just (AST.Super keywordTk _)) -> do
-      distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
-      pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-    _ -> pure emptyResolverMeta
+  meta <-
+    AST.Meta.content fa
+      & visit_
+        [ visitor $ \AST.Block{} -> do
+            endScope
+            pure emptyResolverMeta
+        , visitor $ \(AST.VarDeclaration tk _) -> do
+            defineLocal (tokenLexeme tk)
+            pure emptyResolverMeta
+        , visitor $ \(AST.ClassDeclaration _ superclass _) -> do
+            endScope -- class
+            when
+              (isJust superclass)
+              endScope -- super
+            pure emptyResolverMeta
+        , visitor $ \(AST.FunDeclaration tk fn) -> do
+            endFunctionScope fn
+            declareLocal tk
+            defineLocal (tokenLexeme tk)
+            pure emptyResolverMeta
+        , visitor $ \fn@AST.Function{} -> do
+            endFunctionScope fn
+            pure emptyResolverMeta
+        , visitor $ \(Const (AST.Variable tk)) -> do
+            checkLocalIsNotBeingDeclared tk
+            distance <- resolveLocalScopeDistance (tokenLexeme tk)
+            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+        , visitor $ \(AST.Assignment tk _) -> do
+            checkLocalIsNotBeingDeclared tk
+            distance <- resolveLocalScopeDistance (tokenLexeme tk)
+            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+        , visitor $ \(Const (AST.This tk)) -> do
+            distance <- resolveLocalScopeDistance (tokenLexeme tk)
+            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+        , visitor $ \(Const (AST.Super keywordTk _)) -> do
+            distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
+            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+        ]
   pure $ AST.Meta.addMetaItem meta fa
 
 newtype ResolveLocalsState = RLS {getStack :: Stack Scope}
@@ -118,6 +126,7 @@ overStackF f rls@(RLS stack) = (\newStack -> rls{getStack = newStack}) <$> f sta
 
 newtype ResolverMeta = ResolverMeta {resolverMetaLocalVariableScopeDistance :: Maybe Int}
   deriving stock (Eq, Ord, Show)
+  deriving (Monoid, Semigroup) via (Maybe (Sum Int))
 
 emptyResolverMeta :: ResolverMeta
 emptyResolverMeta = ResolverMeta Nothing

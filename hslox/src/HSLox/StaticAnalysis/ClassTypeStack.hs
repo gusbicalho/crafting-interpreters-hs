@@ -9,10 +9,11 @@ module HSLox.StaticAnalysis.ClassTypeStack (
 import Control.Algebra (Has)
 import Control.Carrier.State.Church (State)
 import Control.Carrier.State.Church qualified as State
+import Data.Function ((&))
 import Data.Maybe (fromMaybe, isJust)
 import HSLox.AST qualified as AST
-import HSLox.AST.AsAST (AsAST (..))
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.VisitAST (visitOnly_)
 import HSLox.AST.WalkAST (Walker (Walker))
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Stack (Stack)
@@ -27,23 +28,22 @@ preClassTypeStack ::
   Has (State ClassTypeStack) sig m =>
   WalkAST.Walk meta meta m
 preClassTypeStack fa = do
-  case AST.Meta.content fa of
-    (toClassDeclaration -> Just (AST.ClassDeclaration _ super _)) -> do
-      beginClassType $
-        if isJust super
-          then Subclass
-          else Class
-    _ -> pure ()
+  AST.Meta.content fa
+    & visitOnly_
+      ( \(AST.ClassDeclaration _ super _) -> do
+          beginClassType $
+            if isJust super
+              then Subclass
+              else Class
+      )
   pure fa
 
 postClassTypeStack ::
   Has (State ClassTypeStack) sig m =>
   WalkAST.Walk meta meta m
 postClassTypeStack fa = do
-  case AST.Meta.content fa of
-    (toClassDeclaration -> Just _) -> do
-      endClassType
-    _ -> pure ()
+  AST.Meta.content fa
+    & visitOnly_ (\AST.ClassDeclaration{} -> endClassType)
   pure fa
 
 newtype ClassTypeStack = CTS {getStack :: Stack ClassType}

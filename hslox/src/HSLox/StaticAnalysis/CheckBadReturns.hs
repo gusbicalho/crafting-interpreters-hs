@@ -4,11 +4,12 @@ import Control.Algebra (Has)
 import Control.Effect.State (State)
 import Control.Effect.Writer (Writer)
 import Control.Monad (when)
+import Data.Function ((&))
 import Data.Maybe (isJust)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
-import HSLox.AST.AsAST (AsAST (..))
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.VisitAST (visit_, visitor)
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
@@ -27,12 +28,13 @@ preCheckBadReturns ::
   Has (Writer (Set AnalysisError)) sig m =>
   WalkAST.Walk meta meta m
 preCheckBadReturns fa = do
-  case AST.Meta.content fa of
-    (toReturn -> Just (AST.Return tk expr)) -> do
-      fnType <- FunctionType.currentFunctionType
-      when (fnType == FunctionType.None) $
-        tellAnalysisError tk "Cannot return from top-level code."
-      when (fnType == FunctionType.Initializer && isJust expr) $
-        tellAnalysisError tk "Cannot return a value from an initializer."
-    _ -> pure ()
+  AST.Meta.content fa
+    & visit_
+      [ visitor $ \(AST.Return tk expr) -> do
+          fnType <- FunctionType.currentFunctionType
+          when (fnType == FunctionType.None) $
+            tellAnalysisError tk "Cannot return from top-level code."
+          when (fnType == FunctionType.Initializer && isJust expr) $
+            tellAnalysisError tk "Cannot return a value from an initializer."
+      ]
   pure fa

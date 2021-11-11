@@ -9,13 +9,14 @@ module HSLox.AST.WalkAST (
 ) where
 
 import Control.Monad ((>=>))
+import Data.Coerce (coerce)
 import HSLox.AST qualified as AST
-import HSLox.AST.AsAST (AsAST, LeafNode (..))
 import HSLox.AST.Meta (WithMeta)
+import HSLox.AST.VisitAST (Const (..), VisitAST)
 
 type Walk input output m =
   forall astNode inner.
-  AsAST astNode =>
+  VisitAST astNode =>
   WithMeta input (astNode inner) ->
   m (WithMeta output (astNode inner))
 
@@ -51,24 +52,26 @@ class WalkAST astNode where
 
 {-# INLINE walkLeaf #-}
 walkLeaf ::
+  forall input inter output m a.
   ( Monad m
-  , AsAST (LeafNode a)
+  , VisitAST (Const a)
   ) =>
   LeafWalker input inter output m ->
   WithMeta input a ->
   m (WithMeta output a)
-walkLeaf (Walker preW postW) t = do
-  preWed <- preW (fmap LeafNode t)
-  -- For a LeafNode, walking is a noop, just change the phantom functor type
-  let walked = fmap (LeafNode . unLeafNode) preWed
-  postWalked <- postW walked
-  pure $ fmap unLeafNode postWalked
+walkLeaf (Walker preW postW) ast = do
+  -- coerce to wrap the leaf in a Const functor
+  let leaf = coerce ast :: WithMeta input (Const a ())
+  preWalked <- preW leaf
+  postWalked <- postW preWalked
+  -- coerce to remove the Const functor
+  pure $ coerce postWalked
 
 {-# INLINE walkWrapped #-}
 walkWrapped ::
   ( Monad m
   , WalkAST astNode
-  , AsAST astNode
+  , VisitAST astNode
   ) =>
   LeafWalker input inter output m ->
   WithMeta input (astNode input) ->
