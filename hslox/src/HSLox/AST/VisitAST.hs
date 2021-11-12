@@ -8,6 +8,7 @@ module HSLox.AST.VisitAST (
   visit_,
   visitOnly,
   visitOnly_,
+  pick,
   Const (..),
 ) where
 
@@ -111,6 +112,15 @@ visitOnly_ ::
   ast meta ->
   m result
 visitOnly_ = visitOnly (pure mempty)
+
+pick ::
+  forall acceptableAST meta.
+  VisitAST acceptableAST =>
+  forall ast.
+  VisitAST ast =>
+  ast meta ->
+  Maybe (acceptableAST meta)
+pick = visitOnly Nothing Just
 
 class VisitAST a where
   visitor :: (a meta -> r) -> Visitor meta r

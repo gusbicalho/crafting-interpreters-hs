@@ -9,7 +9,7 @@ import Data.Maybe (isJust)
 import Data.Set (Set)
 import HSLox.AST qualified as AST
 import HSLox.AST.Meta qualified as AST.Meta
-import HSLox.AST.VisitAST (visit_, visitor)
+import HSLox.AST.VisitAST (visitOnly_)
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Error (
   AnalysisError,
@@ -29,12 +29,13 @@ preCheckBadReturns ::
   WalkAST.Walk meta meta m
 preCheckBadReturns fa = do
   AST.Meta.content fa
-    & visit_
-      [ visitor $ \(AST.Return tk expr) -> do
+    & visitOnly_
+      ( \(AST.Return tk expr) -> do
           fnType <- FunctionType.currentFunctionType
           when (fnType == FunctionType.None) $
             tellAnalysisError tk "Cannot return from top-level code."
           when (fnType == FunctionType.Initializer && isJust expr) $
             tellAnalysisError tk "Cannot return a value from an initializer."
-      ]
+      )
+
   pure fa
