@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.CheckBadSuperclass (walk) where
 
 import Control.Algebra (Has)
@@ -30,12 +32,10 @@ preCheckBadSuperclass ::
   WalkAST.Walk meta meta m
 preCheckBadSuperclass fa = do
   AST.Meta.content fa
-    & visitOnly_
-      ( \case
-          AST.ClassDeclaration tk (Just superclass) _ -> do
-            let superclassTk = AST.variableIdentifier . AST.Meta.content $ superclass
-            when (tokenLexeme tk == tokenLexeme superclassTk) $
-              tellAnalysisError tk "A class cannot inherit from itself."
-          _ -> pure ()
-      )
+    & visitOnly_ \case
+      AST.ClassDeclaration tk (Just superclass) _ -> do
+        let superclassTk = AST.variableIdentifier . AST.Meta.content $ superclass
+        when (tokenLexeme tk == tokenLexeme superclassTk) $
+          tellAnalysisError tk "A class cannot inherit from itself."
+      _ -> pure ()
   pure fa

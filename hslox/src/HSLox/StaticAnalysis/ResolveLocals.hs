@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DerivingVia #-}
 
 module HSLox.StaticAnalysis.ResolveLocals (
@@ -49,11 +50,11 @@ preResolvingLocals ::
 preResolvingLocals fa = do
   AST.Meta.content fa
     & visit_
-      [ visitor $ \AST.Block{} -> do
+      [ visitor \AST.Block{} -> do
           beginScope
-      , visitor $ \(AST.VarDeclaration tk _) -> do
+      , visitor \(AST.VarDeclaration tk _) -> do
           declareLocal tk
-      , visitor $ \(AST.ClassDeclaration tk superclass _) -> do
+      , visitor \(AST.ClassDeclaration tk superclass _) -> do
           declareLocal tk
           defineLocal (tokenLexeme tk)
           when (isJust superclass) $ do
@@ -61,9 +62,9 @@ preResolvingLocals fa = do
             defineLocal "super"
           beginScope -- instance
           defineLocal "this"
-      , visitor $ \(AST.FunDeclaration _ fn) -> do
+      , visitor \(AST.FunDeclaration _ fn) -> do
           beginFunctionScope fn
-      , visitor $ \fn@AST.Function{} -> do
+      , visitor \fn@AST.Function{} -> do
           beginFunctionScope fn
       ]
   pure fa
@@ -76,38 +77,38 @@ postResolvingLocals fa = do
   meta <-
     AST.Meta.content fa
       & visit_
-        [ visitor $ \AST.Block{} -> do
+        [ visitor \AST.Block{} -> do
             endScope
             pure emptyResolverMeta
-        , visitor $ \(AST.VarDeclaration tk _) -> do
+        , visitor \(AST.VarDeclaration tk _) -> do
             defineLocal (tokenLexeme tk)
             pure emptyResolverMeta
-        , visitor $ \(AST.ClassDeclaration _ superclass _) -> do
+        , visitor \(AST.ClassDeclaration _ superclass _) -> do
             endScope -- class
             when
               (isJust superclass)
               endScope -- super
             pure emptyResolverMeta
-        , visitor $ \(AST.FunDeclaration tk fn) -> do
+        , visitor \(AST.FunDeclaration tk fn) -> do
             endFunctionScope fn
             declareLocal tk
             defineLocal (tokenLexeme tk)
             pure emptyResolverMeta
-        , visitor $ \fn@AST.Function{} -> do
+        , visitor \fn@AST.Function{} -> do
             endFunctionScope fn
             pure emptyResolverMeta
-        , visitor $ \(Const (AST.Variable tk)) -> do
+        , visitor \(Const (AST.Variable tk)) -> do
             checkLocalIsNotBeingDeclared tk
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
             pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-        , visitor $ \(AST.Assignment tk _) -> do
+        , visitor \(AST.Assignment tk _) -> do
             checkLocalIsNotBeingDeclared tk
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
             pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-        , visitor $ \(Const (AST.This tk)) -> do
+        , visitor \(Const (AST.This tk)) -> do
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
             pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
-        , visitor $ \(Const (AST.Super keywordTk _)) -> do
+        , visitor \(Const (AST.Super keywordTk _)) -> do
             distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
             pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
         ]

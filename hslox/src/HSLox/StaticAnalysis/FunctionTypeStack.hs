@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.FunctionTypeStack (
   FunctionTypeStack,
   FunctionType (..),
@@ -13,7 +15,7 @@ import Data.Function ((&))
 import Data.Maybe (fromMaybe)
 import HSLox.AST qualified as AST
 import HSLox.AST.Meta qualified as AST.Meta
-import HSLox.AST.VisitAST (visit, visit_, visitor)
+import HSLox.AST.VisitAST (visit_, visitor)
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Stack (Stack)
 import HSLox.StaticAnalysis.Stack qualified as Stack
@@ -30,11 +32,11 @@ preFunctionTypeStack ::
 preFunctionTypeStack fa = do
   AST.Meta.content fa
     & visit_
-      [ visitor $ \AST.FunDeclaration{} -> do
+      [ visitor \AST.FunDeclaration{} -> do
           beginFunctionType Function
-      , visitor $ \AST.ClassDeclaration{} -> do
+      , visitor \AST.ClassDeclaration{} -> do
           beginFunctionType Class
-      , visitor $ \(AST.Function tk _ _ _) -> do
+      , visitor \(AST.Function tk _ _ _) -> do
           current <- currentFunctionType
           case current of
             Class
@@ -49,13 +51,12 @@ postFunctionTypeStack ::
   WalkAST.Walk meta meta m
 postFunctionTypeStack fa = do
   AST.Meta.content fa
-    & visit
-      (pure ())
-      [ visitor $ \AST.FunDeclaration{} -> do
+    & visit_
+      [ visitor \AST.FunDeclaration{} -> do
           endFunctionType
-      , visitor $ \AST.ClassDeclaration{} -> do
+      , visitor \AST.ClassDeclaration{} -> do
           endFunctionType
-      , visitor $ \AST.Function{} -> do
+      , visitor \AST.Function{} -> do
           endFunctionType
       ]
   pure fa

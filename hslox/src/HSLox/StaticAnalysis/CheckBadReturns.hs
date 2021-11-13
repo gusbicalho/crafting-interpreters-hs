@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.CheckBadReturns (walk) where
 
 import Control.Algebra (Has)
@@ -29,13 +31,11 @@ preCheckBadReturns ::
   WalkAST.Walk meta meta m
 preCheckBadReturns fa = do
   AST.Meta.content fa
-    & visitOnly_
-      ( \(AST.Return tk expr) -> do
-          fnType <- FunctionType.currentFunctionType
-          when (fnType == FunctionType.None) $
-            tellAnalysisError tk "Cannot return from top-level code."
-          when (fnType == FunctionType.Initializer && isJust expr) $
-            tellAnalysisError tk "Cannot return a value from an initializer."
-      )
+    & visitOnly_ \(AST.Return tk expr) -> do
+      fnType <- FunctionType.currentFunctionType
+      when (fnType == FunctionType.None) $
+        tellAnalysisError tk "Cannot return from top-level code."
+      when (fnType == FunctionType.Initializer && isJust expr) $
+        tellAnalysisError tk "Cannot return a value from an initializer."
 
   pure fa

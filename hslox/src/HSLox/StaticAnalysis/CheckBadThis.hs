@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.CheckBadThis (walk) where
 
 import Control.Algebra (Has)
@@ -29,10 +31,8 @@ preCheckBadThis ::
   WalkAST.Walk meta meta m
 preCheckBadThis fa = do
   AST.Meta.content fa
-    & visitOnly_
-      ( \(Const (AST.This tk)) -> do
-          fnType <- ClassType.currentClassType
-          when (fnType == ClassType.None) $
-            tellAnalysisError tk "Cannot use 'this' outside of a class."
-      )
+    & visitOnly_ \(Const (AST.This tk)) -> do
+      fnType <- ClassType.currentClassType
+      when (fnType == ClassType.None) $
+        tellAnalysisError tk "Cannot use 'this' outside of a class."
   pure fa

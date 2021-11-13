@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.ClassTypeStack (
   ClassTypeStack,
   ClassType (..),
@@ -29,13 +31,11 @@ preClassTypeStack ::
   WalkAST.Walk meta meta m
 preClassTypeStack fa = do
   AST.Meta.content fa
-    & visitOnly_
-      ( \(AST.ClassDeclaration _ super _) -> do
-          beginClassType $
-            if isJust super
-              then Subclass
-              else Class
-      )
+    & visitOnly_ \(AST.ClassDeclaration _ super _) -> do
+      beginClassType $
+        if isJust super
+          then Subclass
+          else Class
   pure fa
 
 postClassTypeStack ::
