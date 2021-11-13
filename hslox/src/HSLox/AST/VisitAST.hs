@@ -185,14 +185,14 @@ instance VisitAST Function where
   getVisitFn = coerce . onFunction
 
 instance VisitAST (Const Variable) where
-  visitor visitFn = mempty{onVariable = Just $ Last (visitFn . Const)}
+  visitor visitFn = mempty{onVariable = Just $ Last (coerce visitFn)}
   getVisitFn = coerce . onVariable
 instance VisitAST (Const Literal) where
-  visitor visitFn = mempty{onLiteral = Just $ Last (visitFn . Const)}
+  visitor visitFn = mempty{onLiteral = Just $ Last (coerce visitFn)}
   getVisitFn = coerce . onLiteral
 instance VisitAST (Const This) where
-  visitor visitFn = mempty{onThis = Just $ Last (visitFn . Const)}
+  visitor visitFn = mempty{onThis = Just $ Last (coerce visitFn)}
   getVisitFn = coerce . onThis
 instance VisitAST (Const Super) where
-  visitor visitFn = mempty{onSuper = Just $ Last (visitFn . Const)}
+  visitor visitFn = mempty{onSuper = Just $ Last (coerce visitFn)}
   getVisitFn = coerce . onSuper
