@@ -84,9 +84,9 @@ library
   import: common-options
   exposed-modules:
       HSLox.AST
-      HSLox.AST.AsAST
       HSLox.AST.Meta
       HSLox.AST.Sugar
+      HSLox.AST.VisitAST
       HSLox.AST.WalkAST
       HSLox.ASTPrinter
       HSLox.Cells.Carrier.CellsOnIO
@@ -135,6 +135,7 @@ library
     , megaparsec >= 9.0.0
     , mtl
     , text
+    , generic-data
   -- ghc-options: -fexpose-all-unfoldings
   --              -fspecialise-aggressively
   --              -fcross-module-specialise

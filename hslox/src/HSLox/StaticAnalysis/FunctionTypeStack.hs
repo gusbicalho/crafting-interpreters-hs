@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 module HSLox.StaticAnalysis.FunctionTypeStack (
   FunctionTypeStack,
   FunctionType (..),
@@ -9,10 +11,11 @@ module HSLox.StaticAnalysis.FunctionTypeStack (
 import Control.Algebra (Has)
 import Control.Carrier.State.Church (State)
 import Control.Carrier.State.Church qualified as State
+import Data.Function ((&))
 import Data.Maybe (fromMaybe)
 import HSLox.AST qualified as AST
-import HSLox.AST.AsAST (AsAST (..))
 import HSLox.AST.Meta qualified as AST.Meta
+import HSLox.AST.VisitAST (visit_, visitor)
 import HSLox.AST.WalkAST qualified as WalkAST
 import HSLox.StaticAnalysis.Stack (Stack)
 import HSLox.StaticAnalysis.Stack qualified as Stack
@@ -27,33 +30,35 @@ preFunctionTypeStack ::
   Has (State FunctionTypeStack) sig m =>
   WalkAST.Walk meta meta m
 preFunctionTypeStack fa = do
-  case AST.Meta.content fa of
-    (toFunDeclaration -> Just _) -> do
-      beginFunctionType Function
-    (toClassDeclaration -> Just _) -> do
-      beginFunctionType Class
-    (toFunction -> Just (AST.Function tk _ _ _)) -> do
-      current <- currentFunctionType
-      case current of
-        Class
-          | tokenLexeme tk == "init" -> beginFunctionType Initializer
-          | otherwise -> beginFunctionType Method
-        _ -> beginFunctionType Function
-    _ -> pure ()
+  AST.Meta.content fa
+    & visit_
+      [ visitor \AST.FunDeclaration{} -> do
+          beginFunctionType Function
+      , visitor \AST.ClassDeclaration{} -> do
+          beginFunctionType Class
+      , visitor \(AST.Function tk _ _ _) -> do
+          current <- currentFunctionType
+          case current of
+            Class
+              | tokenLexeme tk == "init" -> beginFunctionType Initializer
+              | otherwise -> beginFunctionType Method
+            _ -> beginFunctionType Function
+      ]
   pure fa
 
 postFunctionTypeStack ::
   Has (State FunctionTypeStack) sig m =>
   WalkAST.Walk meta meta m
 postFunctionTypeStack fa = do
-  case AST.Meta.content fa of
-    (toFunDeclaration -> Just _) -> do
-      endFunctionType
-    (toClassDeclaration -> Just _) -> do
-      endFunctionType
-    (toFunction -> Just _) -> do
-      endFunctionType
-    _ -> pure ()
+  AST.Meta.content fa
+    & visit_
+      [ visitor \AST.FunDeclaration{} -> do
+          endFunctionType
+      , visitor \AST.ClassDeclaration{} -> do
+          endFunctionType
+      , visitor \AST.Function{} -> do
+          endFunctionType
+      ]
   pure fa
 
 newtype FunctionTypeStack = FTS {getStack :: Stack FunctionType}
