@@ -20,7 +20,7 @@ import Data.List qualified as List
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
-import Data.Semigroup (Sum (..))
+import Data.Semigroup (Last (Last))
 import Data.Set (Set)
 import Data.Text qualified as T
 import HSLox.AST qualified as AST
@@ -79,38 +79,38 @@ postResolvingLocals fa = do
       & visit_
         [ visitor \AST.Block{} -> do
             endScope
-            pure emptyResolverMeta
+            pure mempty
         , visitor \(AST.VarDeclaration tk _) -> do
             defineLocal (tokenLexeme tk)
-            pure emptyResolverMeta
+            pure mempty
         , visitor \(AST.ClassDeclaration _ superclass _) -> do
             endScope -- class
             when
               (isJust superclass)
               endScope -- super
-            pure emptyResolverMeta
+            pure mempty
         , visitor \(AST.FunDeclaration tk fn) -> do
             endFunctionScope fn
             declareLocal tk
             defineLocal (tokenLexeme tk)
-            pure emptyResolverMeta
+            pure mempty
         , visitor \fn@AST.Function{} -> do
             endFunctionScope fn
-            pure emptyResolverMeta
+            pure mempty
         , visitor \(Const (AST.Variable tk)) -> do
             checkLocalIsNotBeingDeclared tk
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
-            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+            pure $ mempty{resolverMetaLocalVariableScopeDistance = distance}
         , visitor \(AST.Assignment tk _) -> do
             checkLocalIsNotBeingDeclared tk
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
-            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+            pure $ mempty{resolverMetaLocalVariableScopeDistance = distance}
         , visitor \(Const (AST.This tk)) -> do
             distance <- resolveLocalScopeDistance (tokenLexeme tk)
-            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+            pure $ mempty{resolverMetaLocalVariableScopeDistance = distance}
         , visitor \(Const (AST.Super keywordTk _)) -> do
             distance <- resolveLocalScopeDistance (tokenLexeme keywordTk)
-            pure $ emptyResolverMeta{resolverMetaLocalVariableScopeDistance = distance}
+            pure $ mempty{resolverMetaLocalVariableScopeDistance = distance}
         ]
   pure $ AST.Meta.addMetaItem meta fa
 
@@ -127,10 +127,7 @@ overStackF f rls@(RLS stack) = (\newStack -> rls{getStack = newStack}) <$> f sta
 
 newtype ResolverMeta = ResolverMeta {resolverMetaLocalVariableScopeDistance :: Maybe Int}
   deriving stock (Eq, Ord, Show)
-  deriving (Monoid, Semigroup) via (Maybe (Sum Int))
-
-emptyResolverMeta :: ResolverMeta
-emptyResolverMeta = ResolverMeta Nothing
+  deriving (Monoid, Semigroup) via (Maybe (Last Int))
 
 beginFunctionScope ::
   Has (State ResolveLocalsState) sig m =>
