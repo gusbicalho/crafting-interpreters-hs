@@ -1,2 +1,9 @@
 packages: */*.cabal
 with-compiler: ghc-9.2.2
+
+package hslox
+  optimization: 2
+  ghc-options: -fcross-module-specialise
+               -flate-specialise
+               -fspecialise-aggressively
+               -fexpose-all-unfoldings
