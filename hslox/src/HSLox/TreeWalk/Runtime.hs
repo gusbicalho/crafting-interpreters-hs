@@ -1,3 +1,5 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
@@ -17,12 +19,11 @@ import Data.Kind (Type)
 import Data.Map.Strict (Map)
 import Data.Sequence (Seq (..))
 import Data.Text qualified as T
-import HSLox.AST qualified as AST
-import HSLox.AST.Meta qualified as AST.Meta
 import HSLox.Cells.Effect (Cells)
 import HSLox.NativeFns.Effect (NativeFns)
-import HSLox.StaticAnalysis.Analyzer qualified as Analyzer
 import HSLox.Token (Token (..))
+import Data.Text (Text)
+import Data.Proxy (Proxy(Proxy))
 
 type Runtime cell sig m =
   ( Has NativeFns sig m
@@ -69,15 +70,30 @@ data RTValue cell
   | ValInstance (LoxInstance cell)
   | ValNativeFn LoxNativeFn
 
-type RuntimeMeta meta = AST.Meta.HasMetaItem Analyzer.ResolverMeta meta
+type RuntimeAction :: (Type -> Type) -> Type -> Type
+newtype RuntimeAction cell a = RuntimeAction (forall mRun sig. Runtime cell sig mRun => mRun a)
+
+runAction :: forall cell mRun sig a. Runtime cell sig mRun => RuntimeAction cell a -> mRun a
+runAction (RuntimeAction action) = action
+
+inRuntime ::
+  forall cell mBuild a.
+  Applicative mBuild =>
+  (forall mRun sig proxy. Runtime cell sig mRun => proxy cell -> mRun a) ->
+  mBuild (RuntimeAction cell a)
+inRuntime action = pure $ RuntimeAction (action (Proxy @cell))
 
 data LoxFn cell where
   LoxFn ::
-    forall cell meta.
-    RuntimeMeta meta =>
-    { loxFnAST :: AST.Function meta
-    , loxClosedEnv :: Maybe (RTFrame cell)
+    { loxClosedEnv :: Maybe (RTFrame cell)
+    , loxFnIdentifier :: Maybe Text
     , loxFnIsInitializer :: Bool
+    , loxFnArity :: Int
+    , loxFnAction ::
+      Maybe (RTFrame cell) ->
+      RTValue cell ->
+      Seq (RTValue cell) ->
+      RuntimeAction cell (RTValue cell)
     } ->
     LoxFn cell
 

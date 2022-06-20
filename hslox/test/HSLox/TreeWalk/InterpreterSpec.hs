@@ -20,8 +20,8 @@ import HSLox.StaticAnalysis.Analyzer qualified as Analyzer
 import HSLox.Test.NativeFnsMock qualified as NativeFnsMock
 import HSLox.Token (Token (..))
 import HSLox.Token qualified as Token
+import HSLox.TreeWalk.Interpreter (InterpreterError (..))
 import HSLox.TreeWalk.Interpreter qualified as Interpreter
-import HSLox.TreeWalk.RTError (RTError (..))
 import HSLox.Util qualified as Util
 import Test.Hspec
 
@@ -57,18 +57,23 @@ spec = do
           <> "print(d); // error\n"
           <> "print(\"never printed!\");\n"
       )
-        `shouldEvaluateTo` ( Just (RTError "Undefined variable 'd'." $ Token "d" Token.IDENTIFIER Nothing 20)
+        `shouldEvaluateTo` ( Just
+                            ( InterpreterError
+                                Interpreter.StageRun
+                                "Undefined variable 'd'."
+                                $ Token "d" Token.IDENTIFIER Nothing 20
+                            )
                            , Seq.fromList
-                              [ "inner a"
-                              , "outer b"
-                              , "global c"
-                              , "outer a"
-                              , "outer b"
-                              , "global c"
-                              , "global a"
-                              , "global b"
-                              , "global c"
-                              ]
+                            [ "inner a"
+                            , "outer b"
+                            , "global c"
+                            , "outer a"
+                            , "outer b"
+                            , "global c"
+                            , "global a"
+                            , "global b"
+                            , "global c"
+                            ]
                            )
     describe "a program with conditionals and local scope" $ do
       let source condition = "var x = 1; if (" <> condition <> ") print(x); else { x = 3; var x = 2; print(x); } print(x);"
@@ -102,9 +107,11 @@ spec = do
       do
         "print((1 + 3)(5));"
         `shouldEvaluateTo` ( Just
-                              ( RTError "Can only call functions and classes." $
-                                  Token ")" Token.RIGHT_PAREN Nothing 1
-                              )
+                            ( InterpreterError
+                                Interpreter.StageRun
+                                "Can only call functions and classes."
+                                $ Token ")" Token.RIGHT_PAREN Nothing 1
+                            )
                            , Seq.empty
                            )
     it "a program the calls clock()" $
@@ -202,12 +209,12 @@ spec = do
                            , Seq.fromList ["4", "1"]
                            )
 
-shouldEvaluateTo :: T.Text -> (Maybe RTError, Seq T.Text) -> Expectation
+shouldEvaluateTo :: T.Text -> (Maybe InterpreterError, Seq T.Text) -> Expectation
 source `shouldEvaluateTo` (error, output) =
   CellsOnST.runST evaluate
     `shouldBe` (error, output)
  where
-  evaluate :: forall s. CellsOnST.ST s (Maybe RTError, Seq T.Text)
+  evaluate :: forall s. CellsOnST.ST s (Maybe InterpreterError, Seq T.Text)
   evaluate =
     source & runParser
       & Interpreter.interpret @(CellsOnST.Cell s)

@@ -25,6 +25,7 @@ parse ::
   Has (Writer (Set.Set ParserError)) sig m =>
   Seq Token ->
   m AST.ProgramI
+{-# INLINABLE parse #-}
 parse tokens = do
   stmts' <- runParserT parseStmts "" (TokenStream tokens)
   case stmts' of

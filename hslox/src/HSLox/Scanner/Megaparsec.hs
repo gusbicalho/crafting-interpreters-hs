@@ -26,6 +26,7 @@ scanTokens ::
   Has (Writer (Set ScanError)) sig m =>
   T.Text ->
   m (Seq Token)
+{-# INLINABLE scanTokens #-}
 scanTokens source = do
   tks <- runParserT (manyTokensUntilEOF recover) "" source
   case tks of
@@ -49,6 +50,7 @@ manyTokensUntilEOF ::
   MonadParsec ScanError T.Text f =>
   (ParseError T.Text ScanError -> f (Maybe Token)) ->
   f (Seq Token)
+{-# INLINABLE manyTokensUntilEOF #-}
 manyTokensUntilEOF recover = do
   space
   (tks, eof) <-

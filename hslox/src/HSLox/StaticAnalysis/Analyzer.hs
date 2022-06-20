@@ -23,6 +23,7 @@ analyze ::
   Has (Writer (Set AnalysisError)) sig m =>
   AST.Program meta ->
   m (AST.Program (ResolveLocals.ResolverMeta, meta))
+{-# INLINABLE analyze #-}
 analyze =
   State.evalState FunctionTypeStack.emptyState
     . State.evalState ClassTypeStack.emptyState
