@@ -6,6 +6,8 @@ module HSLox.TreeWalk.Interpreter (
   interpret,
   interpretNext,
   baseEnv,
+  InterpreterStage (..),
+  InterpreterError (..),
 ) where
 
 import Control.Algebra (Has)
@@ -37,7 +39,7 @@ import HSLox.TreeWalk.BuildError qualified as BuildError
 import HSLox.TreeWalk.RTError qualified as RTError
 import HSLox.TreeWalk.RTReturn qualified as RTReturn
 import HSLox.TreeWalk.RTState qualified as RTState
-import HSLox.TreeWalk.Runtime (RTError (..), Runtime)
+import HSLox.TreeWalk.Runtime (Runtime)
 import HSLox.TreeWalk.Runtime qualified as Runtime
 import HSLox.Util qualified as Util
 
@@ -64,13 +66,23 @@ baseEnv = State.Church.execState RTState.newState do
           _ -> pure Runtime.ValNil
       )
 
+data InterpreterStage = StageBuild | StageRun
+  deriving stock (Eq, Ord, Show)
+
+data InterpreterError = InterpreterError
+  { errorStage :: InterpreterStage
+  , errorMessage :: T.Text
+  , errorToken :: Token
+  }
+  deriving stock (Eq, Ord, Show)
+
 interpret ::
   forall cell sig m meta.
   Has (Cells.Cells cell) sig m =>
   Has NativeFns.NativeFns sig m =>
   InterpreterMeta meta =>
   AST.Program meta ->
-  m (Maybe Runtime.RTError)
+  m (Maybe InterpreterError)
 {-# INLINE interpret #-}
 interpret prog = do
   env <- baseEnv @cell
@@ -84,22 +96,47 @@ interpretNext ::
   InterpreterMeta meta =>
   Runtime.RTState cell ->
   AST.Program meta ->
-  m (Runtime.RTState cell, Maybe Runtime.RTError)
+  m (Runtime.RTState cell, Maybe InterpreterError)
 {-# INLINE interpretNext #-}
 interpretNext env prog =
+  case buildNext prog of
+    Left err ->
+      pure (env, Just err)
+    Right stmt ->
+      runNext env stmt
+
+buildNext ::
+  StmtInterpreter e =>
+  e ->
+  Either InterpreterError (Runtime.RuntimeAction cell ())
+{-# INLINE buildNext #-}
+buildNext prog =
   interpretStmt prog
-    & Util.runErrorToEither
+    & Util.runErrorToEither @BuildError
     & Identity.runIdentity
-    & \case
-      Left (BuildError msg tk) ->
-        -- TODO propagate BuildError as separate thing
-        pure (env, Just (RTError ("Build error: " <> msg) tk))
-      Right stmt ->
-        Runtime.runAction @cell stmt
-          & RTReturn.runReturn @cell
-          & Util.runErrorToEither @Runtime.RTError
-          & fmap (Util.rightToMaybe . Util.swapEither)
-          & Util.runStateToPair env
+    & either (Left . buildErrorToInterpreterError) Right
+ where
+  buildErrorToInterpreterError (BuildError msg tk) =
+    InterpreterError StageBuild msg tk
+
+runNext ::
+  forall cell sig m.
+  Has (Cells.Cells cell) sig m =>
+  Has NativeFns.NativeFns sig m =>
+  Runtime.RTState cell ->
+  Runtime.RuntimeAction cell () ->
+  m (Runtime.RTState cell, Maybe InterpreterError)
+{-# INLINE runNext #-}
+runNext env stmt =
+  Runtime.runAction @cell stmt
+    & RTReturn.runReturn @cell
+    & Util.runErrorToEither @Runtime.RTError
+    & fmap (Util.rightToMaybe . Util.swapEither)
+    & Util.runStateToPair env
+    & fmap (fmap (fmap rtErrorToInterpreterError))
+ where
+  rtErrorToInterpreterError (Runtime.RTError msg tk) =
+    InterpreterError StageRun msg tk
 
 showValue :: Runtime.RTValue cell -> T.Text
 showValue (Runtime.ValString s) = s
