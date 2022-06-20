@@ -3,13 +3,15 @@
 
 module HSLox.ParserSpec where
 
-import Control.Algebra (run)
+import Control.Algebra (Has, run)
+import Control.Effect.Writer (Writer)
 import Data.Functor ((<&>))
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text qualified as T
+import HSLox.AST qualified as AST
 import HSLox.ASTPrinter (printAST)
 import HSLox.Parser.ByTheBook.Parser qualified as ByTheBook
 import HSLox.Parser.Megaparsec qualified as Megaparsec
@@ -46,11 +48,11 @@ spec = do
       testParserImplementations
         (scan "1 / 2, < 11; \n+2+2; \n-1-1; \n*-4; == 7")
         ( Set.fromList
-            [ ParserError (Just $ Token "<" Token.LESS Nothing 1) "Binary operator < found at the beginning of expression."
-            , ParserError (Just $ Token "+" Token.PLUS Nothing 2) "Binary operator + found at the beginning of expression."
-            , ParserError (Just $ Token "*" Token.STAR Nothing 4) "Binary operator * found at the beginning of expression."
-            , ParserError (Just $ Token "==" Token.EQUAL_EQUAL Nothing 4) "Binary operator == found at the beginning of expression."
-            ]
+          [ ParserError (Just $ Token "<" Token.LESS Nothing 1) "Binary operator < found at the beginning of expression."
+          , ParserError (Just $ Token "+" Token.PLUS Nothing 2) "Binary operator + found at the beginning of expression."
+          , ParserError (Just $ Token "*" Token.STAR Nothing 4) "Binary operator * found at the beginning of expression."
+          , ParserError (Just $ Token "==" Token.EQUAL_EQUAL Nothing 4) "Binary operator == found at the beginning of expression."
+          ]
         , "[ (- (- 1.0) 1.0) ]"
         )
   describe "programs with function calls" $ do
@@ -77,24 +79,24 @@ spec = do
       testParserImplementations
         (scan "var x = 120 / 2; print(x); { var x = 7; print(x); { var y = 7; }")
         ( Set.fromList
-            [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
-            ]
+          [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
+          ]
         , "[ (var x (/ 120.0 2.0)) (print x) ]"
         )
     describe "with nested unterminated blocks" $ do
       testParserImplementations
         (scan "{ { } {")
         ( Set.fromList
-            [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
-            ]
+          [ ParserError (Just $ Token "" Token.EOF Nothing 1) "Expect '}' after block."
+          ]
         , "[ ]"
         )
     describe "with unterminated statement inside block" $ do
       testParserImplementations
         (scan "var x = 120 / 2; print(x); { var x = 7 }")
         ( Set.fromList
-            [ ParserError (Just $ Token "}" Token.RIGHT_BRACE Nothing 1) "Expect ';' after variable declaration."
-            ]
+          [ ParserError (Just $ Token "}" Token.RIGHT_BRACE Nothing 1) "Expect ';' after variable declaration."
+          ]
         , "[ (var x (/ 120.0 2.0)) (print x) ]"
         )
   describe "programs with if statements" $ do
@@ -114,13 +116,13 @@ spec = do
       testParserImplementations
         (scan "if;\n if (;\n if (true;\n if (true) else;\n if (true) {} else;\n if (true) else {};\n {}")
         ( Set.fromList
-            [ ParserError (Just $ Token ";" Token.SEMICOLON Nothing 1) "Expect '(' after 'if'."
-            , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 2) "Expect expression."
-            , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 3) "Expect ')' after if condition."
-            , ParserError (Just $ Token "else" Token.ELSE Nothing 4) "Expect expression."
-            , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 5) "Expect expression."
-            , ParserError (Just $ Token "else" Token.ELSE Nothing 6) "Expect expression."
-            ]
+          [ ParserError (Just $ Token ";" Token.SEMICOLON Nothing 1) "Expect '(' after 'if'."
+          , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 2) "Expect expression."
+          , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 3) "Expect ')' after if condition."
+          , ParserError (Just $ Token "else" Token.ELSE Nothing 4) "Expect expression."
+          , ParserError (Just $ Token ";" Token.SEMICOLON Nothing 5) "Expect expression."
+          , ParserError (Just $ Token "else" Token.ELSE Nothing 6) "Expect expression."
+          ]
         , "[ { } ]"
         )
   describe "programs with logical operators" $ do
@@ -173,17 +175,17 @@ spec = do
     testParserImplementations
       (scan "return true = nil;")
       ( Set.fromList
-          [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
-          ]
+        [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+        ]
       , "[ (return True) ]"
       )
   describe "invalid assignment target, missing ; at end" $ do
     testParserImplementations
       (scan "-24 = -33 nil")
       ( Set.fromList
-          [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
-          , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."
-          ]
+        [ ParserError (Just $ Token "=" Token.EQUAL Nothing 1) "Invalid assignment target."
+        , ParserError (Just $ Token "nil" Token.NIL Nothing 1) "Expect ';' after expression."
+        ]
       , "[ ]"
       )
   describe "programs with classes" $ do
@@ -297,7 +299,15 @@ testParserImplementations tokens expected = do
     it "parses correctly" $
       runParser Megaparsec.parse tokens `shouldBe` expected
 
-runParser :: _ -> Seq Token -> (Set ParserError, T.Text)
+{-# NOINLINE runParser #-}
+runParser ::
+  ( forall m sig.
+    Has (Writer (Set ParserError)) sig m =>
+    Seq Token ->
+    m AST.ProgramI
+  ) ->
+  Seq Token ->
+  (Set ParserError, T.Text)
 runParser parse =
   fmap printAST
     . run
