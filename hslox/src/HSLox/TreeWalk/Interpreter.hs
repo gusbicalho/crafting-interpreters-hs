@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module HSLox.TreeWalk.Interpreter (
@@ -12,15 +13,17 @@ import Control.Applicative ((<|>))
 import Control.Carrier.State.Church qualified as State.Church
 import Control.Effect.Error (Throw)
 import Control.Effect.State qualified as State
-import Control.Monad (when)
-import Data.Foldable (foldl', for_)
+import Control.Monad (unless, when)
+import Data.Foldable qualified as F
 import Data.Function ((&))
-import Data.Functor (($>))
+import Data.Functor.Identity qualified as Identity
 import Data.Kind (Type)
 import Data.Map.Strict qualified as Map
+import Data.Maybe qualified as Maybe
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
+import Data.Traversable qualified as T
 import HSLox.AST qualified as AST
 import HSLox.AST.Meta (WithMeta)
 import HSLox.AST.Meta qualified as AST.Meta
@@ -29,18 +32,22 @@ import HSLox.NativeFns.Effect qualified as NativeFns
 import HSLox.StaticAnalysis.Analyzer qualified as Analyzer
 import HSLox.Token (Token (..))
 import HSLox.Token qualified as Token
+import HSLox.TreeWalk.BuildError (BuildError (..))
+import HSLox.TreeWalk.BuildError qualified as BuildError
 import HSLox.TreeWalk.RTError qualified as RTError
 import HSLox.TreeWalk.RTReturn qualified as RTReturn
 import HSLox.TreeWalk.RTState qualified as RTState
-import HSLox.TreeWalk.Runtime (Runtime)
+import HSLox.TreeWalk.Runtime (RTError (..), Runtime)
 import HSLox.TreeWalk.Runtime qualified as Runtime
 import HSLox.Util qualified as Util
+
+type InterpreterMeta meta = AST.Meta.HasMetaItem Analyzer.ResolverMeta meta
 
 baseEnv ::
   forall cell sig m.
   Has (Cells.Cells cell) sig m =>
   m (Runtime.RTState cell)
-baseEnv = State.Church.execState RTState.newState $ do
+baseEnv = State.Church.execState RTState.newState do
   RTState.defineM @cell "clock" $
     Runtime.NativeDef
       0
@@ -61,39 +68,46 @@ interpret ::
   forall cell sig m meta.
   Has (Cells.Cells cell) sig m =>
   Has NativeFns.NativeFns sig m =>
-  Runtime.RuntimeMeta meta =>
+  InterpreterMeta meta =>
   AST.Program meta ->
   m (Maybe Runtime.RTError)
+{-# INLINE interpret #-}
 interpret prog = do
   env <- baseEnv @cell
   (_, rtError) <- interpretNext env prog
   pure rtError
-{-# INLINE interpret #-}
 
 interpretNext ::
   forall cell sig m meta.
   Has (Cells.Cells cell) sig m =>
   Has NativeFns.NativeFns sig m =>
-  Runtime.RuntimeMeta meta =>
+  InterpreterMeta meta =>
   Runtime.RTState cell ->
   AST.Program meta ->
   m (Runtime.RTState cell, Maybe Runtime.RTError)
-interpretNext env prog =
-  pure prog
-    & (interpretStmt @cell =<<)
-    & RTReturn.runReturn @cell
-    & Util.runErrorToEither @Runtime.RTError
-    & fmap (Util.rightToMaybe . Util.swapEither)
-    & Util.runStateToPair env
 {-# INLINE interpretNext #-}
+interpretNext env prog =
+  interpretStmt prog
+    & Util.runErrorToEither
+    & Identity.runIdentity
+    & \case
+      Left (BuildError msg tk) ->
+        -- TODO propagate BuildError as separate thing
+        pure (env, Just (RTError ("Build error: " <> msg) tk))
+      Right stmt ->
+        Runtime.runAction @cell stmt
+          & RTReturn.runReturn @cell
+          & Util.runErrorToEither @Runtime.RTError
+          & fmap (Util.rightToMaybe . Util.swapEither)
+          & Util.runStateToPair env
 
 showValue :: Runtime.RTValue cell -> T.Text
 showValue (Runtime.ValString s) = s
 showValue (Runtime.ValBool True) = "true"
 showValue (Runtime.ValBool False) = "false"
 showValue Runtime.ValNil = "nil"
-showValue (Runtime.ValFn (Runtime.LoxFn (AST.Function tk _ _ _) _ _)) =
-  "<fn " <> tokenLexeme tk <> ">"
+showValue (Runtime.ValFn Runtime.LoxFn{Runtime.loxFnIdentifier}) =
+  "<fn " <> Maybe.fromMaybe "[anonymous]" loxFnIdentifier <> ">"
 showValue (Runtime.ValClass (Runtime.LoxClass className _ _)) =
   "<class " <> className <> ">"
 showValue (Runtime.ValInstance (Runtime.LoxInstance (Runtime.LoxClass className _ _) _)) =
@@ -106,156 +120,168 @@ showValue (Runtime.ValNum d) = dropZeroDecimal doubleString
     | T.takeEnd 2 numStr == ".0" = T.dropEnd 2 numStr
     | otherwise = numStr
 
-class
-  StmtInterpreter
-    (cell :: Type -> Type)
-    (e :: Type)
-    (m :: Type -> Type)
-  where
-  interpretStmt :: e -> m ()
+class StmtInterpreter (e :: Type) where
+  interpretStmt ::
+    forall cell mBuild sigBuild.
+    ( Monad mBuild
+    , Has (Throw BuildError) sigBuild mBuild
+    ) =>
+    e ->
+    mBuild (Runtime.RuntimeAction cell ())
 
-instance (StmtInterpreter cell e m) => StmtInterpreter cell (WithMeta meta e) m where
+instance (StmtInterpreter e) => StmtInterpreter (WithMeta meta e) where
   {-# INLINE interpretStmt #-}
-  interpretStmt = interpretStmt @cell . AST.Meta.content
+  interpretStmt = interpretStmt . AST.Meta.content
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.Program meta) m
-  where
-  interpretStmt (AST.Program stmts) = for_ stmts (interpretStmt @cell)
-
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.Stmt meta) m
+  (InterpreterMeta meta) =>
+  StmtInterpreter (AST.Program meta)
   where
   {-# INLINE interpretStmt #-}
-  interpretStmt (AST.ExprStmt expr) = interpretExpr @cell expr $> ()
-  interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt @cell decl
-  interpretStmt (AST.FunDeclarationStmt decl) = interpretStmt @cell decl
-  interpretStmt (AST.ClassDeclarationStmt decl) = interpretStmt @cell decl
-  interpretStmt (AST.BlockStmt block) = interpretStmt @cell block
-  interpretStmt (AST.IfStmt ifStmt) = interpretStmt @cell ifStmt
-  interpretStmt (AST.WhileStmt whileStmt) = interpretStmt @cell whileStmt
-  interpretStmt (AST.ReturnStmt return) = interpretStmt @cell return
+  interpretStmt (AST.Program stmts) = do
+    actions <- T.for stmts interpretStmt
+    Runtime.inRuntime \(_ :: p cell) -> do
+      (F.traverse_ (Runtime.runAction @cell) actions)
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.VarDeclaration meta) m
+  (InterpreterMeta meta) =>
+  StmtInterpreter (AST.Stmt meta)
   where
+  {-# INLINE interpretStmt #-}
+  interpretStmt (AST.ExprStmt expr) = do
+    runExpr <- interpretExpr expr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      _ <- Runtime.runAction @cell runExpr
+      pure ()
+  interpretStmt (AST.VarDeclarationStmt decl) = interpretStmt decl
+  interpretStmt (AST.FunDeclarationStmt decl) = interpretStmt decl
+  interpretStmt (AST.ClassDeclarationStmt decl) = interpretStmt decl
+  interpretStmt (AST.BlockStmt block) = interpretStmt block
+  interpretStmt (AST.IfStmt ifStmt) = interpretStmt ifStmt
+  interpretStmt (AST.WhileStmt whileStmt) = interpretStmt whileStmt
+  interpretStmt (AST.ReturnStmt return) = interpretStmt return
+
+instance
+  (InterpreterMeta meta) =>
+  StmtInterpreter (AST.VarDeclaration meta)
+  where
+  {-# INLINE interpretStmt #-}
   interpretStmt (AST.VarDeclaration tk expr) = do
-    val <- interpretExpr @cell expr
-    RTState.defineM (tokenLexeme tk) val
+    let varName = tokenLexeme tk
+    initialize <- interpretExpr expr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      val <- Runtime.runAction @cell initialize
+      RTState.defineM varName val
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.FunDeclaration meta) m
+  (InterpreterMeta meta) =>
+  StmtInterpreter (AST.FunDeclaration meta)
   where
+  {-# INLINE interpretStmt #-}
   interpretStmt (AST.FunDeclaration tk expr) = do
-    let name = tokenLexeme tk
-    val <- interpretExpr @cell expr
-    RTState.defineM @cell name val
+    let fnName = tokenLexeme tk
+    initialize <- interpretExpr expr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      val <- Runtime.runAction @cell initialize
+      RTState.defineM fnName val
 
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.ClassDeclaration meta) m
-  where
-  interpretStmt (AST.ClassDeclaration tk superclassVar methodExprs) = do
-    superclass <- traverse getSuperclass superclassVar
-    RTState.defineM @cell (tokenLexeme tk) Runtime.ValNil
-    classFrame <- case superclass of
-      Nothing -> State.gets (RTState.localFrame @cell)
-      Just super' -> Just <$> RTState.childFrameWithBinding "super" (Runtime.ValClass super')
-    RTState.assignM @cell tk (buildClass superclass classFrame)
+instance (InterpreterMeta meta) => StmtInterpreter (AST.ClassDeclaration meta) where
+  {-# INLINE interpretStmt #-}
+  interpretStmt = \(AST.ClassDeclaration classTk mbSuperclassVar methodExprs) -> do
+    methodTable <- F.foldlM addMethod Map.empty methodExprs
+    let className = tokenLexeme classTk
+    case mbSuperclassVar of
+      Nothing -> Runtime.inRuntime \(_ :: p cell) -> do
+        RTState.defineM @cell className Runtime.ValNil
+        classFrame <- State.gets (RTState.localFrame @cell)
+        RTState.assignM classTk (buildClass className Nothing classFrame methodTable)
+      Just superclassVar -> do
+        resolveSuperclass <- interpretExpr superclassVar
+        Runtime.inRuntime \(_ :: p cell) -> do
+          superclass <- checkSuperIsAClass superclassVar =<< Runtime.runAction resolveSuperclass
+          RTState.defineM @cell className Runtime.ValNil
+          classFrame <- Just <$> RTState.childFrameWithBinding "super" (Runtime.ValClass superclass)
+          RTState.assignM classTk (buildClass className (Just superclass) classFrame methodTable)
    where
-    getSuperclass variable = do
-      super <- interpretExpr @cell variable
+    checkSuperIsAClass variable super = do
       case super of
         Runtime.ValClass super -> pure super
         _ ->
           RTError.throwRT
             (AST.variableIdentifier . AST.Meta.content $ variable)
             "Superclass must be a class."
-    buildClass super frame = Runtime.ValClass $ Runtime.LoxClass (tokenLexeme tk) super (methodTable frame methodExprs)
-    methodTable frame methodExprs = foldl' (addMethod frame) Map.empty methodExprs
+    buildClass className super frame methodTable =
+      Runtime.ValClass $ Runtime.LoxClass className super (fmap ($ frame) methodTable)
+    addMethod table (AST.Meta.content -> methodExpr) = do
+      makeMethod <- compileFn methodExpr (isInit methodExpr)
+      pure $
+        Map.insert
+          (tokenLexeme $ AST.functionMarker methodExpr)
+          makeMethod
+          table
     isInit (AST.Function tk _ _ _) = tokenLexeme tk == "init"
-    addMethod frame table (AST.Meta.content -> methodExpr) =
-      Map.insert
-        (tokenLexeme $ AST.functionMarker methodExpr)
-        (Runtime.LoxFn methodExpr frame (isInit methodExpr))
-        table
 
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.Block meta) m
-  where
-  interpretStmt (AST.Block stmts) =
-    RTState.runInChildEnv @cell $ do
-      for_ stmts (interpretStmt @cell)
+instance (InterpreterMeta meta) => StmtInterpreter (AST.Block meta) where
+  {-# INLINE interpretStmt #-}
+  interpretStmt (AST.Block stmts) = do
+    runStmts <- T.for stmts (interpretStmt)
+    Runtime.inRuntime \(_ :: p cell) -> do
+      RTState.runInChildEnv @cell do
+        F.traverse_ (Runtime.runAction @cell) runStmts
 
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.If meta) m
-  where
+instance (InterpreterMeta meta) => StmtInterpreter (AST.If meta) where
+  {-# INLINE interpretStmt #-}
   interpretStmt (AST.If cond thenStmt elseStmt) = do
-    cond <- interpretExpr @cell cond
-    if isTruthy cond
-      then interpretStmt @cell thenStmt
-      else maybe (pure ()) (interpretStmt @cell) elseStmt
+    runCond <- interpretExpr cond
+    runThen <- interpretStmt thenStmt
+    runElse <- maybe (Runtime.inRuntime \_ -> pure ()) (interpretStmt) elseStmt
+    Runtime.inRuntime \(_ :: p cell) -> do
+      cond <- Runtime.runAction @cell runCond
+      if isTruthy cond
+        then Runtime.runAction @cell runThen
+        else Runtime.runAction @cell runElse
 
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.While meta) m
-  where
-  interpretStmt (AST.While cond body) =
-    Util.whileM (isTruthy <$> interpretExpr @cell cond) $
-      interpretStmt @cell body
+instance (InterpreterMeta meta) => StmtInterpreter (AST.While meta) where
+  {-# INLINE interpretStmt #-}
+  interpretStmt (AST.While cond body) = do
+    runCond <- interpretExpr cond
+    runBody <- interpretStmt body
+    Runtime.inRuntime \(_ :: p cell) -> do
+      Util.whileM (isTruthy <$> Runtime.runAction @cell runCond) do
+        Runtime.runAction @cell runBody
 
-instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  StmtInterpreter cell (AST.Return meta) m
-  where
+instance (InterpreterMeta meta) => StmtInterpreter (AST.Return meta) where
+  {-# INLINE interpretStmt #-}
   interpretStmt (AST.Return tk expr) = do
     case expr of
       Just expr -> do
-        val <- interpretExpr @cell expr
-        RTReturn.throwReturn tk val
-      Nothing -> RTReturn.throwReturn @cell tk Runtime.ValNil
+        runVal <- interpretExpr expr
+        Runtime.inRuntime \(_ :: p cell) -> do
+          val <- Runtime.runAction @cell runVal
+          RTReturn.throwReturn tk val
+      Nothing -> do
+        Runtime.inRuntime \(_ :: p cell) -> do
+          RTReturn.throwReturn @cell tk Runtime.ValNil
 
-class
-  ExprInterpreter
-    (cell :: Type -> Type)
-    (e :: Type)
-    (m :: Type -> Type)
-  where
-  interpretExpr :: e -> m (Runtime.RTValue cell)
-
-instance (ExprInterpreter cell e m) => ExprInterpreter cell (WithMeta meta e) m where
-  {-# INLINE interpretExpr #-}
-  interpretExpr = interpretExpr @cell . AST.Meta.content
+class ExprInterpreter (e :: Type) where
+  interpretExpr ::
+    forall cell mBuild sigBuild.
+    ( Monad mBuild
+    , Has (Throw BuildError) sigBuild mBuild
+    ) =>
+    e ->
+    mBuild (Runtime.RuntimeAction cell (Runtime.RTValue cell))
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.Expr meta) m
+  ExprInterpreter e =>
+  ExprInterpreter (WithMeta meta e)
+  where
+  {-# INLINE interpretExpr #-}
+  interpretExpr = interpretExpr . AST.Meta.content
+
+instance
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.Expr meta)
   where
   {-# INLINE interpretExpr #-}
   interpretExpr (AST.UnaryExpr t) = interpretExpr t
@@ -275,210 +301,273 @@ instance
 
 instance
   {-# OVERLAPPING #-}
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (WithMeta meta AST.This) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (WithMeta meta AST.This)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr this = do
     let (AST.This tk) = AST.Meta.content this
     let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta this
-    RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
+    let scopeDistance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
+    Runtime.inRuntime \(_ :: p cell) -> do
+      RTState.getBoundValueAtM tk scopeDistance
 
 instance
   {-# OVERLAPPING #-}
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (WithMeta meta AST.Variable) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (WithMeta meta AST.Variable)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr variable = do
     let (AST.Variable tk) = AST.Meta.content variable
     let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta variable
-    RTState.getBoundValueAtM tk (Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta)
+    let scopeDistance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
+    Runtime.inRuntime \(_ :: p cell) -> do
+      RTState.getBoundValueAtM tk scopeDistance
 
 instance
   {-# OVERLAPPING #-}
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (WithMeta meta (AST.Assignment meta)) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (WithMeta meta (AST.Assignment meta))
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr assignment = do
     let (AST.Assignment tk expr) = AST.Meta.content assignment
-    val <- interpretExpr expr
     let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta assignment
     let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
-    RTState.assignAtM tk distance val
-    pure val
+    runVal <- interpretExpr expr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      val <- Runtime.runAction runVal
+      RTState.assignAtM tk distance val
+      pure val
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.Ternary meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.Ternary meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Ternary left op1 middle op2 right) = do
-    leftVal <- interpretExpr @cell left
-    case (tokenType op1, tokenType op2) of
-      (Token.QUESTION_MARK, Token.COLON) ->
-        if isTruthy leftVal
-          then interpretExpr middle
-          else interpretExpr right
-      _ ->
-        RTError.throwRT op2 $
-          "AST Error: Operator pair "
-            <> tokenLexeme op1
-            <> " and "
-            <> tokenLexeme op2
-            <> " not supported in ternary position"
+    runLeft <- interpretExpr left
+    runMiddle <- interpretExpr middle
+    runRight <- interpretExpr right
+    unless (tokenType op1 == Token.QUESTION_MARK && tokenType op2 == Token.COLON) do
+      BuildError.throwBuildError op2 $
+        "AST Error: Operator pair "
+          <> tokenLexeme op1
+          <> " and "
+          <> tokenLexeme op2
+          <> " not supported in ternary position"
+    Runtime.inRuntime \(_ :: p cell) -> do
+      leftVal <- Runtime.runAction @cell runLeft
+      if isTruthy leftVal
+        then Runtime.runAction runMiddle
+        else Runtime.runAction runRight
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.Logical meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.Logical meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Logical left op right) = do
-    leftVal <- interpretExpr left
-    case tokenType op of
-      Token.OR ->
-        if isTruthy leftVal
-          then pure leftVal
-          else interpretExpr right
-      Token.AND ->
-        if not . isTruthy $ leftVal
-          then pure leftVal
-          else interpretExpr right
+    runLeft <- interpretExpr left
+    runRight <- interpretExpr right
+    shouldStopOnLeftVal <- case tokenType op of
+      Token.OR -> pure isTruthy
+      Token.AND -> pure (not . isTruthy)
       _ ->
-        RTError.throwRT op $
+        BuildError.throwBuildError op $
           "AST Error: Operator "
             <> tokenLexeme op
             <> " not supported in logical position"
+    Runtime.inRuntime \(_ :: p cell) -> do
+      leftVal <- Runtime.runAction runLeft
+      if shouldStopOnLeftVal leftVal
+        then pure leftVal
+        else Runtime.runAction runRight
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
+  ( InterpreterMeta meta
   ) =>
-  ExprInterpreter cell (AST.Binary meta) m
+  ExprInterpreter (AST.Binary meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Binary left op right) = do
-    leftVal <- interpretExpr left
-    rightVal <- interpretExpr right
-    case tokenType op of
-      Token.COMMA -> pure rightVal
-      Token.PLUS -> sumVals op leftVal rightVal
-      Token.MINUS -> applyNumericOp op (-) leftVal rightVal
-      Token.STAR -> applyNumericOp op (*) leftVal rightVal
-      Token.SLASH -> applyNumericOp op (/) leftVal rightVal
-      Token.GREATER -> applyComparisonOp op (>) leftVal rightVal
-      Token.GREATER_EQUAL -> applyComparisonOp op (>=) leftVal rightVal
-      Token.LESS -> applyComparisonOp op (<) leftVal rightVal
-      Token.LESS_EQUAL -> applyComparisonOp op (<=) leftVal rightVal
-      Token.EQUAL_EQUAL -> pure . Runtime.ValBool $ isEqual leftVal rightVal
-      Token.BANG_EQUAL -> pure . Runtime.ValBool . not $ isEqual leftVal rightVal
+    runLeft <- interpretExpr left
+    runRight <- interpretExpr right
+    runOp <- case tokenType op of
+      Token.COMMA -> pure \_l r -> Runtime.RuntimeAction (pure r)
+      Token.PLUS -> pure $ sumVals op
+      Token.MINUS -> pure $ applyNumericOp op (-)
+      Token.STAR -> pure $ applyNumericOp op (*)
+      Token.SLASH -> pure $ applyNumericOp op (/)
+      Token.GREATER -> pure $ applyComparisonOp op (>)
+      Token.GREATER_EQUAL -> pure $ applyComparisonOp op (>=)
+      Token.LESS -> pure $ applyComparisonOp op (<)
+      Token.LESS_EQUAL -> pure $ applyComparisonOp op (<=)
+      Token.EQUAL_EQUAL -> pure \l r -> Runtime.RuntimeAction $ pure . Runtime.ValBool $ isEqual l r
+      Token.BANG_EQUAL -> pure \l r -> Runtime.RuntimeAction $ pure . Runtime.ValBool . not $ isEqual l r
       _ ->
-        RTError.throwRT op $
+        BuildError.throwBuildError op $
           "AST Error: Operator "
             <> tokenLexeme op
             <> " not supported in binary position"
+    Runtime.inRuntime \(_ :: p cell) -> do
+      left <- Runtime.runAction runLeft
+      right <- Runtime.runAction runRight
+      Runtime.runAction @cell (runOp left right)
    where
-    applyNumericOp opTk op v1 v2 = Runtime.ValNum . uncurry op <$> numericOperands opTk v1 v2
-    applyComparisonOp opTk op v1 v2 = Runtime.ValBool . uncurry op <$> numericOperands opTk v1 v2
-    sumVals _ (Runtime.ValNum d1) (Runtime.ValNum d2) = pure $ Runtime.ValNum (d1 + d2)
-    sumVals _ (Runtime.ValString s1) (Runtime.ValString s2) = pure $ Runtime.ValString (s1 <> s2)
-    sumVals opTk _ _ = RTError.throwRT opTk "Operands must be two numbers or two strings."
+    applyNumericOp opTk op v1 v2 = Runtime.RuntimeAction do
+      Runtime.ValNum . uncurry op <$> numericOperands opTk v1 v2
+    applyComparisonOp opTk op v1 v2 = Runtime.RuntimeAction do
+      Runtime.ValBool . uncurry op <$> numericOperands opTk v1 v2
+    sumVals _ (Runtime.ValNum d1) (Runtime.ValNum d2) = Runtime.RuntimeAction do
+      pure $ Runtime.ValNum (d1 + d2)
+    sumVals _ (Runtime.ValString s1) (Runtime.ValString s2) = Runtime.RuntimeAction do
+      pure $ Runtime.ValString (s1 <> s2)
+    sumVals opTk _ _ = Runtime.RuntimeAction do
+      RTError.throwRT opTk "Operands must be two numbers or two strings."
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.Unary meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.Unary meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Unary op expr) = do
-    val <- interpretExpr @cell expr
-    case tokenType op of
-      Token.BANG -> pure . Runtime.ValBool . not . isTruthy $ val
-      Token.MINUS -> Runtime.ValNum . negate <$> numericOperand op val
+    runVal <- interpretExpr expr
+    runOp <- case tokenType op of
+      Token.BANG -> pure \val -> Runtime.RuntimeAction do
+        pure . Runtime.ValBool . not . isTruthy $ val
+      Token.MINUS -> pure \val -> Runtime.RuntimeAction do
+        number <- numericOperand op val
+        pure . Runtime.ValNum . negate $ number
       _ ->
-        RTError.throwRT op $
+        BuildError.throwBuildError op $
           "AST Error: Operator "
             <> tokenLexeme op
             <> " not supported in unary position"
+    Runtime.inRuntime \(_ :: p cell) -> do
+      val <- Runtime.runAction @cell runVal
+      Runtime.runAction @cell (runOp val)
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
+  ( InterpreterMeta meta
   ) =>
-  ExprInterpreter cell (AST.Grouping meta) m
+  ExprInterpreter (AST.Grouping meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Grouping expr) = interpretExpr expr
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
+  ( InterpreterMeta meta
   ) =>
-  ExprInterpreter cell (AST.Function meta) m
+  ExprInterpreter (AST.Function meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr fn = do
-    frame <- State.gets (RTState.localFrame @cell)
-    pure . Runtime.ValFn $ Runtime.LoxFn fn frame False
+    makeFn <- compileFn fn False
+    Runtime.inRuntime \(_ :: p cell) -> do
+      frame <- State.gets RTState.localFrame
+      pure . Runtime.ValFn $ makeFn frame
 
-instance Runtime cell sig m => ExprInterpreter cell AST.Literal m where
-  interpretExpr (AST.LitString s) = pure $ Runtime.ValString s
-  interpretExpr (AST.LitNum d) = pure $ Runtime.ValNum d
-  interpretExpr (AST.LitBool b) = pure $ Runtime.ValBool b
-  interpretExpr AST.LitNil = pure Runtime.ValNil
+compileFn ::
+  forall cell meta mBuild sigBuild.
+  ( InterpreterMeta meta
+  , Has (Throw BuildError) sigBuild mBuild
+  ) =>
+  AST.Function meta ->
+  Bool ->
+  mBuild
+    ( Maybe (Runtime.RTFrame cell) ->
+      Runtime.LoxFn cell
+    )
+{-# INLINE compileFn #-}
+compileFn fnExpr@(AST.Function _ fnRecTk params _) isInit = do
+  let fnRecId = Token.tokenLexeme <$> fnRecTk
+  let paramIds = Token.tokenLexeme <$> params
+  bodyAction <- interpretStmt (AST.functionBody fnExpr)
+  let fnAction frame self args =
+        Runtime.RuntimeAction @cell do
+          RTReturn.catchReturn do
+            RTState.runInChildEnvOf frame do
+              case fnRecId of
+                Just fnName -> RTState.defineM fnName self
+                Nothing -> pure ()
+              F.for_ (Seq.zip paramIds args) $ \(param, arg) -> do
+                RTState.defineM param arg
+              Runtime.runAction @cell bodyAction
+              pure Runtime.ValNil
+  pure \frame ->
+    Runtime.LoxFn
+      { Runtime.loxClosedEnv = frame
+      , Runtime.loxFnIdentifier = fnRecId
+      , Runtime.loxFnIsInitializer = isInit
+      , Runtime.loxFnArity = Seq.length params
+      , Runtime.loxFnAction = fnAction
+      }
+
+instance ExprInterpreter AST.Literal where
+  {-# INLINE interpretExpr #-}
+  interpretExpr (AST.LitString s) = Runtime.inRuntime \(_ :: p cell) -> do
+    pure $ Runtime.ValString s
+  interpretExpr (AST.LitNum d) = Runtime.inRuntime \(_ :: p cell) -> do
+    pure $ Runtime.ValNum d
+  interpretExpr (AST.LitBool b) = Runtime.inRuntime \(_ :: p cell) -> do
+    pure $ Runtime.ValBool b
+  interpretExpr AST.LitNil = Runtime.inRuntime \(_ :: p cell) -> do
+    pure $ Runtime.ValNil
 
 instance
   {-# OVERLAPPING #-}
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (WithMeta meta AST.Super) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (WithMeta meta AST.Super)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr super = do
     let (AST.Super keyword propertyName) = AST.Meta.content super
     let resolverMeta = AST.Meta.getMetaItem @Analyzer.ResolverMeta super
     let distance = Analyzer.resolverMetaLocalVariableScopeDistance resolverMeta
-    superclass <- RTState.getBoundValueAtM @cell keyword distance
-    superclass <- case superclass of
-      Runtime.ValClass superclass -> pure superclass
-      _ -> RTError.throwRT keyword $ "Invalid 'super' binding, expected a class, found " <> showValue superclass
-    this <- RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (pred <$> distance)
-    this <- case this of
-      Runtime.ValInstance inst -> pure inst
-      _ -> RTError.throwRT keyword $ "Invalid 'this' binding, expected an instance, found " <> showValue this
     let methodName = tokenLexeme propertyName
-    case findMethod methodName superclass of
-      Just method -> Runtime.ValFn <$> bindThis this method
-      _ -> RTError.throwRT propertyName $ "Undefined method '" <> methodName <> "'."
+    Runtime.inRuntime \(_ :: p cell) -> do
+      superclass <- RTState.getBoundValueAtM keyword distance
+      superclass <- case superclass of
+        Runtime.ValClass superclass -> pure superclass
+        _ -> RTError.throwRT keyword $ "Invalid 'super' binding, expected a class, found " <> showValue superclass
+      this <- RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (pred <$> distance)
+      this <- case this of
+        Runtime.ValInstance inst -> pure inst
+        _ -> RTError.throwRT keyword $ "Invalid 'this' binding, expected an instance, found " <> showValue this
+      case findMethod methodName superclass of
+        Just method -> Runtime.ValFn <$> bindThis this method
+        _ -> RTError.throwRT propertyName $ "Undefined method '" <> methodName <> "'."
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.GetProperty meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.GetProperty meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.GetProperty objectExpr tk) = do
-    object <- interpretExpr objectExpr
-    case object of
-      Runtime.ValInstance inst -> getProperty @cell inst tk
-      _ -> RTError.throwRT tk "Only instances have properties."
+    runObject <- interpretExpr objectExpr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      object <- Runtime.runAction runObject
+      case object of
+        Runtime.ValInstance inst -> getProperty inst tk
+        _ -> RTError.throwRT tk "Only instances have properties."
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.SetProperty meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.SetProperty meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.SetProperty objectExpr tk valueExpr) = do
-    object <- interpretExpr objectExpr
-    case object of
-      Runtime.ValInstance inst -> do
-        value <- interpretExpr valueExpr
-        setProperty @cell inst tk value
-      _ -> RTError.throwRT tk "Only instances have properties."
+    runObject <- interpretExpr objectExpr
+    runValue <- interpretExpr valueExpr
+    Runtime.inRuntime \(_ :: p cell) -> do
+      object <- Runtime.runAction runObject
+      case object of
+        Runtime.ValInstance inst -> do
+          value <- Runtime.runAction runValue
+          setProperty inst tk value
+        _ -> RTError.throwRT tk "Only instances have properties."
 
 getProperty ::
   forall cell sig m.
@@ -486,6 +575,7 @@ getProperty ::
   Runtime.LoxInstance cell ->
   Token ->
   m (Runtime.RTValue cell)
+{-# INLINE getProperty #-}
 getProperty inst@(Runtime.LoxInstance klass properties) propertyName = do
   let name = tokenLexeme propertyName
   props <- Cells.readCell properties
@@ -497,6 +587,7 @@ getProperty inst@(Runtime.LoxInstance klass properties) propertyName = do
         Nothing -> RTError.throwRT propertyName $ "Undefined property '" <> name <> "'."
 
 findMethod :: T.Text -> Runtime.LoxClass cell -> Maybe (Runtime.LoxFn cell)
+{-# INLINE findMethod #-}
 findMethod name (Runtime.LoxClass _ superclass methodTable) =
   Map.lookup name methodTable <|> (findMethod name =<< superclass)
 
@@ -505,9 +596,11 @@ bindThis ::
   Runtime.LoxInstance cell ->
   Runtime.LoxFn cell ->
   m (Runtime.LoxFn cell)
-bindThis inst (Runtime.LoxFn function env isInit) = RTState.runInChildEnvOf env $ do
+{-# INLINE bindThis #-}
+bindThis inst loxFn@Runtime.LoxFn{Runtime.loxClosedEnv = env} = RTState.runInChildEnvOf env do
   RTState.defineM "this" (Runtime.ValInstance inst)
-  Runtime.LoxFn function <$> State.gets RTState.localFrame <*> pure isInit
+  frame <- State.gets RTState.localFrame
+  pure $ loxFn{Runtime.loxClosedEnv = frame}
 
 setProperty ::
   forall cell sig m.
@@ -516,25 +609,28 @@ setProperty ::
   Token ->
   Runtime.RTValue cell ->
   m (Runtime.RTValue cell)
+{-# INLINE setProperty #-}
 setProperty (Runtime.LoxInstance _klass properties) propertyName value = do
   let name = tokenLexeme propertyName
   Cells.updateCell (Map.insert name value) properties
   pure value
 
 instance
-  ( Runtime cell sig m
-  , Runtime.RuntimeMeta meta
-  ) =>
-  ExprInterpreter cell (AST.Call meta) m
+  (InterpreterMeta meta) =>
+  ExprInterpreter (AST.Call meta)
   where
+  {-# INLINE interpretExpr #-}
   interpretExpr (AST.Call calleeExpr paren argExprs) = do
-    callee <- interpretExpr @cell calleeExpr
-    args <- traverse interpretExpr argExprs
-    case callee of
-      Runtime.ValFn fn -> call paren fn args
-      Runtime.ValClass klass -> call paren klass args
-      Runtime.ValNativeFn nativeFn -> call paren nativeFn args
-      _ -> RTError.throwRT paren "Can only call functions and classes."
+    runCallee <- interpretExpr calleeExpr
+    runArgs <- traverse (interpretExpr) argExprs
+    Runtime.inRuntime \(_ :: p cell) -> do
+      callee <- Runtime.runAction @cell runCallee
+      args <- T.traverse Runtime.runAction runArgs
+      case callee of
+        Runtime.ValFn fn -> call paren fn args
+        Runtime.ValClass klass -> call paren klass args
+        Runtime.ValNativeFn nativeFn -> call paren nativeFn args
+        _ -> RTError.throwRT paren "Can only call functions and classes."
 
 call ::
   forall cell e sig m.
@@ -544,6 +640,7 @@ call ::
   e ->
   Seq (Runtime.RTValue cell) ->
   m (Runtime.RTValue cell)
+{-# INLINE call #-}
 call paren callee args = do
   arity <- loxArity @cell callee
   let argCount = Seq.length args
@@ -561,26 +658,29 @@ class LoxCallable cell e m where
   loxCall :: Token -> e -> Seq (Runtime.RTValue cell) -> m (Runtime.RTValue cell)
 
 instance Runtime cell sig m => LoxCallable cell (Runtime.LoxFn cell) m where
-  loxArity (Runtime.LoxFn (AST.Function _ _ params _) _ _) = pure (Seq.length params)
-  loxCall _ fn@(Runtime.LoxFn (AST.Function _ fnRecId params body) env isInit) args = do
-    returnVal <- RTReturn.catchReturn $
-      RTState.runInChildEnvOf env $ do
-        case fnRecId of
-          Just fnName -> RTState.defineM (Token.tokenLexeme fnName) (Runtime.ValFn fn)
-          Nothing -> pure ()
-        for_ (Seq.zip params args) $ \(param, arg) -> do
-          RTState.defineM (tokenLexeme param) arg
-        interpretStmt @cell body
-        pure Runtime.ValNil
-    if isInit
-      then RTState.runInChildEnvOf env $ do
-        RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (Just 1)
-      else pure returnVal
+  {-# INLINE loxArity #-}
+  loxArity Runtime.LoxFn{Runtime.loxFnArity} = pure loxFnArity
+  {-# INLINE loxCall #-}
+  loxCall
+    _
+    fn@Runtime.LoxFn
+      { Runtime.loxClosedEnv = env
+      , Runtime.loxFnIsInitializer = isInit
+      , Runtime.loxFnAction = bodyAction
+      }
+    args = do
+      returnVal <- Runtime.runAction (bodyAction env (Runtime.ValFn fn) args)
+      if isInit
+        then RTState.runInChildEnvOf env do
+          RTState.getBoundValueAtM (Token "this" Token.THIS Nothing 0) (Just 1)
+        else pure returnVal
 
 instance Runtime cell sig m => LoxCallable cell (Runtime.LoxClass cell) m where
+  {-# INLINE loxArity #-}
   loxArity klass = case findMethod "init" klass of
     Nothing -> pure 0
     Just fn -> loxArity @cell fn
+  {-# INLINE loxCall #-}
   loxCall tk klass args = do
     instanceState <- Cells.newCell @cell Map.empty
     let inst = Runtime.LoxInstance klass instanceState
@@ -593,14 +693,18 @@ instance Runtime cell sig m => LoxCallable cell (Runtime.LoxClass cell) m where
     pure $ Runtime.ValInstance inst
 
 instance Runtime cell sig m => LoxCallable cell Runtime.LoxNativeFn m where
+  {-# INLINE loxArity #-}
   loxArity (Runtime.LoxNativeFn arity _) = pure arity
+  {-# INLINE loxCall #-}
   loxCall tk (Runtime.LoxNativeFn _ impl) args = Runtime.runNativeFnImpl impl tk args
 
+{-# INLINE isTruthy #-}
 isTruthy :: Runtime.RTValue cell -> Bool
 isTruthy (Runtime.ValBool b) = b
 isTruthy Runtime.ValNil = False
 isTruthy _ = True
 
+{-# INLINE isEqual #-}
 isEqual :: Runtime.RTValue cell -> Runtime.RTValue cell -> Bool
 isEqual (Runtime.ValString s1) (Runtime.ValString s2) = s1 == s2
 isEqual (Runtime.ValNum d1) (Runtime.ValNum d2) = d1 == d2
@@ -608,6 +712,7 @@ isEqual (Runtime.ValBool b1) (Runtime.ValBool b2) = b1 == b2
 isEqual Runtime.ValNil Runtime.ValNil = True
 isEqual _ _ = False
 
+{-# INLINE numericOperand #-}
 numericOperand ::
   Has (Throw Runtime.RTError) sig m =>
   Token ->
@@ -616,6 +721,7 @@ numericOperand ::
 numericOperand _ (Runtime.ValNum n) = pure n
 numericOperand opTk _ = RTError.throwRT opTk "Operand must be a number."
 
+{-# INLINE numericOperands #-}
 numericOperands ::
   Has (Throw Runtime.RTError) sig m =>
   Token ->

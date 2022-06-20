@@ -90,6 +90,7 @@ library
       HSLox.StaticAnalysis.Stack
       HSLox.Token
       HSLox.TreeWalk.Interpreter
+      HSLox.TreeWalk.BuildError
       HSLox.TreeWalk.RTError
       HSLox.TreeWalk.RTReturn
       HSLox.TreeWalk.RTState
@@ -108,10 +109,6 @@ library
     , mtl
     , text
     , generic-data
-  -- ghc-options: -fexpose-all-unfoldings
-  --              -fspecialise-aggressively
-  --              -fcross-module-specialise
-  --              -flate-specialise
 
 executable hslox-exe
   import: common-options
